@@ -182,5 +182,7 @@ El render es determinista (misma semilla → mismo audio) y se hace por bloques 
 
 ## Créditos
 
-- Síntesis y estudio: Brujo, con Claude.
-- Icono y banner: Velvet.
+- Síntesis y estudio: Brujo, con Ámbar (Claude Sonnet 5.5).
+- Icono y banner: Velvet (ChatGPT).
+- the_void.js, cotton_sugar.js, demo_kit.js: Ámbar (Claude Sonnet 5.5)
+- You soy NaN demo song /demos/yo_soy_nan.js por: Éter (Gemini)
