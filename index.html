@@ -3,7 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Estudio Demo Kit</title>
+<title>Demo Kit</title>
+<meta name="description" content="A tiny procedural synth studio. Runs in your browser.">
+<link rel="icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="assets/icon.png">
+<meta name="theme-color" content="#0d0e12">
+<meta property="og:type" content="website">
+<meta property="og:title" content="dk — demo kit">
+<meta property="og:description" content="A tiny procedural synth studio. Runs in your browser.">
+<meta property="og:image" content="https://mialmoga.github.io/demo-kit/assets/banner.png">
+<meta name="twitter:card" content="summary_large_image">
 <style>
 :root{--bg:#0d0e12;--p:#14161c;--p2:#1a1d25;--b:#272b36;--t:#e7e9ef;--m:#8b92a3;--a:#8fa8ff;--a2:#ff7ab8;--ok:#6ee7a8;--err:#ff6b6b}
 *{box-sizing:border-box}
@@ -26,7 +35,9 @@ header .brand span{color:var(--m);font-weight:400}
 .grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .grp label{color:var(--m);display:flex;gap:4px;align-items:center}
 #pname{width:150px}
-#stat{margin-left:auto;color:var(--m);font-size:12px}
+#repo{margin-left:auto;color:var(--m);text-decoration:none;font-size:12px}
+#repo:hover{color:var(--a)}
+#stat{color:var(--m);font-size:12px}
 #stat.warn{color:#ffd166}
 #prog{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--a2);transition:width .1s}
 main{flex:1;min-height:0;display:grid;grid-template-columns:250px minmax(0,1fr) 300px}
@@ -95,7 +106,7 @@ details summary{cursor:pointer;color:var(--a)}
 </head>
 <body>
 <header>
-  <div class="brand">🎹 Estudio <span>· demo kit</span></div>
+  <div class="brand"><img src="assets/icon.png" onerror="this.onerror=null;this.src='favicon.ico'" alt="dk" width="28" height="28" style="vertical-align:middle;border-radius:7px;margin-right:6px"> Demo Kit</div>
   <div class="grp">
     <button id="bPlay" class="pri">▶ Play</button>
     <button id="bStop">■</button>
@@ -114,6 +125,7 @@ details summary{cursor:pointer;color:var(--a)}
     <button id="bWav">⬇ WAV</button>
     <button id="bLib">Demos y plugins</button>
   </div>
+  <a id="repo" href="https://github.com/mialmoga/demo-kit" target="_blank" rel="noopener" title="Código en GitHub">GitHub ↗</a>
   <div id="stat"></div>
   <div id="prog"></div>
 </header>
