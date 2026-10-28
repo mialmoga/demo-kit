@@ -21,7 +21,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 ## Uso rápido
 
-1. Abre la versión en línea: **<https://mialmoga.github.io/demo-kit/>**. O descarga `demo_kit_studio.html` y ábrelo con doble clic (no necesita servidor; el favicon y las imágenes vienen de `favicon.ico` y `assets/`, así que sin ellos el HTML funciona igual pero sin iconos).
+1. Abre la versión en línea: **<https://mialmoga.github.io/demo-kit/>**. O descarga `studio_demo_kit.html` y ábrelo con doble clic (no necesita servidor; el favicon y las imágenes vienen de `favicon.ico` y `assets/`, así que sin ellos el HTML funciona igual pero sin iconos).
 2. «Demos y plugins» → «Cargar proyecto de ejemplo», y dale **Play**.
 3. O arrastra `the_void.js` / `cotton_sugar.js` a la ventana y pulsa **«✎ Convertir en editable»**.
 
