@@ -112,6 +112,7 @@ Resultado actual con las demos incluidas:
 |---|---|---|
 | Cotton Sugar | 15 | 1928 |
 | The Void | 17 | 1693 |
+| Yo soy NaN | 11 | 322 |
 
 Límites a tener en cuenta:
 
@@ -119,6 +120,66 @@ Límites a tener en cuenta:
 - Los `add()` con funciones propias que no se pueden parametrizar (el sub del drop de The Void, por ejemplo) quedan como pista **«Clip»** con audio horneado. Funcionan, pero no son editables, y hacen que el proyecto guardado pese más (≈ 9 MB en The Void). Rehacer esa pista con un instrumento como «Sub con caída» la vuelve editable.
 - Los ajustes que cambian nota por nota (un filtro que se abre a lo largo de una sección, por ejemplo) se conservan por nota y se marcan con un punto blanco; hay un botón para unificarlos con los controles de la pista.
 - La conversión reconoce funciones auxiliares conocidas (`reese`, `growl`, `rim`, `wash`, `impact`) por su nombre. Una demo con helpers nuevos los trata como `add()` horneados.
+
+## Escribir demos compatibles (para humanos e IAs)
+
+Una demo es un archivo `.js` con una función `async` que usa `demoKit` y devuelve el audio. Si solo usa las funciones nombradas del kit, **se convierte en un proyecto completamente editable**. *Yo soy NaN* la escribió una IA (Éter) viendo el kit y un par de ejemplos, y convirtió a la primera.
+
+**El contrato**
+
+```js
+// ── Título de la demo · lo que quieras ──      ← el texto antes del primer «·» es el nombre del proyecto
+// BPM = 100 | BARS = 4                           ← BPM y BARS: el convertidor los busca con estos nombres en mayúsculas
+async function renderLoQueSea(sr, onProg) {      // el nombre debe empezar con «render»
+  const K = demoKit(sr, BARS*bar + 2.5, 20261015);   // segundos totales (+2.5 s de cola) y semilla
+  // ... llamadas a K.kick, K.syn, K.bell, etc.
+  return K.mix(duckAt);                          // duckAt(t) → ganancia de la música (1 = sin sidechain)
+}
+```
+
+**Qué se convierte en notas editables**
+
+| En la demo | En el estudio |
+|---|---|
+| `K.kick` `K.snare` `K.clap` `K.snap` `K.hat` `K.crash` | pistas de batería (el hi-hat abierto va en el segundo carril) |
+| `K.syn(buf, …)` | pistas «Sinte» (se agrupan por onda, envolvente y desafine), con ganancia, voces, filtro y envolvente como sliders |
+| `K.bell` `K.chop` `K.riser` `K.sweep` | sus instrumentos, con parámetros |
+| funciones propias llamadas `reese` `growl` `rim` `wash` `impact` | sus instrumentos (se reconocen por el nombre) |
+| `K.mix(duckAt)`, la función que quieras | una curva de sidechain guardada como tabla |
+
+**Qué no se convierte, y cómo evitarlo**
+
+- `K.add` con una función propia (osciladores o filtros escritos a mano) queda como pista **«Clip»**: suena igual, pero no es editable. Para que sea editable, expresa ese sonido con `K.syn` o escribe un [plugin](#plugins-instrumentos-propios).
+- Un filtro que no sea un número ni la forma `t => base + barrido * Math.exp(-t * velocidad)` se conserva como función propia, en vez de sliders. El sonido es idéntico; solo ese parámetro no es ajustable con un slider.
+- Si no hay `BPM = N` (mayúsculas) ni «N BPM» en el archivo, se asume 120. Si no hay `BARS = N`, los compases se deducen de la duración.
+- Los demos corren en la página con `demoKit` y `sleep` disponibles. No hay archivos ni red.
+
+**Un ejemplo mínimo** (convierte en 5 pistas y 72 notas):
+
+```js
+// ── Ejemplo mínimo · demo para Demo Kit ──
+// BPM = 100 | BARS = 4
+async function renderEjemplo(sr, onProg) {
+  const BPM = 100, BARS = 4, beat = 60 / BPM, bar = beat * 4;
+  const K = demoKit(sr, BARS * bar + 2.5, 20261015);
+  const kicks = [];
+  for (let b = 0; b < BARS; b++) {
+    const t0 = b * bar;
+    for (let i = 0; i < 4; i++) { K.kick(t0 + i * beat, 0.9); kicks.push(t0 + i * beat); }
+    K.clap(t0 + beat, 0.5); K.clap(t0 + 3 * beat, 0.5);
+    for (let h = 0; h < 8; h++) K.hat(t0 + h * beat / 2, h % 2 ? 0.1 : 0.2, false, h % 2 ? 0.3 : -0.3);
+    [57, 60, 64].forEach(m => K.syn(K.mu, t0, bar * 0.95, K.hz(m), 0.1, 0, { w: 0, atk: 0.2, rel: 0.3, det: [-8, 0, 8], lp: 1200 }));
+    K.syn(K.mu, t0, beat * 0.9, K.hz(33), 0.4, 0, { w: 2, atk: 0.01, rel: 0.1, lp: 400 });
+    if (onProg) onProg(b / BARS);
+  }
+  const duckAt = t => { let g = 1; for (const k of kicks) { const d = t - k; if (d >= 0 && d < 0.25) g = Math.min(g, 0.4 + 0.6 * (d / 0.25)); } return g; };
+  return K.mix(duckAt);
+}
+```
+
+**Pedirle una demo a una IA:** pásale `demo_kit.js`, este ejemplo (o `yo_soy_nan.js`) y algo como:
+
+> Escribe una demo para Demo Kit en el estilo del ejemplo: una sola función `async function renderXxx(sr, onProg)`, con `BPM = N` y `BARS = N` en el encabezado, que use solo funciones de `demoKit` (`kick`, `snare`, `clap`, `hat`, `syn`, `bell`, `chop`, `riser`, `sweep`, `crash`) y termine con `return K.mix(duckAt)`. Sin `K.add` propios. Estilo: …
 
 ## Plugins (instrumentos propios)
 
@@ -223,7 +284,7 @@ El render es determinista (misma semilla → mismo audio) y se hace por bloques 
 
 ## Créditos
 
-- Síntesis y estudio: Brujo, con Ámbar (Claude Sonnet 5.5).
-- Icono y banner: Velvet (ChatGPT).
-- the_void.js, cotton_sugar.js, demo_kit.js: Ámbar (Claude Sonnet 5.5)
-- You soy NaN demo song /demos/yo_soy_nan.js por: Éter (Gemini)
+* Síntesis y estudio: Brujo, con Ámbar (Claude Sonnet 5.5).
+* Icono y banner: Velvet (ChatGPT).
+* `the_void.js`, `cotton_sugar.js`, `demo_kit.js`: Ámbar (Claude Sonnet 5.5).
+* *Yo soy NaN* en `/demos/yo_soy_nan.js`: Éter (Gemini).
