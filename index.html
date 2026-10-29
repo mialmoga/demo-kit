@@ -60,6 +60,11 @@ aside{background:var(--p);overflow:auto;min-height:0}
 .rtool{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:6px 8px;background:var(--p);border-bottom:1px solid var(--b)}
 .rtool .nm{font-weight:600}
 .rtool .sp{flex:1}
+.rtool .live{gap:4px;padding-left:10px;border-left:1px solid var(--b)}
+#oct{min-width:26px;text-align:center;font-variant-numeric:tabular-nums;color:var(--a)}
+#midiIn{max-width:150px}
+#bRec.armed{background:#8f2b34;border-color:#ff6b6b;color:#fff;animation:recp 1.4s ease-in-out infinite}
+@keyframes recp{50%{box-shadow:0 0 0 3px #ff6b6b44}}
 #wrap{flex:1;min-height:0;overflow:auto;position:relative;background:#0d0f14}
 #cv{position:sticky;top:0;left:0;display:block}
 #sp{pointer-events:none}
@@ -112,6 +117,9 @@ details summary{cursor:pointer;color:var(--a)}
     <button id="bStop">■</button>
     <label class="chk"><input type="checkbox" id="loop"> bucle</label>
     <label class="chk" title="Evita que se apague la pantalla mientras suena (Wake Lock)"><input type="checkbox" id="wake" checked> 🔆 pantalla activa</label>
+    <button id="bRec" title="Grabar lo que toques">⏺ Grabar</button>
+    <label class="chk" title="Ajusta inicio y largo de lo grabado a la Rejilla (si la rejilla está en «libre», se graba tal cual)"><input type="checkbox" id="recQ" checked> cuantizar</label>
+    <label class="chk" title="Un compás de metrónomo antes de empezar a grabar"><input type="checkbox" id="recCount" checked> cuenta previa</label>
   </div>
   <div class="grp">
     <input type="text" id="pname" value="Sin título" aria-label="Nombre del proyecto">
@@ -144,6 +152,12 @@ details summary{cursor:pointer;color:var(--a)}
       </span>
       <span class="grp"><label>Rejilla <select id="snap"></select></label>
         <button id="zOut" class="sm">−</button><button id="zIn" class="sm">＋</button></span>
+      <span class="grp live">
+        <button id="bLive" class="sm on" title="Tocar la pista activa con el teclado de la compu (Z S X D C V… y Q 2 W 3 E R…)">⌨ Tocar</button>
+        <button id="oDn" class="sm" title="Octava abajo (tecla −)">−</button><span id="oct" title="Octava de la fila de abajo">C4</span><button id="oUp" class="sm" title="Octava arriba (tecla =)">＋</button>
+        <button id="bMidi" class="sm" title="Conectar un teclado o controlador MIDI">🎛 MIDI</button>
+        <select id="midiIn" hidden aria-label="Entrada MIDI"></select>
+      </span>
       <span class="sp"></span>
       <span class="hint" id="rtHint">clic = nota · arrastra el borde = largo · Shift+arrastrar = seleccionar · Supr = borrar · Ctrl+D = duplicar · Ctrl+Z = deshacer</span>
     </div>
@@ -458,6 +472,15 @@ function previewBuffer(P,tr,nt){
   inst.play(K,noteArgs(K,P,tr,Object.assign({},nt,{b:0}),beat,0)); return K.mix(()=>1);
 }
 
+// Nota para tocar en vivo: se renderiza con volumen 1 (el volumen y la velocidad se aplican después como ganancia),
+// y el largo es fijo; al soltar la tecla la interfaz hace el fundido de salida.
+function liveNoteBuffer(P,tr,m,lenSec){
+  const inst=INSTRUMENTS[tr.inst]; if(!inst) throw new Error('instrumento no disponible');
+  const beat=60/P.bpm, dur=inst.oneShot?3:lenSec+.8, K=Kit.make(SR,dur,7); K.sr=SR;
+  const t=Object.assign({},tr,{vol:1});
+  inst.play(K,noteArgs(K,P,t,{b:0,l:inst.oneShot?.25:lenSec/beat,m,v:1},beat,0)); return K.mix(()=>1);
+}
+
 // ───────────────────────── WAV ─────────────────────────
 function encodeWav(L,R,sr){
   const n=L.length,buf=new ArrayBuffer(44+n*4),v=new DataView(buf); const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
@@ -623,6 +646,9 @@ const download=(blob,name)=>{const a=el('a',{href:URL.createObjectURL(blob),down
 
 // ───────────── estado ─────────────
 let P=starterProject(), sel=0, selNotes=new Set(), cursorBeat=0, version=0, dirty=true, cache=null, rendering=false;
+const rec={armed:false,active:false,open:new Map(),snap:new Set(),n:0}, clickNodes=[];   // grabación
+let playLoopEnd=0;
+const down=new Map();   // teclas/notas sostenidas ahora (para resaltarlas)
 let mode='draw', snap=.25, BW=48, lastLen=.5, drag=null, kitName='incluido';
 const KW=62, RUL=24;
 let ctx=null, srcNode=null, playing=false, playIsProject=false, playStartCtx=0, playOffset=0, playLoop=false, playDur=0;
@@ -630,26 +656,32 @@ const undoStack=[]; const demos=[];
 const wrap=$('wrap'), cv=$('cv'), sp=$('sp');
 
 // ───────────── audio / reproducción ─────────────
-function ac(){ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); if(ctx.state==='suspended') ctx.resume(); return ctx; }
+function ac(){ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'}); if(ctx.state==='suspended') ctx.resume(); return ctx; }
 function toAudioBuffer(out){ const b=ac().createBuffer(2,out.L.length,SR); b.copyToChannel(out.L,0); b.copyToChannel(out.R,1); return b; }
-function startPlayback(buf,offset,loop,isProject){
+function startPlayback(buf,offset,loop,isProject,delay){
   stopSource(); const a=ac(), s=a.createBufferSource(); s.buffer=buf; s.connect(a.destination); s.loop=!!loop;
+  playLoopEnd=0; if(loop&&isProject){ s.loopStart=0; s.loopEnd=playLoopEnd=Math.min(buf.duration,P.bars*4*60/P.bpm); if(offset>=playLoopEnd-.01) offset=0; }
   s.onended=()=>{ if(srcNode===s) stop(); };
-  playStartCtx=a.currentTime+.02; playOffset=offset; playLoop=!!loop; playDur=buf.duration; playIsProject=!!isProject;
-  s.start(a.currentTime+.02,offset); srcNode=s; playing=true; $('bPlay').textContent='■ Detener'; acquireWake(); invalidate();
+  playStartCtx=a.currentTime+.02+(delay||0); playOffset=offset; playLoop=!!loop; playDur=buf.duration; playIsProject=!!isProject;
+  s.start(playStartCtx,offset); srcNode=s; playing=true; $('bPlay').textContent='■ Detener'; acquireWake(); invalidate();
 }
 function stopSource(){ if(srcNode){ srcNode.onended=null; try{srcNode.stop();}catch(e){} srcNode=null; } }
-function stop(){ stopSource(); playing=false; $('bPlay').textContent='▶ Play'; releaseWake(); invalidate(); }
-function playheadBeat(){ if(!playing||!ctx||!playIsProject) return null; let pos=playOffset+Math.max(0,ctx.currentTime-playStartCtx); if(playLoop&&playDur>0) pos%=playDur; return pos/(60/P.bpm); }
+function stop(){ recFinish(); for(const o of clickNodes){ try{o.stop();}catch(e){} } clickNodes.length=0; stopSource(); playing=false; $('bPlay').textContent='▶ Play'; releaseWake(); invalidate(); }
+function playheadBeat(){ if(!playing||!ctx||!playIsProject) return null; let pos=playOffset+Math.max(0,ctx.currentTime-playStartCtx); if(playLoop&&playDur>0) pos%=(playLoopEnd||playDur); return pos/(60/P.bpm); }
 async function togglePlay(){
   if(playing){ stop(); return; }
   ac(); if(rendering) return;
   if(dirty||!cache){ if(!(await doRender())) return; }
-  startPlayback(cache.buf,clamp(cursorBeat*60/P.bpm,0,Math.max(0,cache.dur-.1)),$('loop').checked,true);
+  const beat=60/P.bpm, count=(rec.armed&&$('recCount').checked)?4*beat:0;
+  if(rec.armed){ rec.active=true; rec.n=0; rec.snap.clear(); rec.open.clear(); setLive(true); }
+  startPlayback(cache.buf,clamp(cursorBeat*60/P.bpm,0,Math.max(0,cache.dur-.1)),$('loop').checked,true,count);
+  if(count){ for(let i=0;i<4;i++) clickAt(playStartCtx-count+i*beat,i===0); $('stat').textContent='⏺ Cuenta previa…'; $('stat').className='warn'; setTimeout(()=>{ if(playing&&rec.active) updateStat(); },count*1000+40); }
+  updateStat();
 }
 function prog(p){ $('prog').style.width=(p*100)+'%'; }
 function updateStat(){
   if(rendering) return; const s=$('stat');
+  if(rec.active){ s.textContent='⏺ Grabando · '+rec.n+' notas'; s.className='warn'; return; }
   if(dirty){ s.textContent=cache?'● cambios sin renderizar':'● sin renderizar'; s.className='warn'; }
   else { s.textContent='✓ listo · '+cache.dur.toFixed(1)+' s'; s.className=''; }
 }
@@ -672,7 +704,7 @@ function previewNote(n,tr){
   catch(e){ console.error(e); toast('Error en la vista previa: '+e.message,'err'); }
 }
 let pvTimer=0;
-function previewTrack(){ clearTimeout(pvTimer); pvTimer=setTimeout(()=>{ const tr=P.tracks[sel]; if(!tr) return;
+function previewTrack(){ clearTimeout(pvTimer); pvTimer=setTimeout(()=>{ const tr=P.tracks[sel]; if(!tr) return; prewarm();
   const n=[...selNotes][0]||tr.notes[0]||{b:0,l:.5,m:INSTRUMENTS[tr.inst]&&INSTRUMENTS[tr.inst].kind==='perc'?0:60,v:1}; previewNote(n,tr); },160); }
 
 // ───────────── pantalla activa (Wake Lock) ─────────────
@@ -735,6 +767,7 @@ function invalidate(){ needDraw=true; if(!raf) raf=requestAnimationFrame(frame);
 function frame(){
   raf=0; const ph=playheadBeat();
   if(playing&&ph!=null){ const x=KW+ph*BW-wrap.scrollLeft; if(x>wrap.clientWidth-24||x<KW) wrap.scrollLeft=Math.max(0,ph*BW-20); }
+  if(rec.active) recTick();
   if(needDraw||playing){ needDraw=false; draw(ph); }
   if(playing) raf=requestAnimationFrame(frame);
 }
@@ -773,10 +806,10 @@ function draw(ph){
   const cx=KW+cursorBeat*BW-sx; if(cx>=KW){ g.strokeStyle='#8fa8ff'; g.setLineDash([4,4]); g.beginPath(); g.moveTo(cx+.5,RUL); g.lineTo(cx+.5,H); g.stroke(); g.setLineDash([]); }
   if(ph!=null){ const x=KW+ph*BW-sx; if(x>=KW){ g.fillStyle='#ff7ab8'; g.fillRect(x-1,0,2,H); } }
   // teclas / carriles
-  g.fillStyle='#12141b'; g.fillRect(0,RUL,KW,H-RUL);
+  g.fillStyle='#12141b'; g.fillRect(0,RUL,KW,H-RUL); const hl=new Set(down.values());
   for(let r=r0;r<=r1;r++){ const y=RUL+r*RH-sy;
-    if(info.perc){ g.fillStyle='#1a1d27'; g.fillRect(0,y,KW-1,RH-1); g.fillStyle='#b8bdca'; g.font='11px system-ui'; g.fillText((info.lanes[r]&&info.lanes[r].name||'').slice(0,9),4,y+RH/2+4); }
-    else { const m=info.hi-r; g.fillStyle=isBlack(m)?'#15171f':'#d9dce6'; g.fillRect(0,y,isBlack(m)?KW*.62:KW-1,RH-1); if(m%12===0){ g.fillStyle='#0b0d14'; g.font='10px system-ui'; g.fillText(midiName(m),KW-24,y+RH-4); } } }
+    if(info.perc){ g.fillStyle=hl.has(r)?'#41518f':'#1a1d27'; g.fillRect(0,y,KW-1,RH-1); g.fillStyle='#b8bdca'; g.font='11px system-ui'; g.fillText((info.lanes[r]&&info.lanes[r].name||'').slice(0,9),4,y+RH/2+4); }
+    else { const m=info.hi-r; g.fillStyle=isBlack(m)?'#15171f':'#d9dce6'; g.fillRect(0,y,isBlack(m)?KW*.62:KW-1,RH-1); if(hl.has(m)){ g.fillStyle='#8fa8ff'; g.fillRect(0,y,isBlack(m)?KW*.62:KW-1,RH-1); } if(m%12===0){ g.fillStyle='#0b0d14'; g.font='10px system-ui'; g.fillText(midiName(m),KW-24,y+RH-4); } } }
   drawRuler(g,W,sx,b0,b1);
   if(ph!=null){ const x=KW+ph*BW-sx; if(x>=KW){ g.fillStyle='#ff7ab8'; g.beginPath(); g.moveTo(x-5,0); g.lineTo(x+5,0); g.lineTo(x,8); g.fill(); } }
 }
@@ -864,7 +897,7 @@ document.addEventListener('keydown',e=>{
 });
 
 // ───────────── pistas ─────────────
-function selectTrack(i){ if(i===sel||!P.tracks[i]) return; sel=i; selNotes.clear(); for(const [j,r] of [...$('tlist').children].entries()) r.classList.toggle('sel',j===i); renderInspector(); centerTrack(); invalidate(); }
+function selectTrack(i){ if(i===sel||!P.tracks[i]) return; recCloseAll(); sel=i; selNotes.clear(); for(const [j,r] of [...$('tlist').children].entries()) r.classList.toggle('sel',j===i); renderInspector(); centerTrack(); invalidate(); }
 function refreshCounts(){ [...$('tlist').children].forEach((r,i)=>{ const c=r.querySelector('.cnt'); if(c&&P.tracks[i]) c.textContent=P.tracks[i].notes.length+' notas'; }); }
 function renderTracks(){
   const box=$('tlist'); box.innerHTML='';
@@ -946,7 +979,7 @@ function renderInspector(){
       el('button',{class:'sm',text:'Copiar',onclick:()=>{ const [f,c,t,x]=cp.map(i=>Math.max(1,Math.round(+i.value)||1)); pushUndo(); const b0=(f-1)*4,len=c*4; const src=tr.notes.filter(n=>n.b>=b0-1e-9&&n.b<b0+len-1e-9);
         for(let r=0;r<x;r++){ const off=(t-1)*4+r*len-b0; for(const n of src){ const k=JSON.parse(JSON.stringify(n)); k.b=r6(n.b+off); tr.notes.push(k); } }
         fitBars(); touch(); toast('Copiadas '+src.length*x+' notas','ok'); }}))));
-  box.append(scBlock()); renderSelInfo();
+  box.append(scBlock()); renderSelInfo(); prewarm();
 }
 
 // ───────────── archivos, demos y plugins ─────────────
@@ -1028,11 +1061,127 @@ $('plgTest').onclick=()=>{ try{ const def=installPlugin($('plgCode').value); pop
 $('plgDl').onclick=()=>{ const m=/name\s*:\s*['"]([^'"]+)/.exec($('plgCode').value); download(new Blob([$('plgCode').value],{type:'text/javascript'}),(m?slug(m[1]):'plugin')+'.js'); };
 $('plgCode').addEventListener('keydown',e=>{ if(e.key==='Tab'){ e.preventDefault(); const t=e.target,s=t.selectionStart; t.value=t.value.slice(0,s)+'  '+t.value.slice(t.selectionEnd); t.selectionStart=t.selectionEnd=s+2; } });
 
+// ───────────── tocar en vivo: teclado de la compu y MIDI ─────────────
+// Cada nota se renderiza una vez (largo fijo) y se guarda en una caché; tocar es solo disparar un buffer ya listo.
+// Al soltar la tecla se hace un fundido de salida. Pedal de sustain (CC64) soportado.
+const LIVE_LEN=2.2, LIVE_MAX=110;
+const KEYMAP={KeyZ:0,KeyS:1,KeyX:2,KeyD:3,KeyC:4,KeyV:5,KeyG:6,KeyB:7,KeyH:8,KeyN:9,KeyJ:10,KeyM:11,Comma:12,KeyL:13,Period:14,Semicolon:15,Slash:16,
+  KeyQ:12,Digit2:13,KeyW:14,Digit3:15,KeyE:16,KeyR:17,Digit5:18,KeyT:19,Digit6:20,KeyY:21,Digit7:22,KeyU:23,KeyI:24,Digit9:25,KeyO:26,Digit0:27,KeyP:28};
+const PERC_KEYS=['KeyZ','KeyX','KeyC','KeyV','KeyB','KeyN','KeyM'];
+let liveEnabled=true, baseOct=60, sustain=false, midiAcc=null;
+const voices=new Map(), sustained=new Set(), liveCache=new Map(), downCodes=new Map();
+const liveKey=(tr,m)=>tr.inst+'|'+tr.pan+'|'+(tr.ducked?1:0)+'|'+P.bpm+'|'+m+'|'+JSON.stringify(tr.params);
+function liveBuf(tr,m){
+  const k=liveKey(tr,m); let b=liveCache.get(k);
+  if(b){ liveCache.delete(k); liveCache.set(k,b); return b; }
+  b=toAudioBuffer(liveNoteBuffer(P,tr,m,LIVE_LEN)); liveCache.set(k,b);
+  if(liveCache.size>LIVE_MAX) liveCache.delete(liveCache.keys().next().value); return b;
+}
+let pwToken=0, pwTimer=0;
+function prewarm(){                       // deja listas, en segundo plano, las notas que se pueden tocar con el teclado de la compu
+  clearTimeout(pwTimer); const tok=++pwToken; if(!liveEnabled) return; const tr=P.tracks[sel]; if(!tr||!INSTRUMENTS[tr.inst]) return;
+  const info=trackInfo(tr), list=[]; if(info.perc){ for(let i=0;i<info.rows;i++) list.push(i); } else for(let k=0;k<=28;k++) list.push(clamp(baseOct+k,0,127));
+  let i=0; const step=()=>{ if(tok!==pwToken||P.tracks[sel]!==tr) return; const t0=performance.now();
+    while(i<list.length&&performance.now()-t0<12){ try{ liveBuf(tr,list[i]); }catch(e){ return; } i++; } if(i<list.length) pwTimer=setTimeout(step,0); };
+  pwTimer=setTimeout(step,180);
+}
+function codeToNote(tr,code){
+  const k=KEYMAP[code]; if(k==null) return null; const info=trackInfo(tr);
+  if(info.perc){ if(info.rows===1) return 0; const i=PERC_KEYS.indexOf(code); return i>=0&&i<info.rows?i:null; }   // percusión: una tecla por carril
+  return clamp(baseOct+k,0,127);
+}
+function midiToNote(tr,n){ const info=trackInfo(tr); return info.perc?(info.rows===1?0:((n-36)%info.rows+info.rows)%info.rows):n; }
+function releaseVoice(v,t){ try{ const a=ctx,g=v.g.gain; g.cancelScheduledValues(a.currentTime); g.setValueAtTime(g.value,a.currentTime); g.linearRampToValueAtTime(0,a.currentTime+t); v.s.stop(a.currentTime+t+.02); }catch(e){} }
+function liveOn(id,m,vel){
+  const tr=P.tracks[sel]; if(!tr||!INSTRUMENTS[tr.inst]) return; liveOff(id,true); let buf;
+  try{ buf=liveBuf(tr,m); }catch(e){ console.error(e); toast('Error al tocar: '+e.message,'err'); return; }
+  const a=ac(), s=a.createBufferSource(), g=a.createGain(); s.buffer=buf; g.gain.value=(tr.vol==null?1:tr.vol)*vel; s.connect(g); g.connect(a.destination); s.start();
+  const v={s,g,oneShot:!!INSTRUMENTS[tr.inst].oneShot}; voices.set(id,v); down.set(id,m); s.onended=()=>{ if(voices.get(id)===v) voices.delete(id); }; invalidate(); recOn(id,m,vel,tr);
+}
+function liveOff(id,hard){
+  const had=down.delete(id), v=voices.get(id); if(had) invalidate(); if(!v){ recClose(id); return; }
+  if(hard){ sustained.delete(id); voices.delete(id); releaseVoice(v,.015); recClose(id); return; }
+  if(v.oneShot){ recClose(id); return; }                  // la percusión se deja sonar completa
+  if(sustain){ sustained.add(id); return; }               // con el pedal abajo, la nota (y su grabación) sigue hasta soltarlo
+  voices.delete(id); releaseVoice(v,.09); recClose(id);
+}
+function setSustain(on){ sustain=on; if(!on){ for(const id of sustained){ const v=voices.get(id); if(v){ voices.delete(id); releaseVoice(v,.12); } recClose(id); } sustained.clear(); } }
+function allOff(){ recCloseAll(); for(const [id,v] of voices) releaseVoice(v,.05); voices.clear(); sustained.clear(); down.clear(); downCodes.clear(); invalidate(); }
+const octName=()=>midiName(baseOct);
+function setOctave(d){ baseOct=clamp(baseOct+d*12,0,96); $('oct').textContent=octName(); prewarm(); }
+function setLive(on){ liveEnabled=on; $('bLive').classList.toggle('on',on); if(!on) allOff(); else prewarm(); }
+const modalOpen=()=>!!document.querySelector('.modal.show');
+document.addEventListener('keydown',e=>{
+  if(!liveEnabled||e.ctrlKey||e.metaKey||e.altKey||modalOpen()) return; const tg=e.target&&e.target.tagName; if(tg==='INPUT'||tg==='TEXTAREA'||tg==='SELECT') return;
+  if(e.code==='Minus'||e.code==='NumpadSubtract'){ e.preventDefault(); if(!e.repeat) setOctave(-1); return; }
+  if(e.code==='Equal'||e.code==='NumpadAdd'){ e.preventDefault(); if(!e.repeat) setOctave(1); return; }
+  const tr=P.tracks[sel]; if(!tr) return; const m=codeToNote(tr,e.code); if(m==null) return;
+  e.preventDefault(); if(e.repeat||downCodes.has(e.code)) return; const id='k'+e.code; downCodes.set(e.code,id); liveOn(id,m,1);
+});
+document.addEventListener('keyup',e=>{ const id=downCodes.get(e.code); if(id){ downCodes.delete(e.code); liveOff(id); } });
+window.addEventListener('blur',()=>{ if(down.size||voices.size) allOff(); });
+// MIDI (Web MIDI: Chrome, Edge, Opera; Firefox pide un permiso; Safari no lo soporta)
+function onMidi(ev){
+  const sv=$('midiIn').value; if(sv!=='all'&&ev.target&&ev.target.id!==sv) return; const d=ev.data; if(!d||d.length<2) return;
+  const st=d[0]&0xF0, n=d[1], v=d.length>2?d[2]:0;
+  if(st===0x90&&v>0){ const tr=P.tracks[sel]; if(tr&&liveEnabled) liveOn('m'+n,midiToNote(tr,n),Math.max(.05,v/127)); }
+  else if(st===0x80||(st===0x90&&v===0)) liveOff('m'+n);
+  else if(st===0xB0){ if(n===64) setSustain(v>=64); else if(n===120||n===123) allOff(); }
+}
+function refreshMidi(){
+  const ins=[...midiAcc.inputs.values()], s=$('midiIn'), cur=s.value; s.innerHTML=''; s.append(el('option',{value:'all',text:'Todas las entradas'}));
+  for(const i of ins){ i.onmidimessage=onMidi; s.append(el('option',{value:i.id,text:i.name||i.id})); } if([...s.options].some(o=>o.value===cur)) s.value=cur;
+  s.hidden=!ins.length; $('bMidi').classList.toggle('on',ins.length>0); return ins;
+}
+$('bMidi').onclick=async()=>{
+  if(!navigator.requestMIDIAccess){ toast('Este navegador no soporta Web MIDI. Usa Chrome, Edge u Opera (Firefox lo pide como permiso; Safari no lo tiene).','err'); return; }
+  try{ if(!midiAcc){ midiAcc=await navigator.requestMIDIAccess(); midiAcc.onstatechange=()=>{ const n=refreshMidi().length; toast(n?('MIDI: '+n+' entrada(s) conectada(s)'):'MIDI: sin dispositivos','ok'); }; }
+    const n=refreshMidi().length; toast(n?('MIDI listo: '+n+' entrada(s). Toca la pista activa.'):'MIDI activo, pero no veo ningún dispositivo. Conéctalo y se detecta solo.',n?'ok':''); }
+  catch(e){ toast('No pude acceder a MIDI: '+(e.message||e.name),'err'); }
+};
+$('bLive').onclick=()=>setLive(!liveEnabled); $('oDn').onclick=()=>setOctave(-1); $('oUp').onclick=()=>setOctave(1); $('oct').textContent=octName();
+
+// ───────────── grabar lo que tocas ─────────────
+// Con ⏺ armado, al pulsar Play el proyecto suena como acompañamiento y lo que tocas se anota en la pista activa,
+// en la posición exacta del cabezal (cuantizada a la rejilla si «cuantizar» está activo). Con bucle, cada vuelta suma notas (overdub).
+function recBeat(){
+  if(!ctx||!playing||!playIsProject) return null; const t=ctx.currentTime-playStartCtx; if(t<0) return null;      // t<0 = cuenta previa
+  let p=playOffset+t; if(playLoop&&playLoopEnd>0) p%=playLoopEnd; return p/(60/P.bpm);
+}
+const recQ=()=>$('recQ').checked&&snap>0;
+function clickAt(t,accent){ const a=ctx,o=a.createOscillator(),g=a.createGain(); o.frequency.value=accent?1500:1000;
+  g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.35,t+.002); g.gain.exponentialRampToValueAtTime(.0001,t+.05);
+  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+.06); clickNodes.push(o); }
+function recLen(o,raw){ if(o.one) return .25; return r6(recQ()?Math.max(snap,Math.round(raw/snap)*snap):Math.max(.0625,raw)); }
+function recOn(id,m,vel,tr){
+  if(!rec.active) return; const raw=recBeat(); if(raw==null) return;                  // durante la cuenta previa no se graba
+  recClose(id); if(!rec.snap.has(tr)){ pushUndo(); rec.snap.add(tr); }                // una toma = un solo Ctrl+Z
+  let b=recQ()?Math.round(raw/snap)*snap:raw; const total=P.bars*4; if(playLoop&&b>=total-1e-9) b-=total;
+  const inst=INSTRUMENTS[tr.inst]; let n=tr.notes.find(x=>Math.abs(x.b-b)<1e-6&&Math.round(x.m)===m&&!(x.o&&x.o.cid));
+  if(n) n.v=r6(vel); else { n={b:r6(b),l:.25,m,v:r6(vel)}; tr.notes.push(n); rec.n++; }   // misma nota en el mismo lugar (bucle): no se duplica
+  rec.open.set(id,{n,tr,raw,one:!!inst.oneShot}); touch(); updateStat();
+}
+function recGrow(o){ const e=recBeat(); if(e==null) return; let raw=e-o.raw; if(raw<0&&playLoop) raw+=P.bars*4; o.n.l=recLen(o,Math.max(0,raw)); }
+function recClose(id){ const o=rec.open.get(id); if(!o) return; rec.open.delete(id); recGrow(o); }
+function recCloseAll(){ for(const id of [...rec.open.keys()]) recClose(id); }
+function recTick(){ for(const o of rec.open.values()) recGrow(o); }
+function recFinish(){
+  if(!rec.active) return; recCloseAll(); rec.active=false; const n=rec.n; rec.snap.clear(); rec.n=0;
+  if(n){ fitBars(); touch(); renderSelInfo(); toast('Toma terminada: '+n+' nota'+(n>1?'s':'')+' nueva'+(n>1?'s':'')+'. Ctrl+Z la deshace.','ok'); } updateStat();
+}
+function setArmed(on){
+  rec.armed=on; $('bRec').classList.toggle('armed',on); $('bRec').title=on?'Armado: pulsa Play (Espacio) para grabar':'Grabar lo que toques';
+  if(on){ setLive(true); if(playing&&playIsProject&&!rec.active){ rec.active=true; rec.n=0; rec.snap.clear(); rec.open.clear(); updateStat(); toast('Grabando (punch-in)…'); } else if(!playing) toast('Grabación armada: pulsa Play o Espacio para empezar'+($('recCount').checked?' (con 1 compás de cuenta previa)':'')+'.'); }
+  else if(rec.active) recFinish();
+  invalidate();
+}
+$('bRec').onclick=()=>setArmed(!rec.armed);
+
 // ───────────── conexión de controles ─────────────
 $('bPlay').onclick=togglePlay; $('bStop').onclick=()=>{ stop(); };
 $('wake').onchange=e=>{ if(playing){ if(e.target.checked) acquireWake(); else releaseWake(); } };
 $('pname').onchange=e=>{ P.name=e.target.value||'Sin título'; touch(); };
-$('bpm').onchange=e=>{ P.bpm=clamp(+e.target.value||120,40,260); e.target.value=P.bpm; touch(); };
+$('bpm').onchange=e=>{ P.bpm=clamp(+e.target.value||120,40,260); e.target.value=P.bpm; touch(); prewarm(); };
 $('bars').onchange=e=>{ P.bars=clamp(Math.round(+e.target.value)||8,1,256); e.target.value=P.bars; layoutSpacer(); touch(); };
 $('bNew').onclick=()=>{ if(P.tracks.some(t=>t.notes.length)&&!confirm('¿Empezar un proyecto vacío? Se pierde lo no guardado.')) return; loadProject(newProject('Sin título',120,8)); };
 $('bSave').onclick=()=>{ try{ download(new Blob([JSON.stringify(projectToJSON(P))],{type:'application/json'}),(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'.demokit.json'); }catch(e){ toast('No pude guardar: '+e.message,'err'); } };

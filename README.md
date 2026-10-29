@@ -35,6 +35,8 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
   - *Melódicos:* Sinte genérico, Supersaw, Pluck, Arpegio cuadrado, Pad, Sub, Sub con caída, Reese, Growl, Campana, Chop vocal.
   - *Percusión y efectos:* Bombo, Caja, Palma, Chasquido, Hi-hat (cerrado/abierto), Crash, Riser, Barrido, Viento, Impacto, Rim.
 - **Sidechain:** las pistas «ducked» (la música) bajan de volumen cada vez que suena una pista marcada como disparador (normalmente el bombo). Profundidad y relajación ajustables.
+- **Tocar en vivo** la pista activa con el teclado de la compu o con un controlador MIDI, para afinar parámetros escuchando (ver [abajo](#tocar-en-vivo)).
+- **Grabar lo que tocas** en el piano roll, con cuenta previa, cuantizado, bucle con overdub y un solo `Ctrl+Z` por toma (ver [abajo](#grabar-lo-que-tocas)).
 - **Plugins:** instrumentos nuevos escritos en JavaScript, con editor integrado.
 - **Demos editables:** convierte las demos del kit en proyectos con pistas y notas.
 - **Pantalla activa** mientras suena (Wake Lock, con un video invisible de respaldo en navegadores que no lo soportan).
@@ -61,6 +63,44 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 | Escuchar una tecla | clic en el teclado de la izquierda |
 
 En pantallas táctiles hay un modo **✋ Navegar** para desplazarse con el dedo sin dibujar notas.
+
+## Tocar en vivo
+
+Con el botón **⌨ Tocar** activo, el teclado de la compu toca la pista seleccionada, como en FL Studio o Ableton. Mueve un slider del inspector, toca una tecla y escucha cómo cambia el sonido.
+
+```
+ 2 3   5 6 7   9 0          fila de arriba:  octava de arriba (empieza en la octava +1)
+Q W E R T Y U I O P
+
+  S D   G H J   L ;         fila de abajo:   octava base (por defecto C4)
+ Z X C V B N M , . /
+```
+
+- **Octava:** `−` / `=` (o los botones de la barra). La octava base se muestra junto al botón.
+- **Percusión:** en pistas de un solo carril (bombo, caja…) cualquier tecla del mapa lo dispara. En pistas de varios carriles (hi-hat: cerrado/abierto), las teclas `Z X C V B N M` son los carriles 1, 2, 3…
+- **MIDI:** pulsa **🎛 MIDI**, acepta el permiso del navegador y elige la entrada. Soporta velocidad, pedal de sustain (CC64) y «all notes off». En percusión, un teclado MIDI usa las notas a partir de C1 (36), una por carril. Web MIDI funciona en Chrome, Edge y Opera; Firefox lo pide como permiso y Safari no lo tiene. Necesita HTTPS (GitHub Pages lo cumple) o `localhost`.
+- **Latencia:** cada nota se renderiza una vez y queda en caché; tocar es solo disparar un buffer ya listo. Al elegir una pista (o al soltar un slider) se precalientan en segundo plano las tres octavas del teclado. Una nota fuera de ese rango, o la primera tras cambiar un parámetro, tarda unos 10–50 ms en renderizarse.
+- **Largo de las notas:** al tocar, cada nota dura como máximo ~2 s y, al soltar la tecla, tiene un fundido de salida de 90 ms. La percusión y los sonidos cortos suenan completos.
+- Las teclas del modo **Tocar** no interfieren con los atajos de edición (todos usan `Ctrl`, flechas, `Supr`, `Espacio`…) y se desactivan solas mientras escribes en un campo de texto o hay una ventana abierta.
+
+## Grabar lo que tocas
+
+1. Elige la pista donde quieres grabar.
+2. Pulsa **⏺ Grabar** (queda armado, en rojo). Es independiente de Play: puedes armarlo y desarmarlo cuando quieras.
+3. Pulsa **Play** (o `Espacio`). Si «cuenta previa» está activo, hay un compás de metrónomo y la grabación empieza al terminar. El proyecto suena como acompañamiento desde el cursor (el punto de inicio que marcas en la regla).
+4. Toca con el teclado de la compu o con MIDI. Las notas aparecen en el piano roll mientras las sostienes.
+5. Pulsa Stop. Toda la toma se deshace con un solo `Ctrl+Z`.
+
+Detalles:
+
+- **Cuantizar** ajusta el inicio y el largo de cada nota a la **Rejilla** elegida. Con la rejilla en «libre» (o con cuantizar desactivado) se graba tal cual lo tocaste.
+- **Bucle:** si está activo, el bucle cubre exactamente los compases del proyecto y cada vuelta suma notas encima (overdub). Tocar la misma nota en el mismo lugar no la duplica.
+- **Punch-in:** si el proyecto ya está sonando y pulsas ⏺, empieza a grabar en ese momento. Si lo desarmas a la mitad, se cierra la toma.
+- **Pedal de sustain** (MIDI): la nota grabada dura hasta que sueltas el pedal. La velocidad MIDI se guarda en cada nota.
+- **Percusión:** las notas se graban en el carril correspondiente con largo fijo.
+- Si cambias de pista durante la toma, las notas abiertas se cierran en su pista.
+- Las notas grabadas no suenan en el acompañamiento hasta el siguiente render (Play vuelve a renderizar solo si hubo cambios). Mientras tocas, oyes tu instrumento en vivo, así que se siente igual.
+- Si pasas del último compás, el proyecto se extiende solo (fuera de bucle).
 
 ## Convertir una demo en proyecto editable
 
@@ -178,11 +218,10 @@ El render es determinista (misma semilla → mismo audio) y se hace por bloques 
 - Un render completo tarda unos segundos (2–6 s para proyectos del tamaño de las demos en un portátil normal).
 - El autoguardado en el navegador no se activa en proyectos con clips horneados (serían demasiado grandes): guarda con «Guardar».
 - En iOS/Safari, el audio solo arranca tras un gesto del usuario (el botón Play ya lo es).
-- No hay exportación MIDI, ni grabación de audio, ni efectos por pista (reverb/delay): por ahora todo pasa por el sidechain y la saturación suave del kit.
+- No hay exportación MIDI, ni efectos por pista (reverb/delay): por ahora todo pasa por el sidechain y la saturación suave del kit.
+- La grabación **no compensa la latencia** de tu equipo (teclado, interfaz de audio o Bluetooth); el tiempo se toma cuando llega la tecla o el mensaje MIDI. Con audífonos Bluetooth puede sentirse desfasada.
 
 ## Créditos
 
-- Síntesis y estudio: Brujo, con Ámbar (Claude Sonnet 5.5).
-- Icono y banner: Velvet (ChatGPT).
-- the_void.js, cotton_sugar.js, demo_kit.js: Ámbar (Claude Sonnet 5.5)
-- You soy NaN demo song /demos/yo_soy_nan.js por: Éter (Gemini)
+- Síntesis y estudio: Brujo, con Claude.
+- Icono y banner: Velvet.
