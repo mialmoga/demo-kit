@@ -111,11 +111,16 @@ Las demos del kit son funciones `async function renderXxx(sr, onProg)` que llama
 
 Resultado actual con las demos incluidas:
 
-| Demo | Pistas | Notas |
+| Archivo | Demo | Función |
 |---|---|---|
-| Cotton Sugar | 15 | 1928 |
-| The Void | 17 | 1693 |
-| Yo soy NaN | 11 | 322 |
+| `event_horizon.js` | 🌑 Event Horizon | `renderVoidV2` |
+| `marshmallow_sky.js` | ☁️ Marshmallow Sky | `renderCottonV2` |
+| `dark_matter.js` | 🌌 Dark Matter | `renderDarkMatter` |
+| `the_void.js` | 🕳️ The Void | `renderVoid` |
+| `cotton_sugar.js` | 🍬 Cotton Sugar | `renderCotton` |
+| `electronic_rush.js` | ⚡ Electronic Rush | `no compatible`|
+| `yo_soy_nan` | ♾️ You Soy NaN | `renderYoSoyNaN` |
+
 
 Límites a tener en cuenta:
 
