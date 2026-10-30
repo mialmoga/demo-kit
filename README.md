@@ -119,7 +119,7 @@ Resultado actual con las demos incluidas:
 | `the_void.js` | 🕳️ The Void | `renderVoid` |
 | `cotton_sugar.js` | 🍬 Cotton Sugar | `renderCotton` |
 | `electronic_rush.js` | ⚡ Electronic Rush | `no compatible`|
-| `yo_soy_nan` | ♾️ You Soy NaN | `renderYoSoyNaN` |
+| `yo_soy_nan.js` | ♾️ You Soy NaN | `renderYoSoyNaN` |
 
 
 Límites a tener en cuenta:
