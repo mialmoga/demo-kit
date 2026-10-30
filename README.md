@@ -271,7 +271,7 @@ K.rnd()   K.hz(midi)   K.lpc(fc)
 - Los plugins se guardan en el navegador (`localStorage`), se pueden descargar como `.js` y se cargan arrastrándolos a la ventana. Si un proyecto usa un plugin, el plugin va incluido en el `.demokit.json`.
 - Si cargas **tu propio `demo_kit.js`** (con funciones nuevas), los instrumentos y plugins lo usan desde ese momento: lo que agregues a `K` queda disponible para los plugins.
 
-## Usar la música en otros proyectos (librería)
+## Usar la música en otros proyectos (librería) lib/
 
 `demokit.min.js` (≈29 KB, ≈12 KB con gzip; `demokit.js` es la versión legible) es el kit, el motor y un reproductor, **sin interfaz**. Carga canciones `.demokit.json` (las del estudio) **o** demos `.js` escritas a mano, las sintetiza en el momento y las reproduce con Web Audio. No hay muestras: la canción es solo código o datos.
 
