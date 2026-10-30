@@ -35,12 +35,15 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
   - *Melódicos:* Sinte genérico, Supersaw, Pluck, Arpegio cuadrado, Pad, Sub, Sub con caída, Reese, Growl, Campana, Chop vocal.
   - *Percusión y efectos:* Bombo, Caja, Palma, Chasquido, Hi-hat (cerrado/abierto), Crash, Riser, Barrido, Viento, Impacto, Rim.
 - **Sidechain:** las pistas «ducked» (la música) bajan de volumen cada vez que suena una pista marcada como disparador (normalmente el bombo). Profundidad y relajación ajustables.
+- **Efectos por pista:** *delay* (tiempo en negras/corcheas, repeticiones, tono, mezcla, ping-pong) y *reverb* (tamaño, amortiguación, mezcla, pre-delay). Se aplican sobre el audio ya renderizado de la pista, así que moverlos **no vuelve a renderizar el instrumento**. También suenan al tocar en vivo y en la vista previa.
+- **Master:** graves y agudos (shelves de ±12 dB en 120 Hz y 7 kHz), ganancia y limitador con anticipación y techo ajustable. Con todo neutro el sonido original queda intacto.
 - **Tocar en vivo** la pista activa con el teclado de la compu o con un controlador MIDI, para afinar parámetros escuchando (ver [abajo](#tocar-en-vivo)).
 - **Grabar lo que tocas** en el piano roll, con cuenta previa, cuantizado, bucle con overdub y un solo `Ctrl+Z` por toma (ver [abajo](#grabar-lo-que-tocas)).
 - **Plugins:** instrumentos nuevos escritos en JavaScript, con editor integrado.
 - **Demos editables:** convierte las demos del kit en proyectos con pistas y notas.
 - **Pantalla activa** mientras suena (Wake Lock, con un video invisible de respaldo en navegadores que no lo soportan).
-- **Exportación a WAV** (estéreo, 16 bits, 44.1 kHz). No hay exportación MIDI a propósito: el kit suena mejor que cualquier sinte MIDI genérico.
+- **Render por pista con caché:** cada pista se renderiza sola y se guarda. Editar una pista solo vuelve a renderizar esa pista, y cambiar volumen, mute o solo no renderiza nada. Un Play tras un cambio pequeño tarda una fracción de segundo.
+- **Exportación a WAV** (estéreo, 16 bits, 44.1 kHz) y **a stems**: un ZIP con un WAV por pista (incluidas las silenciadas), con los efectos de cada pista pero sin el master, para seguir mezclando en otro DAW. No hay exportación MIDI a propósito: el kit suena mejor que cualquier sinte MIDI genérico.
 - **Guardar / cargar** proyectos `.demokit.json`.
 
 ## Controles
@@ -269,17 +272,22 @@ Todo vive en un solo `<script>` dentro del HTML:
 | Parte | Responsabilidad |
 |---|---|
 | `demo_kit.js` | el kit de síntesis (osciladores, percusión, campana, chop, mezcla con sidechain y saturación suave) |
-| Motor | registro de instrumentos, render de proyectos, conversión de demos, WAV, (de)serialización. No toca el DOM |
+| Motor | registro de instrumentos, render por pista con caché de stems, mezcla, conversión de demos, WAV, (de)serialización. No toca el DOM |
 | Interfaz | piano roll en `<canvas>`, pistas, inspector, modales, wake lock, carga de archivos |
 
 El render es determinista (misma semilla → mismo audio) y se hace por bloques cediendo el hilo para que la interfaz no se congele.
 
+**Cómo funciona el render por pista.** Cada pista se renderiza en su propio kit y se guarda como un *stem* (audio de 16 bits recortado al tramo con sonido). La clave de caché de una pista es un hash de su instrumento, parámetros, paneo, notas, tempo, compases y versión del plugin o del kit, así que cualquier cambio que afecte el sonido invalida solo esa pista. La mezcla final (sidechain, saturación suave, fundido y limitador) se hace aparte con el `K.mix` del kit, y a ella llegan el volumen, el mute y el solo. Cada pista usa una semilla propia derivada de su identificador, de modo que dos pistas de ruido (el hi-hat y la caja, por ejemplo) no repiten la misma secuencia.
+
 ## Notas y límites conocidos
 
-- Un render completo tarda unos segundos (2–6 s para proyectos del tamaño de las demos en un portátil normal).
+- El primer render de un proyecto completo tarda unos segundos (1.5–4 s con las demos incluidas, medido en Node). Después, con la caché, un cambio pequeño tarda de 0.1 a 1 s.
+- La caché de stems ocupa memoria: unos 60–170 MB con las demos incluidas. Tiene un tope de 320 MB; al pasarlo se desalojan primero las pistas que no están sonando (se renderizan de nuevo cuando las necesites).
+- Un stem exportado pasa por el mismo sidechain y saturación suave del master, solo con esa pista. La suma de todos los stems no es bit a bit idéntica al WAV de la mezcla completa, porque la saturación y el limitador no son lineales.
 - El autoguardado en el navegador no se activa en proyectos con clips horneados (serían demasiado grandes): guarda con «Guardar».
 - En iOS/Safari, el audio solo arranca tras un gesto del usuario (el botón Play ya lo es).
-- No hay exportación MIDI, ni efectos por pista (reverb/delay): por ahora todo pasa por el sidechain y la saturación suave del kit.
+- No hay exportación MIDI (a propósito). Los efectos son solo delay y reverb por pista; no hay compresor ni EQ por pista.
+- La reverb tiene cola de ~0.8 s (tamaño .2) a ~5 s (tamaño 1) y su nivel está calibrado de forma aproximada, afínalo de oído. Los efectos añaden a la caché (unos 230 MB en The Void con 5 pistas con efectos; tope 320 MB).
 - La grabación **no compensa la latencia** de tu equipo (teclado, interfaz de audio o Bluetooth); el tiempo se toma cuando llega la tecla o el mensaje MIDI. Con audífonos Bluetooth puede sentirse desfasada.
 
 ## Créditos
