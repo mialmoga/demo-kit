@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo Kit · ejemplo de la librería</title>
+<style>
+  :root{color-scheme:dark;--bg:#0d0f14;--p:#161922;--b:#272b36;--t:#e8eaf0;--m:#8b92a3;--a:#8fa8ff}
+  body{margin:0;background:var(--bg);color:var(--t);font:15px/1.5 system-ui,sans-serif;display:grid;place-items:start center;min-height:100vh;padding:24px 16px}
+  main{width:100%;max-width:560px} h1{font-size:20px;margin:0 0 4px} p{color:var(--m);margin:0 0 16px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+  select,button{background:var(--p);color:var(--t);border:1px solid var(--b);border-radius:8px;padding:8px 12px;font:inherit}
+  button.pri{background:var(--a);color:#0b0d14;border-color:var(--a);font-weight:600} button:disabled{opacity:.5}
+  .bar{height:6px;background:var(--p);border-radius:3px;overflow:hidden;margin:12px 0}.bar i{display:block;height:100%;width:0;background:var(--a);transition:width .1s}
+  #msg{color:var(--m);min-height:1.5em}
+  pre{background:var(--p);border:1px solid var(--b);border-radius:8px;padding:12px;overflow:auto;font-size:13px}
+</style></head><body><main>
+<h1>Demo Kit · librería</h1>
+<p>Música procedural que se sintetiza al cargar: sin muestras, solo código y datos.</p>
+<div class="row">
+  <select id="song">
+    <option value="demos/the_void.js">The Void (demo .js)</option>
+    <option value="demos/cotton_sugar.js">Cotton Sugar (demo .js)</option>
+    <option value="demos/event_horizon.js">Event Horizon (demo .js)</option>
+    <option value="demos/marshmallow_sky.js">Marshmallow Sky (demo .js)</option>
+    <option value="demos/dark_matter.js">Dark Matter (demo .js)</option>
+    <option value="demos/electronic_rush.js">Electronic Rush (demo .js)</option>
+    <option value="demos/yo_soy_nan.js">Yo soy NaN (demo .js)</option>
+    <option value="demos/ejemplo_minimo.js">Ejemplo mínimo (demo .js)</option>
+  </select>
+  <button id="go" class="pri">Cargar y tocar</button>
+  <button id="stop" disabled>Detener</button>
+</div>
+<div class="row"><label><input type="checkbox" id="loop" checked> en bucle</label> <label>volumen <input type="range" id="vol" min="0" max="1" step=".01" value=".8"></label></div>
+<div class="bar"><i id="prog"></i></div>
+<div id="msg"></div>
+<h1 style="margin-top:28px;font-size:16px">Uso</h1>
+<pre>&lt;script src="demokit.min.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  // dentro de un clic (los navegadores exigen un gesto para sonar)
+  const song = await DemoKit.load('musica/menu.demokit.json', {
+    onProgress: p =&gt; barra.style.width = p * 100 + '%'
+  });
+  const h = song.play({ loop: true, volume: 0.8, fadeIn: 1 });
+  h.stop(1.5);   // con fundido de salida
+&lt;/script&gt;</pre>
+</main>
+<script src="demokit.min.js"></script>
+<script>
+  const $=id=>document.getElementById(id); let cur=null, handle=null; const cache=new Map();
+  $('vol').oninput=e=>{ DemoKit.setVolume(+e.target.value,.05); };
+  $('stop').onclick=()=>{ if(handle) handle.stop(1); $('stop').disabled=true; };
+  $('go').onclick=async()=>{
+    const url=$('song').value; $('go').disabled=true; if(handle) handle.stop(.4); $('msg').textContent='Sintetizando…'; $('prog').style.width='0';
+    try{
+      await DemoKit.unlock(); DemoKit.setVolume(+$('vol').value,0);
+      let song=cache.get(url); const t0=performance.now();
+      if(!song){ song=await DemoKit.load(url,{onProgress:p=>{ $('prog').style.width=(p*100)+'%'; }}); cache.set(url,song); }
+      const secs=((performance.now()-t0)/1000).toFixed(1);
+      handle=song.play({loop:$('loop').checked,fadeIn:.3});
+      $('msg').textContent=song.name+' · '+(song.bpm||'?')+' BPM · '+song.duration.toFixed(0)+' s · '+(song.kind==='project'?'proyecto':'demo .js')+' · sintetizada en '+secs+' s'+(song.warnings.length?' · ⚠ '+song.warnings.join(' | '):'');
+      const h=handle; $('stop').disabled=false; h.ended.then(()=>{ if(handle===h) $('stop').disabled=true; });
+    }catch(e){ $('msg').textContent='Error: '+e.message; console.error(e); }
+    $('go').disabled=false;
+  };
+</script></body></html>
