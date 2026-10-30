@@ -27,18 +27,21 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 | Archivo | Demo | Función |
 |---|---|---|
-| `electronic_rush.js` | ⚡ Electronic Rush OG | `no editable`|
-| `the_void_MK.js` | 🕳️ The Void OG | `no editable` |
-| `cotton_sugar_MK.js` | 🍬 Cotton Sugar OG | `no editable` |
+| `electronic_rush.js` | ⚡ Electronic Rush - Ws | `no editable`|
+| `the_void_MK.js` | 🕳️ The Void - Ws | `no editable` |
+| `cotton_sugar_MK.js` | 🍬 Cotton Sugar - Ws | `no editable` |
 |---|---|---|
-| `event_horizon.js` | 🌑 Event Horizon | `renderVoidV2` |
-| `marshmallow_sky.js` | ☁️ Marshmallow Sky | `renderCottonV2` |
-| `dark_matter.js` | 🌌 Dark Matter | `renderDarkMatter` |
+| `event_horizon.js` | 🌑 Event Horizon - Ws | `renderVoidV2` |
+| `marshmallow_sky.js` | ☁️ Marshmallow Sky - Ws | `renderCottonV2` |
+| `dark_matter.js` | 🌌 Dark Matter - Ws | `renderDarkMatter` |
 |---|---|---|
 | `the_void.js` | 🕳️ The Void (edit) | `renderVoid` |
 | `cotton_sugar.js` | 🍬 Cotton Sugar (edit) | `renderCotton` |
 |---|---|---|
 | `yo_soy_nan.js` | ♾️ You Soy NaN (by Éter) | `renderYoSoyNaN` |
+
+> las marcadas como no editables se pueden reproducir y exportar a .WAV usan un kit diferente que viene incrustado.
+> Todas las marcadas - Ws forman parte del proyecto Wavesurfer  **<https://mialmoga.github.io/Wavesurfer/>**
 
 > El audio solo se genera cuando pulsas Play o WAV: Demo Kit renderiza el proyecto completo y luego lo reproduce. Si cambias algo, el indicador de arriba a la derecha muestra «cambios sin renderizar» y el siguiente Play vuelve a renderizar.
 
