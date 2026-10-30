@@ -1,4 +1,4 @@
-// ── KIT DE SÍNTESIS PARA LAS DEMOS (Cotton Sugar, The Void) ────
+// ── DEMO KIT REFERENCIA ────
 // Todo se calcula muestra a muestra en JavaScript: sin archivos de audio, sin librerías.
 function demoKit(sr,seconds,seed0){
   const n=Math.ceil(seconds*sr);
