@@ -35,9 +35,6 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 | `marshmallow_sky.js` | ☁️ Marshmallow Sky - Ws | `renderCottonV2` |
 | `dark_matter.js` | 🌌 Dark Matter - Ws | `renderDarkMatter` |
 |---|---|---|
-| `the_void.js` | 🕳️ The Void (edit) | `renderVoid` |
-| `cotton_sugar.js` | 🍬 Cotton Sugar (edit) | `renderCotton` |
-|---|---|---|
 | `yo_soy_nan.js` | ♾️ You Soy NaN (by Éter) | `renderYoSoyNaN` |
 
 > las marcadas como no editables se pueden reproducir y exportar a .WAV usan un kit diferente que viene incrustado.
