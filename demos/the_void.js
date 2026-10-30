@@ -1,4 +1,4 @@
-// ── THE VOID · dark drum & bass con medio tiempo dubstep · 174 BPM · Re menor (Dm7–Bbmaj7–Gm7–A7) ──
+// ── 🕳️ The Void · dark drum & bass con medio tiempo dubstep · 174 BPM · Re menor (Dm7–Bbmaj7–Gm7–A7) ──
 // intro(0-7) vacío · build(8-15) · drop DnB(16-31) · breakdown medio tiempo(32-39) · drop final(40-55) · cierre pesado(56-63)
 async function renderVoid(sr,onProg){
   const BPM=174, beat=60/BPM, bar=beat*4, BARS=64, K=demoKit(sr,BARS*bar+2.5,20261017);

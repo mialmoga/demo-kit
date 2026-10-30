@@ -1,4 +1,4 @@
-// ── COTTON SUGAR · future bass dulce · 150 BPM · Do mayor (Cmaj7–Am7–Fmaj7–G6) ──
+// ── 🍬 COTTON SUGAR · future bass dulce · 150 BPM · Do mayor (Cmaj7–Am7–Fmaj7–G6) ──
 // intro(0-7) cajita de música · build(8-15) · drop(16-31) · breakdown(32-39) · drop final(40-55)
 async function renderCotton(sr,onProg){
   const BPM=150, beat=60/BPM, bar=beat*4, BARS=56, K=demoKit(sr,BARS*bar+2.5,20261016);
