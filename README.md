@@ -27,14 +27,18 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 | Archivo | Demo | Función |
 |---|---|---|
+| `electronic_rush.js` | ⚡ Electronic Rush OG | `no editable`|
+| `the_void_MK.js` | 🕳️ The Void OG | `no editable` |
+| `cotton_sugar_MK.js` | 🍬 Cotton Sugar OG | `no editable` |
+|---|---|---|
 | `event_horizon.js` | 🌑 Event Horizon | `renderVoidV2` |
 | `marshmallow_sky.js` | ☁️ Marshmallow Sky | `renderCottonV2` |
 | `dark_matter.js` | 🌌 Dark Matter | `renderDarkMatter` |
-| `the_void.js` | 🕳️ The Void | `renderVoid` |
-| `cotton_sugar.js` | 🍬 Cotton Sugar | `renderCotton` |
-| `yo_soy_nan.js` | ♾️ You Soy NaN | `renderYoSoyNaN` |
 |---|---|---|
-| `electronic_rush.js` | ⚡ Electronic Rush | `no compatible`|
+| `the_void.js` | 🕳️ The Void (edit) | `renderVoid` |
+| `cotton_sugar.js` | 🍬 Cotton Sugar (edit) | `renderCotton` |
+|---|---|---|
+| `yo_soy_nan.js` | ♾️ You Soy NaN (by Éter) | `renderYoSoyNaN` |
 
 > El audio solo se genera cuando pulsas Play o WAV: Demo Kit renderiza el proyecto completo y luego lo reproduce. Si cambias algo, el indicador de arriba a la derecha muestra «cambios sin renderizar» y el siguiente Play vuelve a renderizar.
 
@@ -179,6 +183,7 @@ async function renderLoQueSea(sr, onProg) {      // el nombre debe empezar con �
 
 ```js
 // ── Ejemplo mínimo · demo para Demo Kit ──
+// /demos/ejemplo_minimo.js
 // BPM = 100 | BARS = 4
 async function renderEjemplo(sr, onProg) {
   const BPM = 100, BARS = 4, beat = 60 / BPM, bar = beat * 4;
