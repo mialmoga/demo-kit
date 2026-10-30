@@ -16,14 +16,14 @@
 <p>Música procedural que se sintetiza al cargar: sin muestras, solo código y datos.</p>
 <div class="row">
   <select id="song">
-    <option value="demos/the_void.js">The Void (demo .js)</option>
-    <option value="demos/cotton_sugar.js">Cotton Sugar (demo .js)</option>
-    <option value="demos/event_horizon.js">Event Horizon (demo .js)</option>
-    <option value="demos/marshmallow_sky.js">Marshmallow Sky (demo .js)</option>
-    <option value="demos/dark_matter.js">Dark Matter (demo .js)</option>
-    <option value="demos/electronic_rush.js">Electronic Rush (demo .js)</option>
-    <option value="demos/yo_soy_nan.js">Yo soy NaN (demo .js)</option>
-    <option value="demos/ejemplo_minimo.js">Ejemplo mínimo (demo .js)</option>
+    <option value="../demos/the_void.js">The Void (demo .js)</option>
+    <option value="../demos/cotton_sugar.js">Cotton Sugar (demo .js)</option>
+    <option value="../demos/event_horizon.js">Event Horizon (demo .js)</option>
+    <option value="../demos/marshmallow_sky.js">Marshmallow Sky (demo .js)</option>
+    <option value="../demos/dark_matter.js">Dark Matter (demo .js)</option>
+    <option value="../demos/electronic_rush.js">Electronic Rush (demo .js)</option>
+    <option value="../demos/yo_soy_nan.js">Yo soy NaN (demo .js)</option>
+    <option value="../demos/ejemplo_minimo.js">Ejemplo mínimo (demo .js)</option>
   </select>
   <button id="go" class="pri">Cargar y tocar</button>
   <button id="stop" disabled>Detener</button>
@@ -42,7 +42,7 @@
   h.stop(1.5);   // con fundido de salida
 &lt;/script&gt;</pre>
 </main>
-<script src="demokit.min.js"></script>
+<script src="../lib/demokit.min.js"></script>
 <script>
   const $=id=>document.getElementById(id); let cur=null, handle=null; const cache=new Map();
   $('vol').oninput=e=>{ DemoKit.setVolume(+e.target.value,.05); };
