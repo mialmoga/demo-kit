@@ -1,5 +1,5 @@
-// ── DEMO KIT REFERENCIA ────
-// Todo se calcula muestra a muestra en JavaScript: sin archivos de audio, sin librerías.
+// ── demoKit: kit de síntesis Original ─────────────────────────────
+// Devuelve las herramientas para componer: kick, snare, hat, syn, mix, etc.
 function demoKit(sr,seconds,seed0){
   const n=Math.ceil(seconds*sr);
   const dr=[new Float32Array(n),new Float32Array(n)], mu=[new Float32Array(n),new Float32Array(n)];
