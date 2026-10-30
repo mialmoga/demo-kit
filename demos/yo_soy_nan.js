@@ -1,4 +1,4 @@
-// ── Yo soy NaN · Demo para Estudio Demo Kit ──
+// ── ♾️ Yo soy NaN · Demo para Estudio Demo Kit ──
 // Composición: Velvet, Ámbar & Humano
 // BPM = 82 | BARS = 16
 
