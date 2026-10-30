@@ -1,4 +1,4 @@
-// ── Ejemplo mínimo · demo para Demo Kit ──
+// ── 🧾 Ejemplo mínimo · demo para Demo Kit ──
 // BPM = 100 | BARS = 4
 async function renderEjemplo(sr, onProg) {
   const BPM = 100, BARS = 4, beat = 60 / BPM, bar = beat * 4;
