@@ -1,4 +1,4 @@
-// ── La casa que respira · demo para Demo Kit ──
+// ── 👻 La casa que respira · demo para Demo Kit ──
 // Suspenso de casa embrujada · 84 BPM · Mi frigio con tritono (Mi–Si♭) · 32 compases · bucle limpio.
 // Composición: Claude × Brujo · 31-oct-2026. Usa solo funciones nombradas del kit: se convierte en proyecto editable.
 // Mapa:  0-3 umbral · 4-11 pasos · 12-19 aparición · 20-25 crecimiento · 26 susto · 27 silencio · 28-31 eco (vuelve al umbral)

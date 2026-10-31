@@ -1,4 +1,4 @@
-// ── Ejemplo métrico · demoKit.metric: BPM y BARS en una sola llamada ──
+// ──📏 Ejemplo métrico · demoKit.metric: BPM y BARS en una sola llamada ──
 async function renderMetrico(sr, onProg) {
   const K = demoKit.metric(sr, 128, 8, 2.5, 7), { beat, T } = K;
   for (let b = 0; b < 8; b++) {

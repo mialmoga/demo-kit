@@ -4,7 +4,7 @@
 // la afinación deriva sola como si alguien moviera la mano en la oscuridad, y hay un halo de aliento a una octava.
 registerInstrument({
   id: 'theremin_fantasma',
-  name: 'Theremin fantasma',
+  name: '👻 Theremin fantasma',
   kind: 'melodic',
   desc: 'Seno con portamento de entrada, vibrato con retardo, deriva de afinación, aliento y un halo de octava.',
   params: [
