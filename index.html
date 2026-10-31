@@ -134,6 +134,8 @@ details summary{cursor:pointer;color:var(--a)}
     <button id="bRec" title="Grabar lo que toques">⏺ Grabar</button>
     <label class="chk" title="Ajusta inicio y largo de lo grabado a la Rejilla (si la rejilla está en «libre», se graba tal cual)"><input type="checkbox" id="recQ" checked> cuantizar</label>
     <label class="chk" title="Un compás de metrónomo antes de empezar a grabar"><input type="checkbox" id="recCount" checked> cuenta previa</label>
+    <label class="chk" title="Retraso entre que tocas y que se oye (audio + teclado). Lo grabado se adelanta esos milisegundos. Vacío = automático (latencia de salida del navegador)">latencia <input type="number" id="recLat" min="0" max="500" step="5" placeholder="auto" style="width:58px"> ms</label>
+    <button id="bCalib" class="sm" title="8 clics de metrónomo: toca cualquier tecla (o haz clic) al ritmo y se calcula tu latencia">Calibrar</button>
   </div>
   <div class="grp">
     <input type="text" id="pname" value="Sin título" aria-label="Nombre del proyecto">
@@ -169,6 +171,7 @@ details summary{cursor:pointer;color:var(--a)}
       </span>
       <span class="grp"><label>Rejilla <select id="snap"></select></label>
         <button id="zOut" class="sm">−</button><button id="zIn" class="sm">＋</button></span>
+      <span class="grp"><button id="bUndo" class="sm" title="Deshacer (Ctrl+Z)" disabled>↶</button><button id="bRedo" class="sm" title="Rehacer (Ctrl+Shift+Z o Ctrl+Y)" disabled>↷</button></span>
       <span class="grp live">
         <button id="bLive" class="sm on" title="Tocar la pista activa con el teclado de la compu (Z S X D C V… y Q 2 W 3 E R…)">⌨ Tocar</button>
         <button id="oDn" class="sm" title="Octava abajo (tecla −)">−</button><span id="oct" title="Octava de la fila de abajo">C4</span><button id="oUp" class="sm" title="Octava arriba (tecla =)">＋</button>
@@ -727,12 +730,13 @@ function projectReport(P){
   const o=projectToJSON(P,{compact:true}), len=x=>JSON.stringify(x).length, notes=o.tracks.reduce((a,t)=>a+len(t.n),0);
   return {total:len(o),notes,noteCount:P.tracks.reduce((a,t)=>a+t.notes.length,0),clips:len(o.clips),clipCount:Object.keys(o.clips).length,plugins:len(o.plugins),tracks:o.tracks.length};
 }
-function projectFromJSON(o){
-  const errs=[]; for(const u of o.plugins||[]){ try{ installPlugin(u.code); }catch(e){ errs.push(u.id+': '+e.message); } }
+// opts.allowPlugins===false: no se ejecuta el código de los plugins incluidos (por defecto sí, para compatibilidad; el estudio pregunta antes)
+function projectFromJSON(o,opts){
+  const errs=[], skipped=[]; for(const u of o.plugins||[]){ if(opts&&opts.allowPlugins===false){ skipped.push(u.name||u.id); continue; } try{ installPlugin(u.code); }catch(e){ errs.push(u.id+': '+e.message); } }
   const P=newProject(o.name,o.bpm,o.bars); P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key);
   if(o.sc&&o.sc.table){ const u=b64ToU8(o.sc.table),T=new Float32Array(u.length); for(let i=0;i<u.length;i++) T[i]=u[i]/255; P.sc.table=T; }
   for(const cid in o.clips||{}){ const u=b64ToU8(o.clips[cid]),q=new Int16Array(u.buffer,u.byteOffset,u.length>>1),d=new Float32Array(q.length); for(let i=0;i<q.length;i++) d[i]=q[i]/16384; P.clips[cid]=d; }
-  P.tracks=(o.tracks||[]).map(t=>fixTrack(expandTrack(t))); P.loadErrors=errs; P.loadWarnings=[]; if(o.kit!=null&&o.kit!==KIT_FORMAT) P.loadWarnings.push('Este proyecto se guardó con la versión '+o.kit+' del kit y esta es la '+KIT_FORMAT+(o.kit>KIT_FORMAT?': puede sonar distinto o faltar instrumentos. Actualiza la librería.':': puede sonar un poco distinto.')); return P;
+  P.tracks=(o.tracks||[]).map(t=>fixTrack(expandTrack(t))); P.loadErrors=errs; P.loadWarnings=[]; if(skipped.length) P.loadWarnings.push('Plugins sin ejecutar: '+skipped.join(', ')+'. Las pistas que los usan quedan sin instrumento.'); if(o.kit!=null&&o.kit!==KIT_FORMAT) P.loadWarnings.push('Este proyecto se guardó con la versión '+o.kit+' del kit y esta es la '+KIT_FORMAT+(o.kit>KIT_FORMAT?': puede sonar distinto o faltar instrumentos. Actualiza la librería.':': puede sonar un poco distinto.')); return P;
 }
 
 // ───────────────────────── conversión de demos → proyecto editable ─────────────────────────
@@ -908,7 +912,7 @@ const down=new Map();   // teclas/notas sostenidas ahora (para resaltarlas)
 let mode='draw', snap=.25, BW=48, lastLen=.5, drag=null, kitName='incluido';
 const KW=62, RUL=24;
 let ctx=null, srcNode=null, playing=false, playIsProject=false, playStartCtx=0, playOffset=0, playLoop=false, playDur=0;
-const undoStack=[]; const demos=[];
+const demos=[];
 const wrap=$('wrap'), cv=$('cv'), sp=$('sp');
 
 // ───────────── audio / reproducción ─────────────
@@ -984,14 +988,39 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 
 // ───────────── proyecto: cambios ─────────────
 let asTimer=0;
-function touch(){ version++; dirty=true; updateStat(); refreshCounts(); invalidate();
+function touch(){ histNote(); version++; dirty=true; updateStat(); refreshCounts(); invalidate();
   clearTimeout(asTimer); asTimer=setTimeout(()=>{ try{ if(Object.keys(P.clips).length) return; localStorage.setItem('demokit-studio-autosave',JSON.stringify(projectToJSON(P))); }catch(e){} },900); }
-function pushUndo(){ const tr=P.tracks[sel]; if(!tr) return; undoStack.push({ti:sel,notes:JSON.stringify(tr.notes),auto:JSON.stringify(tr.auto||null)}); if(undoStack.length>40) undoStack.shift(); }
-function undo(){ const u=undoStack.pop(); if(!u||!P.tracks[u.ti]) return; P.tracks[u.ti].notes=JSON.parse(u.notes); if(u.auto!==undefined){ const a=JSON.parse(u.auto); if(a) P.tracks[u.ti].auto=a; else delete P.tracks[u.ti].auto; } selNotes.clear(); touch(); renderInspector(); }
+// ───────────── historial global: deshacer / rehacer de TODO el proyecto ─────────────
+// Cada cambio guarda una foto del proyecto (JSON; los arreglos de audio —clips, tabla de sidechain— van por referencia).
+// Los cambios continuos (sliders, arrastres, una toma grabada) se agrupan en una sola entrada.
+const hist={undo:[],redo:[],last:null,open:false,timer:0,max:100,restoring:false};
+function snapProject(){ const refs=[]; const json=JSON.stringify(P,(k,v)=>{ if(v&&ArrayBuffer.isView(v)){ refs.push(v); return {__ref:refs.length-1}; } return v; }); return {json,refs}; }
+function histPush(s){ const t=hist.undo[hist.undo.length-1]; if(t&&t.json===s.json) return; hist.undo.push(s); if(hist.undo.length>hist.max) hist.undo.shift(); hist.redo.length=0; histBtns(); }
+function histArm(){ clearTimeout(hist.timer); hist.timer=setTimeout(histClose,700); }
+function histClose(){ if(drag||rec.active){ hist.timer=setTimeout(histClose,700); return; } hist.open=false; hist.last=snapProject(); }
+function histReset(){ clearTimeout(hist.timer); hist.undo.length=0; hist.redo.length=0; hist.open=false; hist.last=snapProject(); histBtns(); }
+function histNote(){ if(hist.restoring) return; if(!hist.open){ if(hist.last) histPush(hist.last); hist.open=true; } histArm(); }   // lo llama touch(): ya cambió algo
+function pushUndo(){ if(hist.restoring) return; histPush(snapProject()); hist.open=true; histArm(); }                         // se llama ANTES de cambiar: cada llamada es un paso nuevo
+function histBtns(){ const u=$('bUndo'),r=$('bRedo'); if(u) u.disabled=!hist.undo.length; if(r) r.disabled=!hist.redo.length; }
+function applySnap(s){
+  hist.restoring=true; try{
+    P=JSON.parse(s.json,(k,v)=>v&&typeof v==='object'&&!Array.isArray(v)&&'__ref' in v&&Object.keys(v).length===1?s.refs[v.__ref]:v);
+    sel=Math.max(0,Math.min(sel,P.tracks.length-1)); selNotes.clear(); drag=null;
+    $('pname').value=P.name; $('bpm').value=P.bpm; $('bars').value=P.bars;
+    renderTracks(); renderInspector(); layoutSpacer(); touch(); invalidate(); prewarm();
+  } finally{ hist.restoring=false; }
+}
+function histGo(from,to,label){
+  if(rec.active){ toast('Detén la grabación antes de deshacer','err'); return; }
+  clearTimeout(hist.timer); hist.open=false; const cur=snapProject(); let s=from.pop(); while(s&&s.json===cur.json) s=from.pop();
+  if(!s){ histBtns(); toast('Nada que '+label,''); return; }
+  to.push(cur); applySnap(s); hist.last=s; histBtns();
+}
+const undo=()=>histGo(hist.undo,hist.redo,'deshacer'), redo=()=>histGo(hist.redo,hist.undo,'rehacer');
 function loadProject(proj){
-  stop(); P=proj; sel=0; selNotes.clear(); undoStack.length=0; cursorBeat=0; cache=null; dirty=true; version++;
+  stop(); P=proj; sel=0; selNotes.clear(); cursorBeat=0; cache=null; dirty=true; version++;
   $('pname').value=P.name; $('bpm').value=P.bpm; $('bars').value=P.bars;
-  renderTracks(); renderInspector(); layoutSpacer(); centerTrack(); updateStat(); invalidate();
+  renderTracks(); renderInspector(); layoutSpacer(); centerTrack(); updateStat(); invalidate(); histReset();
   if(P.loadErrors&&P.loadErrors.length) toast('Plugins con error: '+P.loadErrors.join('; '),'err');
   if(P.loadWarnings&&P.loadWarnings.length) toast(P.loadWarnings.join(' '),'err');
 }
@@ -1140,7 +1169,8 @@ document.addEventListener('keydown',e=>{
   const tg=e.target&&e.target.tagName; if(tg==='INPUT'||tg==='TEXTAREA'||tg==='SELECT') return;
   const tr=P.tracks[sel], ctrl=e.ctrlKey||e.metaKey;
   if(e.code==='Space'){ e.preventDefault(); togglePlay(); return; }
-  if(ctrl&&e.key.toLowerCase()==='z'){ e.preventDefault(); undo(); return; }
+  if(ctrl&&e.key.toLowerCase()==='z'){ e.preventDefault(); if(e.shiftKey) redo(); else undo(); return; }
+  if(ctrl&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); return; }
   if(!tr) return;
   if(e.key==='Delete'||e.key==='Backspace'){ if(selNotes.size){ e.preventDefault(); pushUndo(); tr.notes=tr.notes.filter(n=>!selNotes.has(n)); selNotes.clear(); touch(); renderSelInfo(); } }
   else if(ctrl&&e.key.toLowerCase()==='a'){ e.preventDefault(); selNotes=new Set(tr.notes); renderSelInfo(); invalidate(); }
@@ -1409,15 +1439,23 @@ ${chunks.join(',\n')}
 }
 $('bDemoJs').onclick=exportDemoJs;
 
+// ───────────── seguridad: el código ajeno solo se ejecuta si lo confirmas ─────────────
+// Un plugin, un kit o un proyecto con plugins es JavaScript que corre con los mismos permisos que esta página.
+function trustCode(titulo,detalle){ return confirm('⚠ '+titulo+'\n\n'+detalle+'\n\nEl código se ejecuta en tu navegador con los mismos permisos que esta página. Continúa solo si confías en quien lo hizo.\n\n¿Ejecutarlo?'); }
+function projectFromFile(o,nombre){   // proyecto → pregunta por los plugins que aún no tienes instalados tal cual
+  const nuevos=(o.plugins||[]).filter(u=>{ const t=USER_PLUGINS.find(x=>x.id===u.id); return !t||t.code!==u.code; });
+  let allow=true; if(nuevos.length) allow=trustCode('«'+(nombre||o.name||'Proyecto')+'» trae '+nuevos.length+' plugin(s) con código propio',nuevos.map(u=>'• '+(u.name||u.id)+' ('+((u.code||'').length/1024).toFixed(1)+' KB)').join('\n'));
+  return projectFromJSON(o,{allowPlugins:allow||!nuevos.length});
+}
 // ───────────── archivos, demos y plugins ─────────────
 const demoName=(txt,fb)=>{ const m=/^\/\/\s*[─\-—–\s]*([^·\n]+?)\s*·/m.exec(txt); return m?m[1].trim():fb; };
 async function ingest(file){
   const txt=await file.text(), name=file.name;
   try{
-    if(/^\s*\{/.test(txt)){ const o=JSON.parse(txt); if(o.format==='demokit-studio'){ loadProject(projectFromJSON(o)); populateAddInst(); toast('Proyecto «'+o.name+'» cargado','ok'); return; } }
-    if(/function\s+demoKit\s*\(/.test(txt)){ const f=new Function(txt+'\nreturn demoKit;')(); const k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); Kit.make=f; bumpKit(); kitName=name; cache=null; dirty=true; renderLib(); updateStat(); toast('Kit «'+name+'» cargado: los instrumentos y plugins lo usan desde ahora','ok'); return; }
+    if(/^\s*\{/.test(txt)){ const o=JSON.parse(txt); if(o.format==='demokit-studio'){ loadProject(projectFromFile(o,name)); populateAddInst(); toast('Proyecto «'+o.name+'» cargado','ok'); return; } }
+    if(/function\s+demoKit\s*\(/.test(txt)){ if(!trustCode('Kit «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código que reemplazará al kit incluido.')){ toast('Kit no cargado','err'); return; } const f=new Function(txt+'\nreturn demoKit;')(); const k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); Kit.make=f; bumpKit(); kitName=name; cache=null; dirty=true; renderLib(); updateStat(); toast('Kit «'+name+'» cargado: los instrumentos y plugins lo usan desde ahora','ok'); return; }
     if(/async\s+function\s+render\w*\s*\(/.test(txt)){ const fn=/async\s+function\s+(render\w*)/.exec(txt)[1]; const d={name:demoName(txt,name.replace(/\.js$/,'')),fn,src:txt,out:null}; const i=demos.findIndex(x=>x.name===d.name); if(i>=0) demos[i]=d; else demos.push(d); renderLib(); openModal('libModal'); toast('Demo «'+d.name+'» lista: reprodúcela o conviértela','ok'); return; }
-    if(/registerInstrument\s*\(/.test(txt)){ const def=installPlugin(txt); populateAddInst(); renderLib(); toast('Plugin «'+def.name+'» registrado','ok'); return; }
+    if(/registerInstrument\s*\(/.test(txt)){ if(!trustCode('Plugin «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código. Empieza así:\n'+txt.slice(0,160).replace(/\s+/g,' ')+'…')){ toast('Plugin no instalado','err'); return; } const def=installPlugin(txt); populateAddInst(); renderLib(); toast('Plugin «'+def.name+'» registrado','ok'); return; }
     toast('No reconocí «'+name+'» (¿demo, plugin, kit o proyecto?)','err');
   }catch(e){ console.error(e); toast('Error con «'+name+'»: '+e.message,'err'); }
 }
@@ -1430,7 +1468,7 @@ async function playDemo(d){
 async function demoWav(d){ if(!d.out){ try{ const fn=compileDemo(d.src,d.fn,sleep); d.out=await fn(SR,p=>prog(p)); prog(0); }catch(e){ prog(0); toast('Error: '+e.message,'err'); return; } } download(encodeWav(d.out.L,d.out.R,SR),d.name.replace(/\W+/g,'_')+'.wav'); }
 async function convertDemo(d){
   if(P.tracks.some(t=>t.notes.length)&&!confirm('Esto reemplaza el proyecto actual. ¿Continuar?')) return;
-  const emb=embeddedProject(d.src); if(emb){ try{ loadProject(projectFromJSON(emb)); populateAddInst(); closeModal('libModal'); toast('«'+d.name+'»: proyecto original recuperado sin pérdidas','ok'); }catch(e){ console.error(e); toast('No pude abrir el proyecto incrustado: '+e.message,'err'); } return; }
+  const emb=embeddedProject(d.src); if(emb){ try{ loadProject(projectFromFile(emb,d.name)); populateAddInst(); closeModal('libModal'); toast('«'+d.name+'»: proyecto original recuperado sin pérdidas','ok'); }catch(e){ console.error(e); toast('No pude abrir el proyecto incrustado: '+e.message,'err'); } return; }
   try{ toast('Convirtiendo «'+d.name+'»…'); await tick(); const {project,stats,warnings}=await recordDemo(d.src,{name:d.name}); loadProject(project); closeModal('libModal'); if(warnings&&warnings.length) setTimeout(()=>toast('⚠ '+warnings.join(' '),'err'),300);
     toast('«'+d.name+'» convertida: '+stats.tracks+' pistas, '+stats.notes+' notas'+(stats.clips?(' y '+stats.clips+' clips horneados (add() en línea que no se puede parametrizar; para rehacerlo usa «Sub con caída» u otro instrumento)'):'')+'. Guarda el proyecto si quieres conservarlo.','ok'); }
   catch(e){ console.error(e); toast('No pude convertir: '+e.message,'err'); }
@@ -1578,9 +1616,31 @@ $('bLive').onclick=()=>setLive(!liveEnabled); $('oDn').onclick=()=>setOctave(-1)
 // Con ⏺ armado, al pulsar Play el proyecto suena como acompañamiento y lo que tocas se anota en la pista activa,
 // en la posición exacta del cabezal (cuantizada a la rejilla si «cuantizar» está activo). Con bucle, cada vuelta suma notas (overdub).
 function recBeat(){
-  if(!ctx||!playing||!playIsProject) return null; const t=ctx.currentTime-playStartCtx; if(t<0) return null;      // t<0 = cuenta previa
-  let p=playOffset+t; if(playLoop&&playLoopEnd>0) p%=playLoopEnd; return p/(60/P.bpm);
+  if(!ctx||!playing||!playIsProject) return null; let t=ctx.currentTime-playStartCtx; if(t<0) return null;      // t<0 = cuenta previa
+  let p=playOffset+t-recLatMs()/1000;                                                       // compensa la latencia: lo que tocaste sonó antes de lo que oyes
+  if(playLoop&&playLoopEnd>0) p=((p%playLoopEnd)+playLoopEnd)%playLoopEnd; else p=Math.max(0,p);
+  return p/(60/P.bpm);
 }
+// latencia de grabación (ms): lo escrito en la casilla, o la latencia de salida del navegador si está vacía
+const LAT_KEY='demokit-rec-latency';
+function recLatMs(){ const v=$('recLat').value; if(v!=='') return Math.max(0,Math.min(500,+v||0)); return ctx&&ctx.outputLatency?Math.round(ctx.outputLatency*1000):0; }
+(function(){ try{ const s=localStorage.getItem(LAT_KEY); if(s!==null&&s!=='') $('recLat').value=s; }catch(e){} })();
+$('recLat').onchange=()=>{ try{ localStorage.setItem(LAT_KEY,$('recLat').value); }catch(e){} };
+// calibración: 8 clics; el usuario toca al ritmo; la latencia es la mediana de (momento del toque − momento del clic)
+let calib=null;
+function startCalib(){
+  if(calib||playing){ if(playing) toast('Detén la reproducción antes de calibrar','err'); return; } const a=ac(), gap=.6, t0=a.currentTime+.8, N=8, clicks=[], taps=[];
+  for(let i=0;i<N;i++){ clickAt(t0+i*gap,i===0); clicks.push(t0+i*gap); }
+  $('stat').textContent='🎚 Calibrando: toca cualquier tecla al ritmo de los clics…'; $('stat').className='warn'; $('bCalib').disabled=true; calib={};
+  const tap=e=>{ if(e.type==='keydown'){ if(e.repeat||e.ctrlKey||e.metaKey||e.altKey) return; e.preventDefault(); e.stopImmediatePropagation(); } else if(e.target.id==='bCalib') return; taps.push(a.currentTime); };
+  document.addEventListener('keydown',tap,true); document.addEventListener('pointerdown',tap,true);
+  setTimeout(()=>{ document.removeEventListener('keydown',tap,true); document.removeEventListener('pointerdown',tap,true); calib=null; $('bCalib').disabled=false; updateStat();
+    const d=[]; for(const t of taps){ let best=null; for(const c of clicks) if(best===null||Math.abs(t-c)<Math.abs(t-best)) best=c; if(Math.abs(t-best)<gap/2) d.push((t-best)*1000); }
+    if(d.length<4){ toast('Pocos toques ('+d.length+'). Toca al ritmo de los 8 clics e inténtalo otra vez','err'); return; }
+    d.sort((x,y)=>x-y); const med=d[d.length>>1], ms=Math.max(0,Math.round(med/5)*5), spread=d[d.length-1]-d[0];
+    $('recLat').value=ms; $('recLat').onchange(); toast('Latencia: '+ms+' ms (de '+d.length+' toques'+(spread>120?'; muy irregulares, repite si puedes':'')+')','ok'); },(N*gap+1.4)*1000);
+}
+$('bCalib').onclick=startCalib;
 const recQ=()=>$('recQ').checked&&snap>0;
 function clickAt(t,accent){ const a=ctx,o=a.createOscillator(),g=a.createGain(); o.frequency.value=accent?1500:1000;
   g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.35,t+.002); g.gain.exponentialRampToValueAtTime(.0001,t+.05);
@@ -1670,7 +1730,8 @@ window.addEventListener('drop',e=>{ if(e.dataTransfer&&e.dataTransfer.files.leng
   populateAddInst();
   try{ const raw=localStorage.getItem('demokit-studio-autosave'); if(raw){ const o=JSON.parse(raw); if(o&&o.format==='demokit-studio'&&o.tracks&&o.tracks.length){ P=projectFromJSON(o); toast('Sesión anterior restaurada. «Nuevo» o «Cargar proyecto de ejemplo» en Demos y plugins para empezar de cero.'); } } }catch(e){ console.warn('autosave',e); }
   $('pname').value=P.name; $('bpm').value=P.bpm; $('bars').value=P.bars; setMode('draw');
-  renderTracks(); renderInspector(); renderLib(); layoutSpacer(); centerTrack(); updateStat(); invalidate();
+  renderTracks(); renderInspector(); renderLib(); layoutSpacer(); centerTrack(); updateStat(); invalidate(); histReset();
+  $('bUndo').onclick=undo; $('bRedo').onclick=redo;
   window.addEventListener('resize',()=>{ layoutSpacer(); invalidate(); });
   window.addEventListener('beforeunload',()=>{ releaseWake(); });
 })();

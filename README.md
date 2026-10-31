@@ -42,7 +42,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 ## Funciones
 
-- **Piano roll** con rejilla (1/4 a 1/32, tresillos o libre), zoom, notas fantasma de las otras pistas, selección múltiple, velocidad por nota y deshacer.
+- **Piano roll** con rejilla (1/4 a 1/32, tresillos o libre), zoom, notas fantasma de las otras pistas, selección múltiple, velocidad por nota y **deshacer/rehacer global** (notas, pistas, parámetros, efectos, master, BPM… hasta 100 pasos; los sliders y arrastres cuentan como un solo paso).
 - **Pistas / capas ilimitadas**, cada una con su instrumento, volumen, paneo, mute y solo.
 - **Instrumentos base parametrizables** (cada uno con sus sliders):
   - *Melódicos:* Sinte genérico, Supersaw, Pluck, Arpegio cuadrado, Pad, Sub, Sub con caída, Reese, Growl, Campana, Chop vocal.
@@ -78,7 +78,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 | Borrar | `Supr` / `Retroceso`, clic derecho sobre la nota, o modo «Borrar» |
 | Duplicar selección | `Ctrl/⌘ + D` |
 | Seleccionar todo | `Ctrl/⌘ + A` |
-| Deshacer | `Ctrl/⌘ + Z` |
+| Deshacer / rehacer | `Ctrl/⌘ + Z` / `Ctrl/⌘ + Shift + Z` o `Ctrl + Y` (también los botones ↶ ↷ de la barra) |
 | Mover selección | flechas (`Shift`: 1 pulso / 1 octava) |
 | Punto de inicio de reproducción | clic en la regla de compases (`Inicio` lo lleva a 0) |
 | Play / Stop | `Espacio` |
@@ -119,6 +119,7 @@ Detalles:
 - **Cuantizar** ajusta el inicio y el largo de cada nota a la **Rejilla** elegida. Con la rejilla en «libre» (o con cuantizar desactivado) se graba tal cual lo tocaste.
 - **Bucle:** si está activo, el bucle cubre exactamente los compases del proyecto y cada vuelta suma notas encima (overdub). Tocar la misma nota en el mismo lugar no la duplica.
 - **Punch-in:** si el proyecto ya está sonando y pulsas ⏺, empieza a grabar en ese momento. Si lo desarmas a la mitad, se cierra la toma.
+- **Latencia:** entre que pulsas una tecla y que lo oyes pasan unos milisegundos, y las notas se grababan «tarde». La casilla **latencia (ms)** adelanta lo grabado esa cantidad; vacía = automática (la latencia de salida que reporta el navegador). Con **Calibrar** suenan 8 clics: toca cualquier tecla (o haz clic) al ritmo y se calcula y guarda tu valor (mediana de los toques; el navegador la recuerda). Es lo que corrige que lo grabado quede detrás del beat, sobre todo con Bluetooth.
 - **Pedal de sustain** (MIDI): la nota grabada dura hasta que sueltas el pedal. La velocidad MIDI se guarda en cada nota.
 - **Percusión:** las notas se graban en el carril correspondiente con largo fijo.
 - Si cambias de pista durante la toma, las notas abiertas se cierran en su pista.
@@ -151,6 +152,8 @@ Límites a tener en cuenta:
 ## Escribir demos compatibles (para humanos e IAs)
 
 Una demo es un archivo `.js` con una función `async` que usa `demoKit` y devuelve el audio. Si solo usa las funciones nombradas del kit, **se convierte en un proyecto completamente editable**. *Yo soy NaN* la escribió una IA (Éter) viendo el kit y un par de ejemplos, y convirtió a la primera.
+
+> 📖 **Referencia completa para escribir demos (pensada para IAs):** [`kits/REFERENCIA.md`](kits/REFERENCIA.md) — molde, firmas de todas las funciones, opciones de `syn`, qué se convierte y trampas frecuentes.
 
 **El contrato (forma métrica, recomendada)**
 
@@ -225,6 +228,8 @@ async function renderEjemplo(sr, onProg) {
 > Escribe una demo para Demo Kit en el estilo del ejemplo: una sola función `async function renderXxx(sr, onProg)`, con `BPM = N` y `BARS = N` en el encabezado, que use solo funciones de `demoKit` (`kick`, `snare`, `clap`, `hat`, `syn`, `bell`, `chop`, `riser`, `sweep`, `crash`) y termine con `return K.mix(duckAt)`. Sin `K.add` propios. Estilo: …
 
 ## Plugins (instrumentos propios)
+
+> 🛡 **Seguridad:** un plugin es JavaScript que se ejecuta con los mismos permisos que la página. Por eso el estudio **pregunta antes de ejecutar** código ajeno: al soltar un plugin `.js`, un kit propio, o al abrir un proyecto que trae plugins (se listan sus nombres y tamaño; si dices que no, el proyecto abre igual pero sin esos instrumentos). Si ya tienes ese plugin instalado tal cual, no vuelve a preguntar. Las demos `.js` se ejecutan solo cuando pulsas ▶ o Convertir, así que cárgalas solo si son tuyas o confías en ellas.
 
 «Demos y plugins» → «Escribir un plugin nuevo» abre un editor con una plantilla. Un plugin es un objeto que llama a `registerInstrument`:
 
