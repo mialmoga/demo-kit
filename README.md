@@ -30,11 +30,9 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 | `electronic_rush.js` | ⚡ Electronic Rush - Ws | `no editable`|
 | `the_void_MK.js` | 🕳️ The Void - Ws | `no editable` |
 | `cotton_sugar_MK.js` | 🍬 Cotton Sugar - Ws | `no editable` |
-|---|---|---|
 | `event_horizon.js` | 🌑 Event Horizon - Ws | `renderVoidV2` |
 | `marshmallow_sky.js` | ☁️ Marshmallow Sky - Ws | `renderCottonV2` |
 | `dark_matter.js` | 🌌 Dark Matter - Ws | `renderDarkMatter` |
-|---|---|---|
 | `yo_soy_nan.js` | ♾️ You Soy NaN (by Éter) | `renderYoSoyNaN` |
 
 > las marcadas como no editables se pueden reproducir y exportar a .WAV usan un kit diferente que viene incrustado.
@@ -133,11 +131,15 @@ Las demos del kit son funciones `async function renderXxx(sr, onProg)` que llama
 
 Resultado actual con las demos incluidas:
 
-| Demo | Pistas | Notas |
-|---|---|---|
-| Cotton Sugar | 15 | 1928 |
-| The Void | 17 | 1693 |
-| Yo soy NaN | 11 | 322 |
+| Demo | Pistas | Notas | Clips horneados |
+|---|---|---|---|
+| Marshmallow Sky | 15 | 1928 | 0 |
+| Dark Matter | 17 | 1693 | 58 |
+| Event Horizon | 21 | 1288 | 284 |
+| Yo soy NaN | 11 | 322 | 0 |
+| Ejemplo mínimo | 5 | 72 | 0 |
+
+Las demos `_MK`, Electronic Rush y cualquier demo que traiga su propio kit no se convierten (suenan y exportan a WAV, pero no son editables).
 
 Límites a tener en cuenta:
 
@@ -150,17 +152,32 @@ Límites a tener en cuenta:
 
 Una demo es un archivo `.js` con una función `async` que usa `demoKit` y devuelve el audio. Si solo usa las funciones nombradas del kit, **se convierte en un proyecto completamente editable**. *Yo soy NaN* la escribió una IA (Éter) viendo el kit y un par de ejemplos, y convirtió a la primera.
 
-**El contrato**
+**El contrato (forma métrica, recomendada)**
 
 ```js
 // ── Título de la demo · lo que quieras ──      ← el texto antes del primer «·» es el nombre del proyecto
-// BPM = 100 | BARS = 4                           ← BPM y BARS: el convertidor los busca con estos nombres en mayúsculas
 async function renderLoQueSea(sr, onProg) {      // el nombre debe empezar con «render»
+  const K = demoKit.metric(sr, 128, 16, 2.5, 20261015);   // BPM, compases, cola (s), semilla → la duración se calcula sola
+  const { beat, bar, T } = K;                    // beat/bar en segundos · T(compás, pulso) → segundos
+  K.kick(T(0, 0), 1);                            // compás 0, pulso 0
+  K.syn(K.mu, T(1, 2), beat, 110, .3, 0, { w: 2 });
+  return K.mix([0, 0, .8, .8 /* …uno por compás */], .13);   // sidechain por compás (0 = nada, .8 = fuerte), decae en cada pulso
+}
+```
+
+`demoKit.metric(sr, BPM, BARS, tail, seed)` devuelve el mismo kit de siempre más `BPM, BARS, beat, bar, T(compás, pulso)` y `duckBars(arreglo, dk)`. El convertidor lee BPM y BARS directamente de esa llamada (sin regex ni comentarios) y `K.mix` acepta el arreglo por compás o una función `duckAt(t)`. La forma clásica `demoKit(sr, segundos, semilla)` sigue funcionando igual.
+
+**Forma clásica** (sigue siendo válida)
+
+```js
+// BPM = 100 | BARS = 4                           ← en este caso el convertidor los busca con estos nombres en mayúsculas
+async function renderLoQueSea(sr, onProg) {
   const K = demoKit(sr, BARS*bar + 2.5, 20261015);   // segundos totales (+2.5 s de cola) y semilla
-  // ... llamadas a K.kick, K.syn, K.bell, etc.
   return K.mix(duckAt);                          // duckAt(t) → ganancia de la música (1 = sin sidechain)
 }
 ```
+
+**Demos hechas con `make_kit.js`** (`makeKit(sr,BPM,BARS,tail,seed)`): el estudio y la librería las ejecutan y convierten solas, sustituyendo `makeKit` por un adaptador sobre `demoKit.metric` (el audio sale idéntico). El `reese` de 4 sierras y la campana en línea de esas demos se reconocen como «Reese 4 sierras (MK)» y «Campana (MK)».
 
 **Qué se convierte en notas editables**
 
@@ -169,7 +186,7 @@ async function renderLoQueSea(sr, onProg) {      // el nombre debe empezar con �
 | `K.kick` `K.snare` `K.clap` `K.snap` `K.hat` `K.crash` | pistas de batería (el hi-hat abierto va en el segundo carril) |
 | `K.syn(buf, …)` | pistas «Sinte» (se agrupan por onda, envolvente y desafine), con ganancia, voces, filtro y envolvente como sliders |
 | `K.bell` `K.chop` `K.riser` `K.sweep` | sus instrumentos, con parámetros |
-| funciones propias llamadas `reese` `growl` `rim` `wash` `impact` | sus instrumentos (se reconocen por el nombre) |
+| funciones propias llamadas `reese` `growl` `rim` `wash` `impact` `bell` | sus instrumentos (se reconocen por el nombre y la firma) |
 | `K.mix(duckAt)`, la función que quieras | una curva de sidechain guardada como tabla |
 
 **Qué no se convierte, y cómo evitarlo**
@@ -276,7 +293,7 @@ K.rnd()   K.hz(midi)   K.lpc(fc)
 <script src="demokit.min.js"></script>
 <script>
   // dentro de un clic o toque (los navegadores exigen un gesto para sonar)
-  const song = await DemoKit.load('musica/menu.demokit.json', {   // o 'demos/the_void.js'
+  const song = await DemoKit.load('musica/menu.demokit.json', {   // o 'demos/the_void_MK.js'
     onProgress: p => barra.style.width = p * 100 + '%'
   });
   const h = song.play({ loop: true, volume: 0.8, fadeIn: 1 });
@@ -299,13 +316,13 @@ K.rnd()   K.hz(midi)   K.lpc(fc)
 - **Plugins:** el código de plugins que traiga un `.demokit.json` **no se ejecuta** salvo que pases `allowPlugins: true` (esas pistas se omiten y aparece un aviso en `song.warnings`). Las demos `.js` sí ejecutan su código: cárgalas solo si son tuyas o confías en ellas.
 - **Cualquier demo con `async function render…(sr, onProg)` suena**, aunque no use `demoKit` (por ejemplo Electronic Rush, que lo trae todo integrado); solo las que usan las funciones del kit se pueden convertir en proyecto editable.
 - La librería se genera con `build_lib.py` a partir de los mismos archivos del estudio, para que suenen idéntico.
-- `ejemplo_libreria.html` es una página mínima que carga y toca las demos de `demos/`. Necesita un servidor (por ejemplo `python3 -m http.server`), porque usa `fetch`.
+- `ejemplo/libreria.html` es una página mínima que carga y toca las demos de `demos/`. Necesita un servidor (por ejemplo `python3 -m http.server` desde la raíz del repo), porque usa `fetch`.
 
 ## Formato de proyecto (`.demokit.json`)
 
 ```jsonc
 {
-  "format": "demokit-studio", "v": 1,
+  "format": "demokit-studio", "v": 1, "kit": 1,
   "name": "...", "bpm": 128, "bars": 8, "seed": 20261015,
   "sc": { "mode": "param|table", "depth": 0.7, "rel": 0.12, "rate": 800, "table": "<base64>" },
   "tracks": [{
@@ -319,7 +336,9 @@ K.rnd()   K.hz(midi)   K.lpc(fc)
 }
 ```
 
-`b` = pulso de inicio, `l` = largo en pulsos, `m` = nota MIDI (en percusión, el carril), `v` = velocidad, `o` = parámetros propios de esa nota.
+`b` = pulso de inicio, `l` = largo en pulsos, `m` = nota MIDI (en percusión, el carril), `v` = velocidad, `o` = parámetros propios de esa nota. `kit` es la versión del kit con que se guardó (si no coincide, la librería avisa en `song.warnings`).
+
+**Formato compacto** (`"v": 2`, el de «⬇ Compacto»): las notas van como arreglos `[b, l, m, v, pan, o]` en `n` (los últimos valores se omiten si son los de fábrica: `[0, 0.5, 60]` es una nota con velocidad 1 y sin paneo) y `params` solo trae lo que difiere del instrumento. El estudio y la librería leen los dos formatos.
 
 ## Arquitectura
 
