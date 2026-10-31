@@ -303,15 +303,18 @@ K.rnd()   K.hz(midi)   K.lpc(fc)
 
 | | |
 |---|---|
-| `DemoKit.load(fuente, opciones)` | `fuente`: URL, texto del archivo u objeto de proyecto. `opciones`: `onProgress(p)`, `allowPlugins` |
+| `DemoKit.load(fuente, opciones)` | `fuente`: URL, texto del archivo u objeto de proyecto. `opciones`: `onProgress(p)`, `allowPlugins`, `cache` (activa por defecto) |
 | `song.play({loop, volume, fadeIn, offset, loopStart, loopEnd})` | devuelve un manejador: `stop(fundido)`, `setVolume(v, fundido)`, `ended` (promesa) |
 | `song.stop(fundido)` | detiene todas las reproducciones de esa canción |
 | `song.L`, `song.R`, `song.duration`, `song.bpm`, `song.bars`, `song.name`, `song.warnings` | el audio (Float32Array a 44.1 kHz) y sus datos |
 | `song.wav()` | `Blob` WAV |
+| `song.cached` | `true` si el audio salió de la caché en lugar de renderizarse |
+| `DemoKit.clearCache()` | borra la caché (promesa) |
 | `DemoKit.unlock()`, `useContext(ctx, destino)`, `setVolume(v)`, `setKit(demoKit)` | integración con tu propio audio |
 
 - **Bucle:** por defecto se repite hasta el final «musical» (`BARS` × compás), sin la cola de 2.5 s; puedes pasar `loopStart` / `loopEnd` en segundos.
 - **Tiempo de síntesis:** de 1 a 3 s para una canción de 1.5 minutos (medido en Node con las demos de la carpeta `demos/`); un proyecto corto, una fracción de segundo. Hazlo en la pantalla de carga y guarda el `song`.
+- **Caché (IndexedDB):** la primera vez la canción se renderiza y el audio queda guardado en el navegador; las siguientes cargas tardan milisegundos (`song.cached === true`). La llave mezcla el contenido del archivo, la versión de la librería, el código del kit en uso (`setKit` incluido) y `allowPlugins`, así que cualquier cambio la invalida sola. Guarda las 12 más recientes (una canción de 90 s ocupa unos 30 MB). Si IndexedDB no existe o falla (modo privado, Node), se renderiza normal. Desactívala con `{cache:false}`.
 - **Versión del kit:** cada proyecto guarda `kit: N`. Si no coincide con la de la librería (o el estudio), `song.warnings` avisa de que puede sonar distinto. Se sube cuando un cambio del kit altera canciones ya guardadas.
 - **Plugins:** el código de plugins que traiga un `.demokit.json` **no se ejecuta** salvo que pases `allowPlugins: true` (esas pistas se omiten y aparece un aviso en `song.warnings`). Las demos `.js` sí ejecutan su código: cárgalas solo si son tuyas o confías en ellas.
 - **Cualquier demo con `async function render…(sr, onProg)` suena**, aunque no use `demoKit` (por ejemplo Electronic Rush, que lo trae todo integrado); solo las que usan las funciones del kit se pueden convertir en proyecto editable.

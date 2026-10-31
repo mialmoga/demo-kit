@@ -69,6 +69,7 @@ aside{background:var(--p);overflow:auto;min-height:0}
 .keyg{gap:6px;padding-left:10px;border-left:1px solid var(--b);display:flex;align-items:center;flex-wrap:wrap}
 #osk{display:flex;gap:0;padding:6px 8px;background:var(--p);border-bottom:1px solid var(--b);overflow-x:auto;touch-action:none;user-select:none;-webkit-user-select:none}
 #osk .wk{position:relative;flex:0 0 34px;height:88px;background:#d9dce6;border:1px solid #0b0d14;border-radius:0 0 5px 5px;margin-right:-1px;color:#0b0d14;font:10px system-ui;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;cursor:pointer}
+#osk[hidden]{display:none}
 #osk .wk.on,#osk .bk.on,#osk .pad.on{background:#8fa8ff}
 #osk .wk.sc::after{content:"";position:absolute;top:6px;width:5px;height:5px;border-radius:50%;background:#5c6bc0}
 #osk .bk{flex:0 0 0;position:relative;z-index:2;width:0}
@@ -1057,7 +1058,9 @@ function draw(ph){
   const cx=KW+cursorBeat*BW-sx; if(cx>=KW){ g.strokeStyle='#8fa8ff'; g.setLineDash([4,4]); g.beginPath(); g.moveTo(cx+.5,RUL); g.lineTo(cx+.5,H); g.stroke(); g.setLineDash([]); }
   if(ph!=null){ const x=KW+ph*BW-sx; if(x>=KW){ g.fillStyle='#ff7ab8'; g.fillRect(x-1,0,2,H); } }
   // teclas / carriles
-  g.fillStyle='#12141b'; g.fillRect(0,RUL,KW,H-RUL); const hl=new Set(down.values());
+  const hl=new Set(down.values());
+  if(hl.size){ g.fillStyle='#8fa8ff30'; for(const m of hl){ const ri=info.perc?Math.round(m):(info.hi-m); if(ri<0||ri>info.rows) continue; const y=RUL+ri*RH-sy; if(y+RH<RUL||y>H) continue; g.fillRect(KW,y,W-KW,RH-1); } }
+  g.fillStyle='#12141b'; g.fillRect(0,RUL,KW,H-RUL);
   for(let r=r0;r<=r1;r++){ const y=RUL+r*RH-sy;
     if(info.perc){ g.fillStyle=hl.has(r)?'#41518f':'#1a1d27'; g.fillRect(0,y,KW-1,RH-1); g.fillStyle='#b8bdca'; g.font='11px system-ui'; g.fillText((info.lanes[r]&&info.lanes[r].name||'').slice(0,9),4,y+RH/2+4); }
     else { const m=info.hi-r; g.fillStyle=isBlack(m)?'#15171f':'#d9dce6'; g.fillRect(0,y,isBlack(m)?KW*.62:KW-1,RH-1); if(hl.has(m)){ g.fillStyle='#8fa8ff'; g.fillRect(0,y,isBlack(m)?KW*.62:KW-1,RH-1); } if(m%12===0){ g.fillStyle='#0b0d14'; g.font='10px system-ui'; g.fillText(midiName(m),KW-24,y+RH-4); } } }
@@ -1277,7 +1280,7 @@ function syncKeyUI(){ const k=KEY(); $('kRoot').value=k.root; $('kScale').value=
 // teclado en pantalla
 let oskOn=false;
 function buildOsk(){ const box=$('osk'); box.hidden=!oskOn; $('bOsk').classList.toggle('on',oskOn); if(!oskOn) return; box.innerHTML=''; const tr=P.tracks[sel]; if(!tr||!INSTRUMENTS[tr.inst]) return; const info=trackInfo(tr);
-  const press=(k,id,m)=>{ k.onpointerdown=e=>{ e.preventDefault(); try{ k.setPointerCapture(e.pointerId); }catch(_){} k.classList.add('on'); liveOn(id,m,.85); }; const up=()=>{ k.classList.remove('on'); liveOff(id); }; k.onpointerup=up; k.onpointercancel=up; };
+  const press=(k,id,m)=>{ k.dataset.m=m; k.onpointerdown=e=>{ e.preventDefault(); try{ k.setPointerCapture(e.pointerId); }catch(_){} k.classList.add('on'); liveOn(id,m,.85); }; const up=()=>{ k.classList.remove('on'); liveOff(id); }; k.onpointerup=up; k.onpointercancel=up; };
   if(info.perc){ for(let i=0;i<info.rows;i++){ const p=el('div',{class:'pad',text:(info.lanes[i]&&info.lanes[i].name)||'Golpe'}); press(p,'osk'+i,i); box.append(p); } return; }
   const lo=baseOct, hi=Math.min(127,baseOct+24);
   for(let m=lo;m<=hi;m++){ const pc=((m%12)+12)%12;
@@ -1516,21 +1519,22 @@ function liveOn1(id,m,vel){
   const tr=P.tracks[sel]; if(!tr||!INSTRUMENTS[tr.inst]) return; liveOff(id,true); let buf;
   try{ buf=liveBuf(tr,m); }catch(e){ console.error(e); toast('Error al tocar: '+e.message,'err'); return; }
   const a=ac(), s=a.createBufferSource(), g=a.createGain(); s.buffer=buf; g.gain.value=(tr.vol==null?1:tr.vol)*vel; s.connect(g); g.connect(a.destination); s.start();
-  const v={s,g,oneShot:!!INSTRUMENTS[tr.inst].oneShot}; voices.set(id,v); down.set(id,m); s.onended=()=>{ if(voices.get(id)===v) voices.delete(id); }; invalidate(); recOn(id,m,vel,tr);
+  const v={s,g,oneShot:!!INSTRUMENTS[tr.inst].oneShot}; voices.set(id,v); down.set(id,m); s.onended=()=>{ if(voices.get(id)===v) voices.delete(id); }; invalidate(); oskSync(); recOn(id,m,vel,tr);
 }
 function liveOff1(id,hard){
-  const had=down.delete(id), v=voices.get(id); if(had) invalidate(); if(!v){ recClose(id); return; }
+  const had=down.delete(id), v=voices.get(id); if(had){ invalidate(); oskSync(); } if(!v){ recClose(id); return; }
   if(hard){ sustained.delete(id); voices.delete(id); releaseVoice(v,.015); recClose(id); return; }
   if(v.oneShot){ recClose(id); return; }                  // la percusión se deja sonar completa
   if(sustain){ sustained.add(id); return; }               // con el pedal abajo, la nota (y su grabación) sigue hasta soltarlo
   voices.delete(id); releaseVoice(v,.09); recClose(id);
 }
+function oskSync(){ if(!oskOn) return; const hl=new Set(down.values()); for(const k of $('osk').querySelectorAll('[data-m]')) k.classList.toggle('on',hl.has(+k.dataset.m)); }
 const chordIds=new Map();
 function liveOn(id,m,vel){ const tr=P.tracks[sel]; liveOn1(id,m,vel); if(chordIds.has(id)){ for(const x of chordIds.get(id)) liveOff1(x,true); chordIds.delete(id); }
   if(chordMode==='off'||!tr||trackInfo(tr).perc) return; const ex=chordPitches(Math.round(m)).slice(1); if(!ex.length) return; const ids=ex.map((p,i)=>id+'#'+i); ex.forEach((p,i)=>liveOn1(ids[i],p,vel*.85)); chordIds.set(id,ids); }
 function liveOff(id,hard){ liveOff1(id,hard); const ids=chordIds.get(id); if(ids){ for(const x of ids) liveOff1(x,hard); if(hard) chordIds.delete(id); else if(!sustain) chordIds.delete(id); } }
 function setSustain(on){ sustain=on; if(!on){ for(const id of sustained){ const v=voices.get(id); if(v){ voices.delete(id); releaseVoice(v,.12); } recClose(id); } sustained.clear(); } }
-function allOff(){ recCloseAll(); for(const [id,v] of voices) releaseVoice(v,.05); voices.clear(); sustained.clear(); down.clear(); downCodes.clear(); invalidate(); }
+function allOff(){ recCloseAll(); for(const [id,v] of voices) releaseVoice(v,.05); voices.clear(); sustained.clear(); down.clear(); downCodes.clear(); invalidate(); oskSync(); }
 const octName=()=>midiName(baseOct);
 function setOctave(d){ baseOct=clamp(baseOct+d*12,0,96); $('oct').textContent=octName(); prewarm(); buildOsk(); }
 function setLive(on){ liveEnabled=on; $('bLive').classList.toggle('on',on); if(!on) allOff(); else prewarm(); }
