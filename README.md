@@ -44,6 +44,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 - **Piano roll** con rejilla (1/4 a 1/32, tresillos o libre), zoom, notas fantasma de las otras pistas, selección múltiple, velocidad por nota y **deshacer/rehacer global** (notas, pistas, parámetros, efectos, master, BPM… hasta 100 pasos; los sliders y arrastres cuentan como un solo paso).
 - **Compás:** selector junto a «Compases» (2/4, 3/4, 4/4, 5/4, 6/4, 7/4, 3/8, 5/8, 6/8, 7/8, 9/8, 12/8). Cambia las líneas de compás y la regla, el bucle, el conteo de compases, la cuenta previa de la grabación (un clic por tiempo del compás) y copiar/pegar por compases. El «pulso» sigue siendo la negra: 6/8 son 3 pulsos por compás y 7/8 son 3.5. Un compás por proyecto; los proyectos viejos abren como 4/4. En una demo `.js` exportada aparece como `// SIG = 3/4`.
+- **Pista de tempo (♩ Tempo):** botón junto a «Compás». Abre un carril sobre el piano roll con la curva de tempo. El rombo del inicio es el BPM de arriba (arrástralo en vertical o cambia el número); **clic** = punto nuevo (horizontal = pulso, vertical = BPM), **arrastra** para moverlo, **doble clic o clic derecho** para quitarlo. Con un punto seleccionado puedes teclear su BPM exacto y marcar **«rampa hasta aquí»**: el tempo cambia gradualmente desde el punto anterior y llega a ese BPM en ese pulso (acelerando / ritardando); sin la marca salta de golpe. Todo sigue el tempo: notas, sidechain, automatización, el eco (delay), el cursor, la grabación y el bucle; el wobble de un bajo toma el tempo del inicio de cada nota. Cambiar el tempo vuelve a renderizar las pistas. Se guarda como `"tempo": [{"b":16,"bpm":90,"ramp":true}]` y la librería lo respeta.
 - **Pistas / capas ilimitadas**, cada una con su instrumento, volumen, paneo, mute y solo.
 - **Instrumentos base parametrizables** (cada uno con sus sliders):
   - *Melódicos:* Sinte genérico, Supersaw, Pluck, Arpegio cuadrado, Pad, Sub, Sub con caída, Reese, Growl, Campana, Chop vocal.
@@ -155,6 +156,8 @@ Límites a tener en cuenta:
 Una demo es un archivo `.js` con una función `async` que usa `demoKit` y devuelve el audio. Si solo usa las funciones nombradas del kit, **se convierte en un proyecto completamente editable**. *Yo soy NaN* la escribió una IA (Éter) viendo el kit y un par de ejemplos, y convirtió a la primera.
 
 > 📖 **Referencia completa para escribir demos (pensada para IAs):** [`kits/REFERENCIA.md`](kits/REFERENCIA.md) — molde, firmas de todas las funciones, opciones de `syn`, qué se convierte y trampas frecuentes.
+>
+> 🧠 **¿Quieres entender cómo funciona el sonido por dentro?** [`kits/demo_kit_comentado.js`](kits/demo_kit_comentado.js) es el mismo kit, con el mismo resultado (se comprobó muestra por muestra), pero explicado línea por línea y sin dar nada por sabido: qué es una muestra, una envolvente, un filtro, el sidechain… Termina con una canción de ejemplo para copiar.
 
 **El contrato (forma métrica, recomendada)**
 
@@ -334,6 +337,7 @@ K.rnd()   K.hz(midi)   K.lpc(fc)
   "format": "demokit-studio", "v": 1, "kit": 1,
   "name": "...", "bpm": 128, "bars": 8, "seed": 20261015,
   "sig": [3, 4],            // compás (solo si no es 4/4); el pulso del proyecto es la negra
+  "tempo": [{"b": 16, "bpm": 90, "ramp": true}],   // cambios de tempo (opcional); "bpm" de arriba es el tempo inicial
   "sc": { "mode": "param|table", "depth": 0.7, "rel": 0.12, "rate": 800, "table": "<base64>" },
   "tracks": [{
     "name": "Bajo", "inst": "subfall", "vol": 1, "pan": 0,
@@ -381,5 +385,5 @@ El render es determinista (misma semilla → mismo audio) y se hace por bloques 
 
 * Síntesis y estudio: Brujo, con Ámbar (Claude Sonnet 5.5).
 * Icono y banner: Velvet (ChatGPT).
-* `the_void_MK.js`, `marshmallow_sky.js`, `event_horizon.js`, `electronic_rush.js`, `dark_matter.js`, `cotton_sugar_MK.js`, `demo_kit.js`: Ámbar (Claude Sonnet 5.5).
+* `the_void.js`, `cotton_sugar.js`, `demo_kit.js`: Ámbar (Claude Sonnet 5.5).
 * *Yo soy NaN* en `/demos/yo_soy_nan.js`: Éter (Gemini).

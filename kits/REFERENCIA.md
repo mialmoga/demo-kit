@@ -1,6 +1,6 @@
 # Demo Kit · referencia para escribir demos a mano
 
-Hoja pensada para una IA (o una persona con prisa). Una **demo** es un archivo `.js` con una función `async` que sintetiza una canción completa con `demoKit` y devuelve el audio. No hay muestras ni librerías: todo se calcula muestra a muestra. La fuente de verdad es [`demo_kit.js`](demo_kit.js); esta hoja resume su uso. Un ejemplo mínimo para copiar está en [`../demos/ejemplo_metrico.js`](../demos/ejemplo_metrico.js).
+Hoja pensada para una IA (o una persona con prisa). Una **demo** es un archivo `.js` con una función `async` que sintetiza una canción completa con `demoKit` y devuelve el audio. No hay muestras ni librerías: todo se calcula muestra a muestra. La fuente de verdad es [`demo_kit.js`](demo_kit.js); esta hoja resume su uso. ¿Quieres entender *cómo* suena cada cosa? Lee [`demo_kit_comentado.js`](demo_kit_comentado.js): el mismo kit (audio idéntico, comprobado muestra por muestra) explicado línea por línea. Un ejemplo mínimo para copiar está en [`../demos/ejemplo_metrico.js`](../demos/ejemplo_metrico.js).
 
 ## 1. Molde (copia y cambia)
 
@@ -13,7 +13,7 @@ async function renderMiCancion(sr, onProg) {      // el nombre empieza con «ren
   for (let b = 0; b < 16; b++) {
     for (let i = 0; i < 4; i++) K.kick(T(b, i), 1);       // bombo en cada pulso
     K.snare(T(b, 1), .8); K.snare(T(b, 3), .8);
-    K.syn(K.mu, T(b, 0), beat * 3.5, K.hz(45), .3, 0, { w: 2 });   // bajo senoidal (¡siempre pasa el objeto de opciones!)
+    K.syn(K.mu, T(b, 0), beat * 3.5, K.hz(45), .3, 0, { w: 2 });   // bajo senoidal (las opciones son opcionales)
     if (b % 4 === 3) { if (onProg) onProg(b / 16); await sleep(0); }   // progreso + ceder el hilo
   }
   return K.mix([0, 0, .8, .8, .8, .8, .8, .8, .8, .8, .8, .8, .8, .8, .8, .8], .13);   // devuelve {L, R, dur}
@@ -50,7 +50,7 @@ Divisiones comunes: corchea `T(b, i/2)`, semicorchea `T(b, i/4)`, tresillo de co
 | `snap` | `(t0, a, pan)` | chasquido |
 | `hat` | `(t0, a, abierto, pan)` | `abierto` true/false |
 | `crash` | `(t0, a, len=2.4)` | |
-| `syn` | `(buf, t0, len, f, a, pan, o)` | sintetizador. `buf` = `K.mu` (música, recibe sidechain) o `K.dr` (batería, no). `f` en **Hz**. **`o` es obligatorio** (puede ser `{}`) |
+| `syn` | `(buf, t0, len, f, a, pan, o)` | sintetizador. `buf` = `K.mu` (música, recibe sidechain) o `K.dr` (batería, no). `f` en **Hz**. `o` es opcional (sin él: sierra de una voz, filtro a 3000 Hz) |
 | `bell` | `(t0, midi, a, pan, len=1.4)` | campana / caja de música (siempre en `mu`) |
 | `chop` | `(t0, len, midi, a, pan, vocal='oh')` | sílaba cantada; vocal: `'oh' 'ah' 'ee' 'oo'` |
 | `riser` | `(t0, len, a)` | ruido que sube; úsalo antes de un drop |
@@ -99,7 +99,6 @@ No se convierte (queda fuera del proyecto): procesado hecho **después** de `K.m
 
 ## 7. Trampas frecuentes
 
-- `K.syn` sin el objeto `o` → error. Pasa `{}` como mínimo.
 - Pasar MIDI a `syn` o Hz a `bell`/`chop`: suenan graves o agudos de más.
 - Olvidar `return K.mix(...)`, o llamar a `mix` dos veces.
 - Pasar pulsos donde se esperan segundos: usa siempre `T(compás, pulso)` o `beat * n`.

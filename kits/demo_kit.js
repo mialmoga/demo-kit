@@ -26,6 +26,7 @@ function demoKit(sr,seconds,seed0){
 
   // ── sintetizador: w 0=sierra 1=cuadrada 2=seno · det en cents · lp en Hz o función del tiempo ──
   function syn(buf,t0,len,f,a,pan,o){
+    o=o||{};
     const det=o.det||[0], D=det.length, inc=det.map(d=>f*Math.pow(2,d/1200)/sr), ph=det.map(()=>rnd()*.5+.5);
     const atk=o.atk||.004, rel=o.rel||.06, w=o.w||0, tot=len+rel;
     const lpf=typeof o.lp==='function', lpk=lpf?0:lpc(o.lp||3000);
