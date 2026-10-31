@@ -1,5 +1,5 @@
-// ── demoKit: kit de síntesis Original ─────────────────────────────
-// Devuelve las herramientas para componer: kick, snare, hat, syn, mix, etc.
+// ── KIT DE SÍNTESIS PARA LAS DEMOS (Cotton Sugar, The Void) ────
+// Todo se calcula muestra a muestra en JavaScript: sin archivos de audio, sin librerías.
 function demoKit(sr,seconds,seed0){
   const n=Math.ceil(seconds*sr);
   const dr=[new Float32Array(n),new Float32Array(n)], mu=[new Float32Array(n),new Float32Array(n)];
@@ -73,3 +73,18 @@ function demoKit(sr,seconds,seed0){
   }
   return {n,dr,mu,rnd,hz,lpc,add,kick,snare,clap,snap,hat,crash,syn,bell,chop,riser,sweep,mix};
 }
+
+// ── FORMA MÉTRICA (recomendada para escribir demos) ────
+// demoKit.metric(sr,BPM,BARS,tail,seed) → el mismo kit + tiempo musical:
+//   beat, bar  (segundos)      T(compás,pulso) → segundos      BPM, BARS
+//   duckBars([..por compás..],dk) → función para mix (sidechain por compás, decae cada pulso)
+//   mix también acepta directamente el arreglo por compás: K.mix(duck,dk)
+// La duración se calcula sola: BARS*bar+tail (tail por defecto 2.5 s).
+demoKit.metric=function(sr,BPM,BARS,tail,seed){
+  const beat=60/BPM, bar=beat*4, K=demoKit(sr,BARS*bar+(tail==null?2.5:tail),seed);
+  const T=(b,p)=>b*bar+(p||0)*beat;
+  const duckBars=(arr,dk)=>t=>{ const b=Math.min(BARS-1,Math.floor(t/bar)); return 1-(t<BARS*bar?(arr[b]||0):0)*Math.exp(-(t%beat)/(dk||.13)); };
+  const rawMix=K.mix;
+  const mix=(d,dk)=>rawMix(typeof d==='function'?d:duckBars(d||[],dk));
+  return Object.assign(K,{BPM,BARS,beat,bar,T,duckBars,mix});
+};
