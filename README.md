@@ -43,6 +43,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 ## Funciones
 
 - **Piano roll** con rejilla (1/4 a 1/32, tresillos o libre), zoom, notas fantasma de las otras pistas, selección múltiple, velocidad por nota y **deshacer/rehacer global** (notas, pistas, parámetros, efectos, master, BPM… hasta 100 pasos; los sliders y arrastres cuentan como un solo paso).
+- **Compás:** selector junto a «Compases» (2/4, 3/4, 4/4, 5/4, 6/4, 7/4, 3/8, 5/8, 6/8, 7/8, 9/8, 12/8). Cambia las líneas de compás y la regla, el bucle, el conteo de compases, la cuenta previa de la grabación (un clic por tiempo del compás) y copiar/pegar por compases. El «pulso» sigue siendo la negra: 6/8 son 3 pulsos por compás y 7/8 son 3.5. Un compás por proyecto; los proyectos viejos abren como 4/4. En una demo `.js` exportada aparece como `// SIG = 3/4`.
 - **Pistas / capas ilimitadas**, cada una con su instrumento, volumen, paneo, mute y solo.
 - **Instrumentos base parametrizables** (cada uno con sus sliders):
   - *Melódicos:* Sinte genérico, Supersaw, Pluck, Arpegio cuadrado, Pad, Sub, Sub con caída, Reese, Growl, Campana, Chop vocal.
@@ -332,6 +333,7 @@ K.rnd()   K.hz(midi)   K.lpc(fc)
 {
   "format": "demokit-studio", "v": 1, "kit": 1,
   "name": "...", "bpm": 128, "bars": 8, "seed": 20261015,
+  "sig": [3, 4],            // compás (solo si no es 4/4); el pulso del proyecto es la negra
   "sc": { "mode": "param|table", "depth": 0.7, "rel": 0.12, "rate": 800, "table": "<base64>" },
   "tracks": [{
     "name": "Bajo", "inst": "subfall", "vol": 1, "pan": 0,

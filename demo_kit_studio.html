@@ -141,6 +141,7 @@ details summary{cursor:pointer;color:var(--a)}
     <input type="text" id="pname" value="Sin título" aria-label="Nombre del proyecto">
     <label>BPM <input type="number" id="bpm" min="40" max="260" step="1" value="120"></label>
     <label>Compases <input type="number" id="bars" min="1" max="256" step="1" value="8"></label>
+    <label title="Compás: cuántos pulsos tiene cada compás. El pulso del proyecto es la negra (6/8 = 3 pulsos por compás)">Compás <select id="sig"></select></label>
   </div>
   <div class="grp">
     <button id="bNew" title="Proyecto vacío">Nuevo</button>
@@ -478,7 +479,10 @@ function installPlugin(code){
 function removePlugin(id){ USER_PLUGINS=USER_PLUGINS.filter(u=>u.id!==id); persistPlugins(); }
 
 // ───────────────────────── proyecto ─────────────────────────
-function newProject(name,bpm,bars){return {name:name||'Sin título',bpm:bpm||120,bars:bars||8,seed:KIT_SEED,sc:{mode:'param',depth:.7,rel:.12,table:null,rate:800},master:Object.assign({},MASTER_DEF),tracks:[],clips:{}};}
+// compás: P.sig=[numerador,denominador]; el «pulso» del proyecto es la negra, así que un compás dura sig[0]*4/sig[1] pulsos (4/4→4, 3/4→3, 6/8→3, 7/8→3.5)
+const barBeats=P=>{ const s=P&&P.sig; return s&&s[0]>0&&s[1]>0?s[0]*4/s[1]:4; };
+const SIGS=[[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[3,8],[5,8],[6,8],[7,8],[9,8],[12,8]];
+function newProject(name,bpm,bars){return {name:name||'Sin título',bpm:bpm||120,bars:bars||8,sig:[4,4],seed:KIT_SEED,sc:{mode:'param',depth:.7,rel:.12,table:null,rate:800},master:Object.assign({},MASTER_DEF),tracks:[],clips:{}};}
 function newTrack(instId,name){
   const inst=INSTRUMENTS[instId];
   return {id:uid(),name:name||inst.name,inst:instId,params:defaultParams(inst),vol:1,pan:0,mute:false,solo:false,
@@ -510,7 +514,7 @@ function starterProject(){
 function noteArgs(K,P,tr,nt,beat,t0){
   const p=nt.o?Object.assign({},tr.params,nt.o):tr.params;
   return {t:t0!=null?t0:nt.b*beat,len:Math.max(.01,(nt.l||.25)*beat),midi:nt.m,hz:K.hz(nt.m),lane:nt.m,a:(nt.v==null?1:nt.v)*(tr.vol==null?1:tr.vol),
-    pan:clamp((tr.pan||0)+(nt.pan||0),-1,1),p,buf:tr.ducked?K.mu:K.dr,sr:SR,bpm:P.bpm,beat,bar:beat*4,note:nt,clips:P.clips};
+    pan:clamp((tr.pan||0)+(nt.pan||0),-1,1),p,buf:tr.ducked?K.mu:K.dr,sr:SR,bpm:P.bpm,beat,bar:beat*barBeats(P),note:nt,clips:P.clips};
 }
 function makeDuck(P,beat){
   const sc=P.sc||{};
@@ -628,7 +632,7 @@ async function renderTrackStem(P,tr,beat,total){
   return extractStems(K);
 }
 async function ensureStems(P,trs,onProg,from,to){
-  const beat=60/P.bpm, total=P.bars*beat*4+TAIL, live=new Set(P.tracks.map(t=>t.id)), errors=[], todo=[]; let tot=0;
+  const beat=60/P.bpm, total=P.bars*beat*barBeats(P)+TAIL, live=new Set(P.tracks.map(t=>t.id)), errors=[], todo=[]; let tot=0;
   for(const id of [...stemCache.keys()]) if(!live.has(id)) stemCache.delete(id);
   for(const tr of trs){ const key=trackKey(P,tr,total),c=stemCache.get(tr.id); if(c&&c.key===key){ if(c.err) errors.push({track:tr.name,msg:c.err}); continue; } todo.push({tr,key}); tot+=tr.notes.length+1; }
   let done=0; for(const {tr,key} of todo){
@@ -719,7 +723,7 @@ function compactTrack(t){
 function expandTrack(t){ if(!Array.isArray(t.n)) return t; t.notes=t.n.map(a=>{ if(!Array.isArray(a)) return a; const n={b:a[0],l:a[1],m:a[2],v:a[3]==null?1:a[3]}; if(a[4]) n.pan=a[4]; if(a[5]) n.o=a[5]; return n; }); delete t.n; return t; }
 function projectToJSON(P,opts){
   const compact=!!(opts&&opts.compact);
-  const o={format:'demokit-studio',v:compact?2:1,kit:KIT_FORMAT,name:P.name,bpm:P.bpm,bars:P.bars,seed:P.seed,sc:{mode:P.sc.mode,depth:P.sc.depth,rel:P.sc.rel,rate:P.sc.rate},master:masterOf(P),key:P.key||undefined,tracks:compact?P.tracks.map(compactTrack):P.tracks,clips:{},plugins:[]};
+  const o={format:'demokit-studio',v:compact?2:1,kit:KIT_FORMAT,name:P.name,bpm:P.bpm,bars:P.bars,sig:barBeats(P)===4&&(!P.sig||P.sig[1]===4)?undefined:P.sig,seed:P.seed,sc:{mode:P.sc.mode,depth:P.sc.depth,rel:P.sc.rel,rate:P.sc.rate},master:masterOf(P),key:P.key||undefined,tracks:compact?P.tracks.map(compactTrack):P.tracks,clips:{},plugins:[]};
   if(P.sc.table){ const T=P.sc.table,u=new Uint8Array(T.length); for(let i=0;i<T.length;i++) u[i]=Math.round(clamp(T[i],0,1)*255); o.sc.table=u8ToB64(u); }
   for(const cid in P.clips){ const d=P.clips[cid],q=new Int16Array(d.length); for(let i=0;i<d.length;i++) q[i]=clamp(Math.round(d[i]*16384),-32768,32767); o.clips[cid]=u8ToB64(new Uint8Array(q.buffer)); }
   const used=new Set(P.tracks.map(t=>t.inst)); for(const u of USER_PLUGINS) if(used.has(u.id)) o.plugins.push(u);
@@ -733,7 +737,7 @@ function projectReport(P){
 // opts.allowPlugins===false: no se ejecuta el código de los plugins incluidos (por defecto sí, para compatibilidad; el estudio pregunta antes)
 function projectFromJSON(o,opts){
   const errs=[], skipped=[]; for(const u of o.plugins||[]){ if(opts&&opts.allowPlugins===false){ skipped.push(u.name||u.id); continue; } try{ installPlugin(u.code); }catch(e){ errs.push(u.id+': '+e.message); } }
-  const P=newProject(o.name,o.bpm,o.bars); P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key);
+  const P=newProject(o.name,o.bpm,o.bars); if(Array.isArray(o.sig)&&o.sig[0]>0&&o.sig[1]>0) P.sig=[+o.sig[0],+o.sig[1]]; P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key);
   if(o.sc&&o.sc.table){ const u=b64ToU8(o.sc.table),T=new Float32Array(u.length); for(let i=0;i<u.length;i++) T[i]=u[i]/255; P.sc.table=T; }
   for(const cid in o.clips||{}){ const u=b64ToU8(o.clips[cid]),q=new Int16Array(u.buffer,u.byteOffset,u.length>>1),d=new Float32Array(q.length); for(let i=0;i<q.length;i++) d[i]=q[i]/16384; P.clips[cid]=d; }
   P.tracks=(o.tracks||[]).map(t=>fixTrack(expandTrack(t))); P.loadErrors=errs; P.loadWarnings=[]; if(skipped.length) P.loadWarnings.push('Plugins sin ejecutar: '+skipped.join(', ')+'. Las pistas que los usan quedan sin instrumento.'); if(o.kit!=null&&o.kit!==KIT_FORMAT) P.loadWarnings.push('Este proyecto se guardó con la versión '+o.kit+' del kit y esta es la '+KIT_FORMAT+(o.kit>KIT_FORMAT?': puede sonar distinto o faltar instrumentos. Actualiza la librería.':': puede sonar un poco distinto.')); return P;
@@ -920,7 +924,7 @@ function ac(){ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)
 function toAudioBuffer(out){ const b=ac().createBuffer(2,out.L.length,SR); b.copyToChannel(out.L,0); b.copyToChannel(out.R,1); return b; }
 function startPlayback(buf,offset,loop,isProject,delay){
   stopSource(); const a=ac(), s=a.createBufferSource(); s.buffer=buf; s.connect(a.destination); s.loop=!!loop;
-  playLoopEnd=0; if(loop&&isProject){ s.loopStart=0; s.loopEnd=playLoopEnd=Math.min(buf.duration,P.bars*4*60/P.bpm); if(offset>=playLoopEnd-.01) offset=0; }
+  playLoopEnd=0; if(loop&&isProject){ s.loopStart=0; s.loopEnd=playLoopEnd=Math.min(buf.duration,P.bars*barBeats(P)*60/P.bpm); if(offset>=playLoopEnd-.01) offset=0; }
   s.onended=()=>{ if(srcNode===s) stop(); };
   playStartCtx=a.currentTime+.02+(delay||0); playOffset=offset; playLoop=!!loop; playDur=buf.duration; playIsProject=!!isProject;
   s.start(playStartCtx,offset); srcNode=s; playing=true; $('bPlay').textContent='■ Detener'; acquireWake(); invalidate();
@@ -932,10 +936,10 @@ async function togglePlay(){
   if(playing){ stop(); return; }
   ac(); if(rendering) return;
   if(dirty||!cache){ if(!(await doRender())) return; }
-  const beat=60/P.bpm, count=(rec.armed&&$('recCount').checked)?4*beat:0;
+  const beat=60/P.bpm, count=(rec.armed&&$('recCount').checked)?barBeats(P)*beat:0;
   if(rec.armed){ rec.active=true; rec.n=0; rec.snap.clear(); rec.open.clear(); setLive(true); }
   startPlayback(cache.buf,clamp(cursorBeat*60/P.bpm,0,Math.max(0,cache.dur-.1)),$('loop').checked,true,count);
-  if(count){ for(let i=0;i<4;i++) clickAt(playStartCtx-count+i*beat,i===0); $('stat').textContent='⏺ Cuenta previa…'; $('stat').className='warn'; setTimeout(()=>{ if(playing&&rec.active) updateStat(); },count*1000+40); }
+  if(count){ { const nc=P.sig?P.sig[0]:4, gp=count/nc; for(let i=0;i<nc;i++) clickAt(playStartCtx-count+i*gp,i===0); } $('stat').textContent='⏺ Cuenta previa…'; $('stat').className='warn'; setTimeout(()=>{ if(playing&&rec.active) updateStat(); },count*1000+40); }
   updateStat();
 }
 function prog(p){ $('prog').style.width=(p*100)+'%'; }
@@ -1006,7 +1010,7 @@ function applySnap(s){
   hist.restoring=true; try{
     P=JSON.parse(s.json,(k,v)=>v&&typeof v==='object'&&!Array.isArray(v)&&'__ref' in v&&Object.keys(v).length===1?s.refs[v.__ref]:v);
     sel=Math.max(0,Math.min(sel,P.tracks.length-1)); selNotes.clear(); drag=null;
-    $('pname').value=P.name; $('bpm').value=P.bpm; $('bars').value=P.bars;
+    $('pname').value=P.name; $('bpm').value=P.bpm; $('bars').value=P.bars; $('sig').value=sigStr();
     renderTracks(); renderInspector(); layoutSpacer(); touch(); invalidate(); prewarm();
   } finally{ hist.restoring=false; }
 }
@@ -1019,12 +1023,13 @@ function histGo(from,to,label){
 const undo=()=>histGo(hist.undo,hist.redo,'deshacer'), redo=()=>histGo(hist.redo,hist.undo,'rehacer');
 function loadProject(proj){
   stop(); P=proj; sel=0; selNotes.clear(); cursorBeat=0; cache=null; dirty=true; version++;
-  $('pname').value=P.name; $('bpm').value=P.bpm; $('bars').value=P.bars;
+  $('pname').value=P.name; $('bpm').value=P.bpm; $('bars').value=P.bars; $('sig').value=sigStr();
   renderTracks(); renderInspector(); layoutSpacer(); centerTrack(); updateStat(); invalidate(); histReset();
   if(P.loadErrors&&P.loadErrors.length) toast('Plugins con error: '+P.loadErrors.join('; '),'err');
   if(P.loadWarnings&&P.loadWarnings.length) toast(P.loadWarnings.join(' '),'err');
 }
-function fitBars(){ let end=0; for(const t of P.tracks) for(const n of t.notes) end=Math.max(end,n.b+(n.l||.25)); const need=Math.ceil(end/4-1e-9); if(need>P.bars){ P.bars=need; $('bars').value=need; layoutSpacer(); } }
+const sigStr=()=>(P.sig?P.sig[0]+'/'+P.sig[1]:'4/4');
+function fitBars(){ let end=0; for(const t of P.tracks) for(const n of t.notes) end=Math.max(end,n.b+(n.l||.25)); const need=Math.ceil(end/barBeats(P)-1e-9); if(need>P.bars){ P.bars=need; $('bars').value=need; layoutSpacer(); } }
 
 // ───────────── piano roll ─────────────
 function trackInfo(tr){
@@ -1040,7 +1045,7 @@ const pyToM=(info,py)=>{ const ry=Math.floor((py-RUL+wrap.scrollTop)/info.RH); r
 function fitCanvas(){ const w=wrap.clientWidth,h=wrap.clientHeight; if(cv.style.width!==w+'px') cv.style.width=w+'px'; if(cv.style.height!==h+'px') cv.style.height=h+'px'; }
 function layoutSpacer(){
   fitCanvas(); const tr=P.tracks[sel], info=tr?trackInfo(tr):{rows:1,RH:30};
-  sp.style.width=(KW+(P.bars*4+8)*BW)+'px'; sp.style.height=(RUL+info.rows*info.RH+8)+'px'; sp.style.marginTop=(-cv.offsetHeight)+'px';
+  sp.style.width=(KW+(P.bars*barBeats(P)+8)*BW)+'px'; sp.style.height=(RUL+info.rows*info.RH+8)+'px'; sp.style.marginTop=(-cv.offsetHeight)+'px';
 }
 function centerTrack(){
   const tr=P.tracks[sel]; if(!tr) return; layoutSpacer(); const info=trackInfo(tr);
@@ -1072,9 +1077,9 @@ function draw(ph){
   // rejilla vertical
   let sub=snap>0?snap:.25; while(sub*BW<7) sub*=2; const k0=Math.floor(b0/sub),k1=Math.ceil(b1/sub);
   for(let k=k0;k<=k1;k++){ const bt=k*sub, x=Math.round(KW+bt*BW-sx)+.5; if(x<KW) continue;
-    const bar=Math.abs(bt/4-Math.round(bt/4))<1e-9, beat=Math.abs(bt-Math.round(bt))<1e-9;
+    const bar=Math.abs(bt/barBeats(P)-Math.round(bt/barBeats(P)))<1e-9, beat=Math.abs(bt-Math.round(bt))<1e-9;
     g.fillStyle=bar?'#323850':beat?'#222735':'#171a24'; g.fillRect(x,RUL,1,H-RUL); }
-  const endX=KW+P.bars*4*BW-sx; if(endX<W){ g.fillStyle='#00000066'; g.fillRect(Math.max(KW,endX),RUL,W,H); }
+  const endX=KW+P.bars*barBeats(P)*BW-sx; if(endX<W){ g.fillStyle='#00000066'; g.fillRect(Math.max(KW,endX),RUL,W,H); }
   // notas fantasma de otras pistas melódicas
   if(!info.perc){ P.tracks.forEach((o,i)=>{ if(i===sel||o.mute) return; const oi=INSTRUMENTS[o.inst]; if(!oi||oi.kind==='perc') return;
     g.fillStyle=trackColor(i,.16); for(const n of o.notes){ const x=KW+n.b*BW-sx,w=Math.max(2,(n.l||.25)*BW); if(x+w<KW||x>W) continue; const y=RUL+(info.hi-n.m)*RH-sy; if(y+RH<RUL||y>H) continue; g.fillRect(x,y+3,w-1,RH-6); } }); }
@@ -1104,8 +1109,8 @@ function draw(ph){
 function drawRuler(g,W,sx,b0,b1){
   g.fillStyle='#14161c'; g.fillRect(0,0,W,RUL); g.fillStyle='#272b36'; g.fillRect(0,RUL-1,W,1);
   g.save(); g.beginPath(); g.rect(KW,0,W-KW,RUL); g.clip(); g.fillStyle='#8b92a3'; g.font='11px system-ui';
-  const step=Math.max(1,Math.ceil(40/(BW*4)));
-  for(let bi=Math.floor(b0/4);bi<=Math.ceil(b1/4);bi++){ if(bi%step) continue; const x=KW+bi*4*BW-sx; g.fillRect(Math.round(x),RUL-8,1,8); g.fillText(String(bi+1),x+4,RUL-8); }
+  const BB=barBeats(P), step=Math.max(1,Math.ceil(40/(BW*BB)));
+  for(let bi=Math.floor(b0/BB);bi<=Math.ceil(b1/BB);bi++){ if(bi%step) continue; const x=KW+bi*BB*BW-sx; g.fillRect(Math.round(x),RUL-8,1,8); g.fillText(String(bi+1),x+4,RUL-8); }
   const cx=KW+cursorBeat*BW-sx; g.fillStyle='#8fa8ff'; g.beginPath(); g.moveTo(cx-5,RUL-10); g.lineTo(cx+5,RUL-10); g.lineTo(cx,RUL-2); g.fill();
   g.restore(); g.fillStyle='#8b92a3'; g.font='10px system-ui'; g.fillText('compás',8,15);
 }
@@ -1290,8 +1295,8 @@ function renderInspector(){
   box.append(sec('Notas',el('div',{id:'selInfo',class:'hint'}),
     velRow,notesTools(),
     el('div',{class:'copyrow',style:'margin-top:8px'},'Copiar compás',cp[0],'×',cp[1],'→',cp[2],'repetir',cp[3],
-      el('button',{class:'sm',text:'Copiar',onclick:()=>{ const [f,c,t,x]=cp.map(i=>Math.max(1,Math.round(+i.value)||1)); pushUndo(); const b0=(f-1)*4,len=c*4; const src=tr.notes.filter(n=>n.b>=b0-1e-9&&n.b<b0+len-1e-9);
-        for(let r=0;r<x;r++){ const off=(t-1)*4+r*len-b0; for(const n of src){ const k=JSON.parse(JSON.stringify(n)); k.b=r6(n.b+off); tr.notes.push(k); } }
+      el('button',{class:'sm',text:'Copiar',onclick:()=>{ const [f,c,t,x]=cp.map(i=>Math.max(1,Math.round(+i.value)||1)); pushUndo(); const b0=(f-1)*barBeats(P),len=c*barBeats(P); const src=tr.notes.filter(n=>n.b>=b0-1e-9&&n.b<b0+len-1e-9);
+        for(let r=0;r<x;r++){ const off=(t-1)*barBeats(P)+r*len-b0; for(const n of src){ const k=JSON.parse(JSON.stringify(n)); k.b=r6(n.b+off); tr.notes.push(k); } }
         fitBars(); touch(); toast('Copiadas '+src.length*x+' notas','ok'); }}))));
   box.append(scBlock(),masterBlock()); renderSelInfo(); prewarm();
 }
@@ -1332,7 +1337,7 @@ function fitSel(){ const tr=P.tracks[sel]; if(!tr||trackInfo(tr).perc) return; i
 function copySel(){ const tr=P.tracks[sel]; if(!tr||!selNotes.size){ toast('Selecciona notas para copiar','err'); return; } const L=[...selNotes], b0=Math.min(...L.map(n=>n.b)); noteClip={perc:trackInfo(tr).perc,notes:L.map(n=>Object.assign(JSON.parse(JSON.stringify(n)),{b:r6(n.b-b0)}))}; toast('Copiadas '+L.length+' notas','ok'); }
 function pasteSel(){ const tr=P.tracks[sel]; if(!tr||!noteClip){ toast('No hay nada copiado','err'); return; } const info=trackInfo(tr); if(noteClip.perc!==info.perc&&!confirm('El origen y el destino son de distinto tipo (percusión / melódico): los tonos no coinciden. ¿Pegar igual?')) return;
   pushUndo(); const b0=snap>0?Math.round(cursorBeat/snap)*snap:cursorBeat, add=noteClip.notes.map(n=>{ const k=JSON.parse(JSON.stringify(n)); k.b=r6(n.b+b0); if(k.o&&k.o.cid) delete k.o; k.m=info.perc?clamp(Math.round(k.m),0,info.rows-1):clamp(k.m,0,127); return k; });
-  tr.notes.push(...add); selNotes=new Set(add); fitBars(); touch(); renderSelInfo(); toast('Pegadas '+add.length+' notas en el compás '+(Math.floor(b0/4)+1),'ok'); }
+  tr.notes.push(...add); selNotes=new Set(add); fitBars(); touch(); renderSelInfo(); toast('Pegadas '+add.length+' notas en el compás '+(Math.floor(b0/barBeats(P)+1e-9)+1),'ok'); }
 function notesTools(){ const b=(t,f,title)=>el('button',{class:'sm',text:t,title:title||'',onclick:f}); const row=(...k)=>el('div',{class:'btnrow',style:'margin-top:6px'},...k);
   return el('div',{},el('div',{class:'hint',text:'Actúan sobre las notas seleccionadas (o toda la pista si no hay selección).'}),
     row(el('span',{class:'hint',text:'Transponer'}),b('−12',()=>transposeSel(-12)),b('−1',()=>transposeSel(-1)),b('+1',()=>transposeSel(1)),b('+12',()=>transposeSel(12))),
@@ -1356,8 +1361,8 @@ function drawAuto(ph){
   if(acv.width!==Math.round(W*dpr)||acv.height!==Math.round(H*dpr)){ acv.width=Math.round(W*dpr); acv.height=Math.round(H*dpr); acv.style.width=W+'px'; }
   const g=acv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.fillStyle='#0d0f14'; g.fillRect(0,0,W,H); const sx=wrap.scrollLeft, k=autoKey, d=adef(k), tr=P.tracks[sel];
   let sub=snap>0?snap:.25; while(sub*BW<7) sub*=2; const b0=Math.floor(sx/BW), b1=Math.ceil((sx+W-KW)/BW);
-  for(let i=Math.floor(b0/sub);i<=Math.ceil(b1/sub);i++){ const bt=i*sub,x=Math.round(KW+bt*BW-sx)+.5; if(x<KW) continue; const bar=Math.abs(bt/4-Math.round(bt/4))<1e-9, beat=Math.abs(bt-Math.round(bt))<1e-9; g.fillStyle=bar?'#323850':beat?'#222735':'#171a24'; g.fillRect(x,0,1,H); }
-  const endX=KW+P.bars*4*BW-sx; if(endX<W){ g.fillStyle='#00000066'; g.fillRect(Math.max(KW,endX),0,W,H); }
+  for(let i=Math.floor(b0/sub);i<=Math.ceil(b1/sub);i++){ const bt=i*sub,x=Math.round(KW+bt*BW-sx)+.5; if(x<KW) continue; const bar=Math.abs(bt/barBeats(P)-Math.round(bt/barBeats(P)))<1e-9, beat=Math.abs(bt-Math.round(bt))<1e-9; g.fillStyle=bar?'#323850':beat?'#222735':'#171a24'; g.fillRect(x,0,1,H); }
+  const endX=KW+P.bars*barBeats(P)*BW-sx; if(endX<W){ g.fillStyle='#00000066'; g.fillRect(Math.max(KW,endX),0,W,H); }
   const yd=Math.round(autoY(k,d.def,H))+.5; g.strokeStyle='#2f3548'; g.setLineDash([3,4]); g.beginPath(); g.moveTo(KW,yd); g.lineTo(W,yd); g.stroke(); g.setLineDash([]);
   g.fillStyle='#12141b'; g.fillRect(0,0,KW,H); g.fillStyle='#8b92a3'; g.font='10px system-ui'; g.fillText(d.label,6,14); g.fillText(autoFmt(k,d.max),6,AP+10); g.fillText(autoFmt(k,d.min),6,H-AP+10);
   const pts=k==='vel'?[]:(tr&&tr.auto&&tr.auto[k]?tr.auto[k].slice().sort((a,b)=>a.b-b.b):[]);
@@ -1420,7 +1425,7 @@ function exportDemoJs(){
   const body=eng.replace('const SR=44100,','let SR=44100,');
   if(body===eng){ toast('No pude preparar el motor (SR)','err'); return; }
   const out=`// ── ${P.name||'Canción'} · exportada de Demo Kit ──
-// BPM = ${P.bpm} | BARS = ${P.bars}
+// BPM = ${P.bpm} | BARS = ${P.bars}${P.sig&&barBeats(P)!==4?' | SIG = '+P.sig[0]+'/'+P.sig[1]:''}
 // Demo autónoma: lleva dentro el proyecto editable (__DEMOKIT_PROJECT__) y el motor de Demo Kit,
 // así que suena igual que en el estudio y se puede volver a abrir con «Convertir en editable» sin pérdidas.
 // Solo necesita que la página aporte demoKit (demo_kit.js), como cualquier demo.
@@ -1649,12 +1654,12 @@ function recLen(o,raw){ if(o.one) return .25; return r6(recQ()?Math.max(snap,Mat
 function recOn(id,m,vel,tr){
   if(!rec.active) return; const raw=recBeat(); if(raw==null) return;                  // durante la cuenta previa no se graba
   recClose(id); if(!rec.snap.has(tr)){ pushUndo(); rec.snap.add(tr); }                // una toma = un solo Ctrl+Z
-  let b=recQ()?Math.round(raw/snap)*snap:raw; const total=P.bars*4; if(playLoop&&b>=total-1e-9) b-=total;
+  let b=recQ()?Math.round(raw/snap)*snap:raw; const total=P.bars*barBeats(P); if(playLoop&&b>=total-1e-9) b-=total;
   const inst=INSTRUMENTS[tr.inst]; let n=tr.notes.find(x=>Math.abs(x.b-b)<1e-6&&Math.round(x.m)===m&&!(x.o&&x.o.cid));
   if(n) n.v=r6(vel); else { n={b:r6(b),l:.25,m,v:r6(vel)}; tr.notes.push(n); rec.n++; }   // misma nota en el mismo lugar (bucle): no se duplica
   rec.open.set(id,{n,tr,raw,one:!!inst.oneShot}); touch(); updateStat();
 }
-function recGrow(o){ const e=recBeat(); if(e==null) return; let raw=e-o.raw; if(raw<0&&playLoop) raw+=P.bars*4; o.n.l=recLen(o,Math.max(0,raw)); }
+function recGrow(o){ const e=recBeat(); if(e==null) return; let raw=e-o.raw; if(raw<0&&playLoop) raw+=P.bars*barBeats(P); o.n.l=recLen(o,Math.max(0,raw)); }
 function recClose(id){ const o=rec.open.get(id); if(!o) return; rec.open.delete(id); recGrow(o); }
 function recCloseAll(){ for(const id of [...rec.open.keys()]) recClose(id); }
 function recTick(){ for(const o of rec.open.values()) recGrow(o); }
@@ -1707,6 +1712,7 @@ $('bPlay').onclick=togglePlay;
 $('wake').onchange=e=>{ if(playing){ if(e.target.checked) acquireWake(); else releaseWake(); } };
 $('pname').onchange=e=>{ P.name=e.target.value||'Sin título'; touch(); };
 $('bpm').onchange=e=>{ P.bpm=clamp(+e.target.value||120,40,260); e.target.value=P.bpm; touch(); prewarm(); };
+$('sig').onchange=e=>{ const [a,b]=e.target.value.split('/').map(Number); P.sig=[a,b]; layoutSpacer(); invalidate(); touch(); };
 $('bars').onchange=e=>{ P.bars=clamp(Math.round(+e.target.value)||8,1,256); e.target.value=P.bars; layoutSpacer(); touch(); };
 $('bNew').onclick=()=>{ if(P.tracks.some(t=>t.notes.length)&&!confirm('¿Empezar un proyecto vacío? Se pierde lo no guardado.')) return; loadProject(newProject('Sin título',120,8)); };
 $('bSave').onclick=()=>{ try{ download(new Blob([JSON.stringify(projectToJSON(P))],{type:'application/json'}),(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'.demokit.json'); }catch(e){ toast('No pude guardar: '+e.message,'err'); } };
@@ -1727,9 +1733,9 @@ window.addEventListener('drop',e=>{ if(e.dataTransfer&&e.dataTransfer.files.leng
 // ───────────── arranque ─────────────
 (function init(){
   try{ const raw=localStorage.getItem('demokit-studio-plugins'); if(raw){ for(const u of JSON.parse(raw)){ try{ const def=evalPlugin(u.code); registerInstrument(def,{user:true}); USER_PLUGINS.push({id:def.id,name:def.name,code:u.code}); }catch(e){ console.warn('plugin',u.id,e); } } } }catch(e){}
-  populateAddInst();
+  populateAddInst(); for(const [a,b] of SIGS) $('sig').append(el('option',{value:a+'/'+b,text:a+'/'+b}));
   try{ const raw=localStorage.getItem('demokit-studio-autosave'); if(raw){ const o=JSON.parse(raw); if(o&&o.format==='demokit-studio'&&o.tracks&&o.tracks.length){ P=projectFromJSON(o); toast('Sesión anterior restaurada. «Nuevo» o «Cargar proyecto de ejemplo» en Demos y plugins para empezar de cero.'); } } }catch(e){ console.warn('autosave',e); }
-  $('pname').value=P.name; $('bpm').value=P.bpm; $('bars').value=P.bars; setMode('draw');
+  $('pname').value=P.name; $('bpm').value=P.bpm; $('bars').value=P.bars; $('sig').value=sigStr(); setMode('draw');
   renderTracks(); renderInspector(); renderLib(); layoutSpacer(); centerTrack(); updateStat(); invalidate(); histReset();
   $('bUndo').onclick=undo; $('bRedo').onclick=redo;
   window.addEventListener('resize',()=>{ layoutSpacer(); invalidate(); });
