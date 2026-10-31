@@ -381,5 +381,5 @@ El render es determinista (misma semilla → mismo audio) y se hace por bloques 
 
 * Síntesis y estudio: Brujo, con Ámbar (Claude Sonnet 5.5).
 * Icono y banner: Velvet (ChatGPT).
-* `the_void.js`, `cotton_sugar.js`, `demo_kit.js`: Ámbar (Claude Sonnet 5.5).
+* `the_void_MK.js`, `marshmallow_sky.js`, `event_horizon.js`, `electronic_rush.js`, `dark_matter.js`, `cotton_sugar_MK.js`, `demo_kit.js`: Ámbar (Claude Sonnet 5.5).
 * *Yo soy NaN* en `/demos/yo_soy_nan.js`: Éter (Gemini).
