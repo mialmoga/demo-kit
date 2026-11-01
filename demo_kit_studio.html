@@ -253,6 +253,9 @@ kbd{display:inline-block;min-width:1.5em;text-align:center;padding:1px 6px;borde
       <span id="autoCtl" hidden>
         <select id="autoK" aria-label="Parámetro a automatizar"></select>
         <button id="autoClr" class="sm" title="Borrar la curva de este parámetro">Borrar curva</button>
+        <select id="autoLv" hidden title="Con cuántos valores distintos se escalona el parámetro entre notas (el valor se toma al inicio de cada nota)"><option value="8">8 niveles</option><option value="16">16 niveles</option></select>
+        <button id="autoBake" class="sm" hidden title="Renderiza las notas seleccionadas (o toda la pista) con el barrido continuo dentro de cada nota; pesa más al guardar">Hornear barrido</button>
+        <button id="autoUnbake" class="sm" hidden title="Devuelve las notas horneadas a su pista original">Deshornear</button>
         <span class="hint">clic = punto · arrastra = mover · doble clic o clic derecho = quitar punto · se oye al volver a dar Play</span>
       </span>
     </div>
@@ -548,7 +551,9 @@ registerInstrument({id:'hat',name:'Hi-hat',kind:'perc',oneShot:true,buf:'dr',lan
 registerInstrument({id:'crash',name:'Crash',kind:'perc',oneShot:true,buf:'dr',desc:'K.crash: platillo de ruido.',params:[G(.3),{k:'len',label:'Duración (s)',min:.5,max:5,step:.1,def:2.4}],
   play(K,n){K.crash(n.t,n.a*n.p.gain,n.p.len);}});
 registerInstrument({id:'clip',name:'Clip de audio horneado',kind:'perc',oneShot:true,hidden:true,desc:'Audio fijo capturado de una demo (un add() con función interna que no se puede parametrizar).',params:[G(1)],
-  play(K,n){const d=n.clips&&n.clips[n.note.o&&n.note.o.cid]; if(!d) return; const sr=n.sr; K.add(n.buf,n.t,d.length/sr,t=>d[Math.round(t*sr)]||0,n.a*n.p.gain,n.pan);}});
+  play(K,n){const cid=n.note.o&&n.note.o.cid, d=n.clips&&n.clips[cid]; if(!d) return; const sr=n.sr, r=n.clips[cid+'~r'];
+    if(r){ const g=n.a*n.p.gain*.70711; K.add(n.buf,n.t,d.length/sr,t=>d[Math.round(t*sr)]||0,g,-1); K.add(n.buf,n.t,r.length/sr,t=>r[Math.round(t*sr)]||0,g,1); return; }   // clip estéreo (horneado): canal izquierdo y derecho por separado
+    K.add(n.buf,n.t,d.length/sr,t=>d[Math.round(t*sr)]||0,n.a*n.p.gain,n.pan);}});
 
 // ───────────────────────── plugins de usuario ─────────────────────────
 function evalPlugin(code){
@@ -724,7 +729,7 @@ const stemBytes=c=>c.stems.reduce((a,st)=>a+st.q[0].length*4,0)+(c.fxStems?c.fxS
 function stemMemory(){ let m=0; for(const c of stemCache.values()) m+=stemBytes(c); return m; }
 function trimStems(keep){ let m=stemMemory(); if(m<=STEM_BUDGET) return; for(const [id,c] of stemCache){ if(keep.has(id)) continue; m-=stemBytes(c); stemCache.delete(id); if(m<=STEM_BUDGET) break; } }
 function bumpKit(){ KIT_REV++; stemCache.clear(); }
-function trackKey(P,tr,total){ const inst=INSTRUMENTS[tr.inst]; return hash2(JSON.stringify([tr.inst,inst?inst.rev:0,KIT_REV,tr.params,tr.pan,tr.ducked?1:0,P.bpm,tempoPts(P),P.seed,total,tr.notes])); }
+function trackKey(P,tr,total){ const inst=INSTRUMENTS[tr.inst]; return hash2(JSON.stringify([tr.inst,inst?inst.rev:0,KIT_REV,tr.params,tr.pan,tr.ducked?1:0,P.bpm,tempoPts(P),P.seed,total,tr.notes,(l=>l.length?[tr.alv===16?16:8,l.map(x=>[x.k,x.pts])]:0)(paramLanes(tr,inst))])); }
 const trackSeed=(P,tr)=>(((P.seed||KIT_SEED)^parseInt(hash2(String(tr.id)).split('-')[0],36))>>>0)||1;
 function extractStems(K){
   const out=[];
@@ -740,8 +745,8 @@ function extractStems(K){
 }
 async function renderTrackStem(P,tr,beat,total){
   const inst=INSTRUMENTS[tr.inst]; if(!inst) throw new Error('instrumento no disponible ('+tr.inst+')');
-  const K=Kit.make(SR,total,trackSeed(P,tr)); K.sr=SR; const t=Object.assign({},tr,{vol:1}); let last=performance.now(),i=0;
-  for(const nt of tr.notes.slice().sort((a,b)=>a.b-b.b)){ inst.play(K,noteArgs(K,P,t,nt,beat)); if(++i%25===0&&performance.now()-last>14){ await tick(); last=performance.now(); } }
+  const K=Kit.make(SR,total,trackSeed(P,tr)); K.sr=SR; const t=Object.assign({},tr,{vol:1}), lanes=paramLanes(tr,inst), LV=tr.alv===16?16:8; let last=performance.now(),i=0;
+  for(const nt of tr.notes.slice().sort((a,b)=>a.b-b.b)){ inst.play(K,noteArgs(K,P,t,laneNote(lanes,LV,nt),beat)); if(++i%25===0&&performance.now()-last>14){ await tick(); last=performance.now(); } }
   return extractStems(K);
 }
 async function ensureStems(P,trs,onProg,from,to){
@@ -763,6 +768,12 @@ const AUTO_DEF={vol:{label:'Volumen',min:0,max:1.5,def:1},pan:{label:'Paneo',min
 const cutHz=c=>80*Math.pow(18000/80,clamp(c,0,1));
 function autoPts(tr,k){ const a=tr.auto&&tr.auto[k]; return a&&a.length?a.slice().sort((x,y)=>x.b-y.b):null; }
 function autoValue(pts,b){ if(b<=pts[0].b) return pts[0].v; for(let j=0;j<pts.length-1;j++){ if(b<pts[j+1].b){ const d=pts[j+1].b-pts[j].b; return d>0?pts[j].v+(pts[j+1].v-pts[j].v)*(b-pts[j].b)/d:pts[j+1].v; } } return pts[pts.length-1].v; }
+// ── automatización de parámetros del instrumento (carril 'p:<param>'): el valor se toma al inicio de cada nota y se cuantiza
+// a 8 (por defecto) o 16 niveles (tr.alv); una nota con ese parámetro fijado a mano (nt.o) manda sobre la curva.
+function paramDef(inst,k){ return inst&&inst.params.find(d=>d.k===k&&(d.type||'num')==='num'&&d.max>d.min); }
+function stepVal(d,v,L){ const q=Math.round(clamp((v-d.min)/(d.max-d.min),0,1)*(L-1))/(L-1); return +(d.min+q*(d.max-d.min)).toFixed(5); }
+function paramLanes(tr,inst){ const out=[]; if(!tr.auto||!inst) return out; for(const k in tr.auto){ if(k.slice(0,2)!=='p:') continue; const d=paramDef(inst,k.slice(2)), pts=autoPts(tr,k); if(d&&pts) out.push({k:d.k,d,pts}); } return out; }
+function laneNote(lanes,L,nt){ if(!lanes.length) return nt; let o=null; for(const ln of lanes){ if(nt.o&&nt.o[ln.k]!=null) continue; if(!o) o=Object.assign({},nt.o); o[ln.k]=stepVal(ln.d,autoValue(ln.pts,nt.b),L); } return o?Object.assign({},nt,{o}):nt; }
 function autoSampler(pts,beat,tm){ let j=0; const T=pts.map(p=>(tm&&!tm.constant?tm.sec(p.b):p.b*beat)*SR), n=pts.length;
   return i=>{ if(i<=T[0]) return pts[0].v; while(j<n-1&&T[j+1]<=i) j++; if(j>=n-1) return pts[n-1].v; return pts[j].v+(pts[j+1].v-pts[j].v)*(i-T[j])/(T[j+1]-T[j]); }; }
 function mixAuto(K0,st,vol,A,beat,tm){
@@ -831,13 +842,14 @@ function compactTrack(t){
   const inst=INSTRUMENTS[t.inst], def=inst?defaultParams(inst):null, o={id:t.id,name:t.name,inst:t.inst};
   const prm={}; for(const k in (t.params||{})) if(!def||t.params[k]!==def[k]) prm[k]=t.params[k]; if(Object.keys(prm).length) o.params=prm;
   if(t.vol!=null&&t.vol!==1) o.vol=t.vol; if(t.pan) o.pan=t.pan; if(t.mute) o.mute=true; if(t.solo) o.solo=true; o.ducked=!!t.ducked; if(t.sc) o.sc=true;
-  if(t.fx) o.fx=t.fx; if(t.auto) o.auto=t.auto; o.n=t.notes.map(compactNote); return o;
+  if(t.fx) o.fx=t.fx; if(t.auto) o.auto=t.auto; if(t.alv) o.alv=t.alv; if(t.bakeOf) o.bakeOf=t.bakeOf; o.n=t.notes.map(compactNote); return o;
 }
 function expandTrack(t){ if(!Array.isArray(t.n)) return t; t.notes=t.n.map(a=>{ if(!Array.isArray(a)) return a; const n={b:a[0],l:a[1],m:a[2],v:a[3]==null?1:a[3]}; if(a[4]) n.pan=a[4]; if(a[5]) n.o=a[5]; return n; }); delete t.n; return t; }
 function projectToJSON(P,opts){
   const compact=!!(opts&&opts.compact);
   const o={format:'demokit-studio',v:compact?2:1,kit:KIT_FORMAT,name:P.name,bpm:P.bpm,bars:P.bars,tempo:(P.tempo&&P.tempo.length)?P.tempo:undefined,sig:barBeats(P)===4&&(!P.sig||P.sig[1]===4)?undefined:P.sig,seed:P.seed,sc:{mode:P.sc.mode,depth:P.sc.depth,rel:P.sc.rel,rate:P.sc.rate},master:masterOf(P),key:P.key||undefined,tracks:compact?P.tracks.map(compactTrack):P.tracks,clips:{},plugins:[]};
   if(P.sc.table){ const T=P.sc.table,u=new Uint8Array(T.length); for(let i=0;i<T.length;i++) u[i]=Math.round(clamp(T[i],0,1)*255); o.sc.table=u8ToB64(u); }
+  if(typeof pruneBakedClips==='function') pruneBakedClips(P);
   for(const cid in P.clips){ const d=P.clips[cid],q=new Int16Array(d.length); for(let i=0;i<d.length;i++) q[i]=clamp(Math.round(d[i]*16384),-32768,32767); o.clips[cid]=u8ToB64(new Uint8Array(q.buffer)); }
   const used=new Set(P.tracks.map(t=>t.inst)); for(const u of USER_PLUGINS) if(used.has(u.id)) o.plugins.push(u);
   return o;
@@ -869,6 +881,44 @@ function compileDemo(src,fnName,sleepFn){ const st=stripMakeKit(src);
 // ───────────────────────── MIDI: exportar el proyecto e importar un archivo .mid ─────────────────────────
 // Archivo MIDI estándar tipo 1, 480 pulsos por negra (el «pulso» del proyecto es la negra, así que 1 pulso = 480 ticks).
 // MIDI lleva la partitura (notas, tempo, compás, volumen y paneo), no el sonido del kit, ni plugins, ni efectos.
+// ── hornear notas con barrido continuo ──
+// Una nota con automatización de parámetros normalmente fija el valor al empezar. Hornear la renderiza varias veces (mismo ruido, mismo
+// inicio) con los valores que la curva toma a lo largo de la nota y hace crossfade entre esos renders: el barrido sale continuo.
+// El resultado es un clip estéreo en una pista «· bake» (p.clips[cid] = izquierdo, p.clips[cid+'~r'] = derecho). Notas idénticas comparten clip.
+function bakeNoteClip(P,tr,nt,lanes){
+  const inst=INSTRUMENTS[tr.inst], tm=tmap(P), beatN=60/tm.bpmAt(nt.b), lenB=nt.l||.25, lenSec=Math.max(.01,tm.span(nt.b,lenB)), dur=lenSec+TAIL;
+  const KN=Math.max(3,Math.min(16,Math.round(lenSec*6)+2)), an=[];
+  for(let i=0;i<KN;i++){ const f=i/(KN-1), o={}; for(const ln of lanes){ if(nt.o&&nt.o[ln.k]!=null) continue; const dd=ln.d, st=dd.step>0?dd.step:.01; o[ln.k]=+(Math.round(clamp(autoValue(ln.pts,nt.b+lenB*f),dd.min,dd.max)/st)*st).toFixed(5); } an.push({s:tm.sec(nt.b+lenB*f)-tm.sec(nt.b),o}); }
+  const cid='bk-'+hash2(JSON.stringify([tr.inst,inst.rev,KIT_REV,tr.params,nt.m,lenSec,nt.v,nt.pan,nt.o,tr.pan,tr.ducked?1:0,beatN,P.seed,trackSeed(P,tr),an.map(x=>[+x.s.toFixed(4),x.o])]));
+  if(P.clips[cid]) return {cid,shared:true,bytes:0};
+  const t=Object.assign({},tr,{vol:1}), n2=Object.assign({},nt,{b:0,l:lenSec/beatN}), R=[]; let N=Infinity;
+  for(const x of an){ const K=Kit.make(SR,dur,trackSeed(P,tr)); K.sr=SR; inst.play(K,noteArgs(K,P,t,Object.assign({},n2,{o:Object.assign({},nt.o,x.o)}),beatN,0)); const bus=tr.ducked?K.mu:K.dr; R.push(bus); N=Math.min(N,bus[0].length); }
+  const L=new Float32Array(N), Rr=new Float32Array(N); let j=0, end=0;
+  for(let i=0;i<N;i++){ const ts=i/SR; while(j<KN-2&&an[j+1].s<=ts) j++; let w=0, A=R[j], B=R[Math.min(j+1,KN-1)];
+    if(KN>1&&ts>=an[j].s&&an[j+1]){ const d=an[j+1].s-an[j].s; w=d>0?Math.min(1,(ts-an[j].s)/d):1; }
+    const l=A[0][i]*(1-w)+B[0][i]*w, r=A[1][i]*(1-w)+B[1][i]*w; L[i]=clamp(l,-1.99,1.99); Rr[i]=clamp(r,-1.99,1.99); if(Math.abs(l)>1e-5||Math.abs(r)>1e-5) end=i+1; }
+  P.clips[cid]=L.slice(0,end); P.clips[cid+'~r']=Rr.slice(0,end); return {cid,shared:false,bytes:end*4};
+}
+function bakeTrackNotes(P,tr,notes){      // → {baked, shared, bytes, track}
+  const inst=INSTRUMENTS[tr.inst]; if(!inst) throw new Error('instrumento no disponible'); const lanes=paramLanes(tr,inst);
+  if(!lanes.length) throw new Error('esta pista no tiene curvas de parámetros del instrumento');
+  let bt=P.tracks.find(x=>x.bakeOf===tr.id&&x.inst==='clip');
+  if(!bt){ const ci=INSTRUMENTS.clip; bt=fixTrack({id:uid(),name:tr.name+' · bake',inst:'clip',params:defaultParams(ci),vol:tr.vol,pan:0,mute:tr.mute,solo:tr.solo,ducked:tr.ducked,sc:tr.sc,bakeOf:tr.id,notes:[]});
+    if(tr.fx) bt.fx=JSON.parse(JSON.stringify(tr.fx)); if(tr.auto){ const a={}; for(const k of ['vol','pan','cut']) if(tr.auto[k]) a[k]=JSON.parse(JSON.stringify(tr.auto[k])); if(Object.keys(a).length) bt.auto=a; }
+    P.tracks.splice(P.tracks.indexOf(tr)+1,0,bt); }
+  let baked=0, shared=0, bytes=0;
+  for(const nt of notes){ const r=bakeNoteClip(P,tr,nt,lanes); tr.notes.splice(tr.notes.indexOf(nt),1);
+    const src={m:nt.m,l:nt.l,v:nt.v==null?1:nt.v}; if(nt.pan) src.pan=nt.pan; if(nt.o) src.o=nt.o;
+    bt.notes.push({b:nt.b,l:nt.l||.25,m:0,v:1,o:{cid:r.cid,src}}); baked++; if(r.shared) shared++; bytes+=r.bytes; }
+  return {baked,shared,bytes,track:bt};
+}
+function unbakeTrackNotes(P,bt,notes){     // devuelve las notas horneadas a su pista de origen
+  const src=P.tracks.find(x=>x.id===bt.bakeOf); if(!src) throw new Error('la pista original ya no existe'); let n=0;
+  for(const nt of notes){ const s=nt.o&&nt.o.src; if(!s) continue; const o={b:nt.b,l:s.l,m:s.m,v:s.v}; if(s.pan) o.pan=s.pan; if(s.o) o.o=s.o; src.notes.push(o); bt.notes.splice(bt.notes.indexOf(nt),1); n++; }
+  if(!bt.notes.length) P.tracks.splice(P.tracks.indexOf(bt),1); pruneBakedClips(P); return n;
+}
+function pruneBakedClips(P){ const used=new Set(); for(const t of P.tracks) if(t.inst==='clip') for(const n of t.notes) if(n.o&&n.o.cid) used.add(n.o.cid); for(const k of Object.keys(P.clips)) if(k.slice(0,3)==='bk-'&&!used.has(k.replace(/~r$/,''))) delete P.clips[k]; }
+
 const MIDI_PPQ=480;
 const MIDI_GM_DRUM={kick:36,snare:38,clap:39,rim:37,snap:75,crash:49};                  // hi-hat: carril 0 → 42 (cerrado), carril 1 → 46 (abierto)
 const MIDI_PROG={sub:38,subfall:38,reese:39,reesemk:39,growl:39,bell:10,bellmk:10,chop:52,pad:89,supersaw:81,sinte:81,pluck:80,arp:80};   // programa GM de referencia (0-127)
@@ -1705,12 +1755,17 @@ document.addEventListener('keydown',e=>{ const tg=e.target&&e.target.tagName; if
 
 // ───────────── automatización (carril bajo el piano roll) ─────────────
 let autoKey='vol', autoShow=false, autoDrag=null; const acv=$('acv'), AP=10;
-const autoFmt=(k,v)=>k==='vol'||k==='vel'?v.toFixed(2):k==='pan'?(Math.abs(v)<.02?'C':(v<0?'L':'R')+Math.round(Math.abs(v)*100)):(cutHz(v)>=1000?(cutHz(v)/1000).toFixed(1)+' kHz':Math.round(cutHz(v))+' Hz');
-const VEL_DEF={min:0,max:1.5,def:1,label:'Velocidad'}; const adef=k=>k==='vel'?VEL_DEF:AUTO_DEF[k];
+const autoFmt=(k,v)=>k.slice(0,2)==='p:'?String(+(+v).toFixed(3)):k==='vol'||k==='vel'?v.toFixed(2):k==='pan'?(Math.abs(v)<.02?'C':(v<0?'L':'R')+Math.round(Math.abs(v)*100)):(cutHz(v)>=1000?(cutHz(v)/1000).toFixed(1)+' kHz':Math.round(cutHz(v))+' Hz');
+const VEL_DEF={min:0,max:1.5,def:1,label:'Velocidad'}; const pdef=k=>{ const tr=P.tracks[sel], d=tr&&paramDef(INSTRUMENTS[tr.inst],k.slice(2)); return d?{min:d.min,max:d.max,def:d.def,step:d.step,label:d.label||d.k}:null; };
+const adef=k=>k==='vel'?VEL_DEF:k.slice(0,2)==='p:'?(pdef(k)||AUTO_DEF.vol):AUTO_DEF[k]||AUTO_DEF.vol;
 const autoY=(k,v,H)=>{ const d=adef(k); return AP+(1-(v-d.min)/(d.max-d.min))*(H-2*AP); };
-const autoV=(k,y,H)=>{ const d=adef(k); let v=d.min+(1-(y-AP)/(H-2*AP))*(d.max-d.min); v=clamp(v,d.min,d.max); v=Math.round(v*100)/100; if(k==='pan'&&Math.abs(v)<.04) v=0; return v; };
+const autoV=(k,y,H)=>{ const d=adef(k); let v=d.min+(1-(y-AP)/(H-2*AP))*(d.max-d.min); v=clamp(v,d.min,d.max); if(k.slice(0,2)==='p:'){ const st=d.step>0?d.step:.01; return +(Math.round(v/st)*st).toFixed(5); } v=Math.round(v*100)/100; if(k==='pan'&&Math.abs(v)<.04) v=0; return v; };
 function refreshAutoUI(){ const tr=P.tracks[sel], s=$('autoK'), cur=autoKey; s.innerHTML='';
-  s.append(el('option',{value:'vel',text:'Velocidad de notas'})); for(const k of Object.keys(AUTO_DEF)){ const n=tr&&tr.auto&&tr.auto[k]?tr.auto[k].length:0; s.append(el('option',{value:k,text:AUTO_DEF[k].label+(n?' ●'+n:'')})); } s.value=cur;
+  s.append(el('option',{value:'vel',text:'Velocidad de notas'})); for(const k of Object.keys(AUTO_DEF)){ const n=tr&&tr.auto&&tr.auto[k]?tr.auto[k].length:0; s.append(el('option',{value:k,text:AUTO_DEF[k].label+(n?' ●'+n:'')})); } const inst=tr&&INSTRUMENTS[tr.inst], ps=inst?inst.params.filter(d=>(d.type||'num')==='num'&&d.max>d.min):[];
+  if(ps.length){ const g=el('optgroup',{label:'Parámetros del instrumento'}); for(const d of ps){ const L=tr.auto&&tr.auto['p:'+d.k], n=L?L.length:0; g.append(el('option',{value:'p:'+d.k,text:(d.label||d.k)+(n?' ●'+n:'')})); } s.append(g); }
+  if(cur.slice(0,2)==='p:'&&!ps.some(d=>'p:'+d.k===cur)) autoKey=cur='vol';
+  s.value=cur; const isP=cur.slice(0,2)==='p:', hasLanes=!!(tr&&inst&&paramLanes(tr,inst).length), isBake=!!(tr&&tr.bakeOf);
+  $('autoLv').hidden=!isP; $('autoLv').value=tr&&tr.alv===16?'16':'8'; $('autoBake').hidden=!hasLanes; $('autoUnbake').hidden=!isBake;
   $('autoCtl').hidden=!autoShow; $('awrap').hidden=!autoShow; $('autoOn').classList.toggle('on',autoShow); }
 function autoList(create){ const tr=P.tracks[sel]; if(!tr) return null; if(!tr.auto){ if(!create) return null; tr.auto={}; } if(!tr.auto[autoKey]){ if(!create) return null; tr.auto[autoKey]=[]; } return tr.auto[autoKey]; }
 function drawAuto(ph){
@@ -1727,9 +1782,11 @@ function drawAuto(ph){
   if(k==='vel'){ const col=trackColor(sel,1), y0=autoY(k,0,H); for(const n of (tr?tr.notes:[])){ const x=KW+n.b*BW-sx; if(x<KW-6||x>W) continue; const v=n.v==null?1:n.v, y=autoY(k,v,H); g.fillStyle=selNotes.has(n)?'#fff':col; g.fillRect(x-2,y,5,y0-y); g.beginPath(); g.arc(x+.5,y,4,0,7); g.fill(); }
     if(autoDrag&&autoDrag.vel){ const n=autoDrag.vel[0], x=KW+n.b*BW-sx, y=autoY(k,n.v==null?1:n.v,H); g.fillStyle='#e8eaf0'; g.font='11px system-ui'; g.fillText((n.v==null?1:n.v).toFixed(2),Math.min(x+8,W-50),Math.max(12,y-8)); }
     if(!tr||!tr.notes.length){ g.fillStyle='#6b7388'; g.font='12px system-ui'; g.fillText('Esta pista no tiene notas. Arrastra las puntas de las barras para cambiar la velocidad.',KW+12,H/2); } }
-  else if(pts.length){ const col=trackColor(sel,1); g.strokeStyle=col; g.lineWidth=2; g.beginPath(); g.moveTo(KW,autoY(k,pts[0].v,H));
+  else if(pts.length){ const col=trackColor(sel,1);
+    if(k.slice(0,2)==='p:'){ const LV=tr.alv===16?16:8; g.strokeStyle='#ffffff14'; for(let i=0;i<LV;i++){ const y=Math.round(autoY(k,d.min+(d.max-d.min)*i/(LV-1),H))+.5; g.beginPath(); g.moveTo(KW,y); g.lineTo(W,y); g.stroke(); } } g.strokeStyle=col; g.lineWidth=2; g.beginPath(); g.moveTo(KW,autoY(k,pts[0].v,H));
     for(const p of pts) g.lineTo(KW+p.b*BW-sx,autoY(k,p.v,H)); g.lineTo(W,autoY(k,pts[pts.length-1].v,H)); g.stroke(); g.lineWidth=1;
     for(const p of pts){ const x=KW+p.b*BW-sx,y=autoY(k,p.v,H); g.fillStyle=autoDrag&&autoDrag.p===p?'#fff':col; g.beginPath(); g.arc(x,y,4.5,0,7); g.fill(); }
+    if(k.slice(0,2)==='p:'){ const LV=tr.alv===16?16:8, dd=paramDef(INSTRUMENTS[tr.inst],k.slice(2)); if(dd){ g.strokeStyle='#e8eaf0'; for(const n of tr.notes){ const x=KW+n.b*BW-sx; if(x<KW-6||x>W) continue; const y=autoY(k,stepVal(dd,autoValue(pts,n.b),LV),H); g.beginPath(); g.arc(x,y,3,0,7); g.stroke(); } } }
     if(autoDrag){ const p=autoDrag.p,x=KW+p.b*BW-sx,y=autoY(k,p.v,H); g.fillStyle='#e8eaf0'; g.font='11px system-ui'; g.fillText(autoFmt(k,p.v),Math.min(x+8,W-70),Math.max(12,y-8)); } }
   else { g.fillStyle='#6b7388'; g.font='12px system-ui'; g.fillText('Sin curva: el parámetro queda fijo. Haz clic para poner el primer punto.',KW+12,H/2); }
   g.restore();
@@ -1750,8 +1807,17 @@ const autoEnd=()=>{ if(!autoDrag) return; const wasVel=!!autoDrag.vel; autoDrag=
 acv.addEventListener('pointerup',autoEnd); acv.addEventListener('pointercancel',autoEnd);
 function autoDel(e){ e.preventDefault(); if(autoKey==='vel') return; const h=autoNear(e); if(!h.p) return; pushUndo(); const L=autoList(false), tr=P.tracks[sel]; L.splice(L.indexOf(h.p),1); if(!L.length){ delete tr.auto[autoKey]; if(!Object.keys(tr.auto).length) delete tr.auto; } touch(); refreshAutoUI(); }
 acv.addEventListener('dblclick',autoDel); acv.addEventListener('contextmenu',autoDel);
+$('autoLv').onchange=e=>{ const tr=P.tracks[sel]; if(!tr) return; pushUndo(); if(e.target.value==='16') tr.alv=16; else delete tr.alv; touch(); invalidate(); };
+$('autoBake').onclick=()=>{ const tr=P.tracks[sel]; if(!tr) return; let notes=tr.notes.filter(n=>selNotes.has(n)); const all=!notes.length;
+  if(all){ notes=tr.notes.slice(); if(!notes.length){ toast('Esta pista no tiene notas','err'); return; } if(!confirm('Sin notas seleccionadas: se hornearán las '+notes.length+' notas de «'+tr.name+'». Cada nota se renderiza varias veces y el clip pesa al guardar el proyecto. ¿Continuar?')) return; }
+  try{ pushUndo(); const r=bakeTrackNotes(P,tr,notes); selNotes.clear(); renderTracks(); renderInspector(); touch(); invalidate();
+    toast('Horneadas '+r.baked+' nota(s)'+(r.shared?' ('+r.shared+' comparten clip)':'')+' en «'+r.track.name+'» · +'+(r.bytes/1048576).toFixed(2)+' MB al guardar. «Deshornear» las devuelve a la pista original.','ok'); }
+  catch(e){ console.error(e); toast('No pude hornear: '+e.message,'err'); } };
+$('autoUnbake').onclick=()=>{ const bt=P.tracks[sel]; if(!bt||!bt.bakeOf) return; let notes=bt.notes.filter(n=>selNotes.has(n)); if(!notes.length) notes=bt.notes.slice();
+  try{ pushUndo(); const n=unbakeTrackNotes(P,bt,notes); selNotes.clear(); sel=Math.max(0,Math.min(sel,P.tracks.length-1)); const src=P.tracks.findIndex(x=>x.id===bt.bakeOf); if(src>=0) sel=src; renderTracks(); renderInspector(); touch(); invalidate(); toast('Deshorneadas '+n+' nota(s)','ok'); }
+  catch(e){ console.error(e); toast('No pude deshornear: '+e.message,'err'); } };
 $('autoOn').onclick=()=>{ autoShow=!autoShow; refreshAutoUI(); invalidate(); };
-$('autoK').onchange=e=>{ autoKey=e.target.value; invalidate(); };
+$('autoK').onchange=e=>{ autoKey=e.target.value; refreshAutoUI(); invalidate(); };
 $('autoClr').onclick=()=>{ const tr=P.tracks[sel]; if(autoKey==='vel'){ if(!tr||!tr.notes.length) return; pushUndo(); for(const n of tr.notes) n.v=1; touch(); renderSelInfo(); return; } if(!tr||!autoList(false)) return; pushUndo(); delete tr.auto[autoKey]; if(!Object.keys(tr.auto).length) delete tr.auto; touch(); refreshAutoUI(); };
 
 // ───────────── pista de tempo (cambios de tempo y rampas) ─────────────
