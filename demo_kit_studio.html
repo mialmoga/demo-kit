@@ -184,6 +184,7 @@ kbd{display:inline-block;min-width:1.5em;text-align:center;padding:1px 6px;borde
     <button id="bSave" title="Descarga el proyecto (.json)">Guardar</button>
     <button id="bOpen" title="Abre proyectos, demos (.js), plugins y kits">Cargar archivos…</button>
     <button id="bWav">⬇ WAV</button>
+    <button id="bMidiOut" title="Descarga las notas como archivo MIDI (.mid): una pista por pista, tempo, compás, volumen y pan">⬇ MIDI</button>
     <button id="bCompact" title="Descarga el proyecto en formato compacto (.demokit.json) para usarlo con la librería, con un reporte de peso">⬇ Compacto</button>
     <button id="bDemoJs" title="Descarga el proyecto como una demo .js autónoma (con el proyecto editable dentro)">⬇ Demo .js</button>
     <button id="bStems" title="Un WAV por pista dentro de un .zip (para mezclar en otro DAW)">⬇ Stems</button>
@@ -262,7 +263,7 @@ kbd{display:inline-block;min-width:1.5em;text-align:center;padding:1px 6px;borde
 
 <div id="libModal" class="modal"><div class="card">
   <h3>Demos y plugins <button class="x" data-close="libModal">Cerrar</button></h3>
-  <div class="drop" id="drop">Suelta aquí archivos <b>.js</b> o <b>.json</b>: demos (.js), plugins de instrumento, un demo_kit.js propio o proyectos guardados.
+  <div class="drop" id="drop">Suelta aquí archivos <b>.js</b>, <b>.json</b> o <b>.mid</b>: demos (.js), plugins de instrumento, un demo_kit.js propio o proyectos guardados.
     <div class="btnrow" style="justify-content:center"><button id="bPick" class="pri">Elegir archivos…</button><button id="bExample">Cargar proyecto de ejemplo</button></div></div>
   <div class="sec fold" data-fold="repo"><h4 class="ft">En el repositorio <button id="repoRefresh" class="sm" title="Volver a mirar las carpetas">↻</button></h4><div id="repoList" class="desc"></div></div>
   <div class="sec fold" data-fold="demos"><h4 class="ft">Demos cargadas</h4><div id="demoList"></div></div>
@@ -313,7 +314,7 @@ kbd{display:inline-block;min-width:1.5em;text-align:center;padding:1px 6px;borde
 </div></div>
 
 <div id="toasts"></div>
-<input type="file" id="fileIn" multiple accept=".js,.json,.txt" style="display:none">
+<input type="file" id="fileIn" multiple accept=".js,.json,.txt,.mid,.midi" style="display:none">
 <script>
 // ── KIT DE SÍNTESIS PARA LAS DEMOS (Cotton Sugar, The Void) ────
 // Todo se calcula muestra a muestra en JavaScript: sin archivos de audio, sin librerías.
@@ -855,6 +856,107 @@ function projectFromJSON(o,opts){
   P.tracks=(o.tracks||[]).map(t=>fixTrack(expandTrack(t))); P.loadErrors=errs; P.loadWarnings=[]; if(skipped.length) P.loadWarnings.push('Plugins sin ejecutar: '+skipped.join(', ')+'. Las pistas que los usan quedan sin instrumento.'); if(o.kit!=null&&o.kit!==KIT_FORMAT) P.loadWarnings.push('Este proyecto se guardó con la versión '+o.kit+' del kit y esta es la '+KIT_FORMAT+(o.kit>KIT_FORMAT?': puede sonar distinto o faltar instrumentos. Actualiza la librería.':': puede sonar un poco distinto.')); return P;
 }
 
+// makeKit (make_kit.js) → adaptador sobre demoKit.metric (salida idéntica muestra a muestra a la original)
+function makeKitOn(metric){ return (sr,BPM,BARS,tail,seed0)=>{ const K=metric(sr,BPM,BARS,tail,seed0), T=K.T, bar=K.bar,
+  soft=x=>x<-3?-1:x>3?1:x*(27+x*x)/(27+9*x*x), k0=K.kick, r0=K.riser, kick=(t0,a,f0,dk)=>{ f0=f0||46; k0(t0,a,{lo:f0,hi:f0+105,dec:dk||6.5}); };
+  return Object.assign(K,{soft,kick,riser:(bs,a)=>r0(T(bs,0),4*bar,a||.5)}); }; }
+function stripMakeKit(src){ const mk=/(^|\n)[ \t]*function\s+makeKit\s*\(/.exec(src), rn=/(^|\n)[ \t]*async\s+function\s+render\w*\s*\(/.exec(src);
+  if(mk&&rn&&mk.index<rn.index) return {src:src.slice(0,mk.index+(mk[1]?1:0))+src.slice(rn.index+(rn[1]?1:0)),used:true}; return {src,used:false}; }
+// compila una demo .js (con demoKit o con makeKit) y devuelve su función render
+function compileDemo(src,fnName,sleepFn){ const st=stripMakeKit(src);
+  return new Function('demoKit','sleep','makeKit',st.src+'\nreturn '+fnName+';')(Kit.make,sleepFn,Kit.make&&Kit.make.metric?makeKitOn(Kit.make.metric):undefined); }
+//#CONVERTER-BEGIN
+// ───────────────────────── MIDI: exportar el proyecto e importar un archivo .mid ─────────────────────────
+// Archivo MIDI estándar tipo 1, 480 pulsos por negra (el «pulso» del proyecto es la negra, así que 1 pulso = 480 ticks).
+// MIDI lleva la partitura (notas, tempo, compás, volumen y paneo), no el sonido del kit, ni plugins, ni efectos.
+const MIDI_PPQ=480;
+const MIDI_GM_DRUM={kick:36,snare:38,clap:39,rim:37,snap:75,crash:49};                  // hi-hat: carril 0 → 42 (cerrado), carril 1 → 46 (abierto)
+const MIDI_PROG={sub:38,subfall:38,reese:39,reesemk:39,growl:39,bell:10,bellmk:10,chop:52,pad:89,supersaw:81,sinte:81,pluck:80,arp:80};   // programa GM de referencia (0-127)
+function midiVlq(n){ n=Math.max(0,Math.round(n)); const b=[n&127]; while((n>>=7)>0) b.unshift((n&127)|128); return b; }
+function midiText(s){ return Array.from(new TextEncoder().encode(String(s))); }
+function midiChunk(tag,bytes){ const n=bytes.length; return [tag.charCodeAt(0),tag.charCodeAt(1),tag.charCodeAt(2),tag.charCodeAt(3),(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255].concat(bytes); }
+function midiTrackBytes(evs,endTick){   // evs: [{t,o,b:[bytes]}] (o: orden en el mismo tick) → bytes de la pista con su fin
+  evs.sort((x,y)=>x.t-y.t||x.o-y.o); const out=[]; let last=0; for(const e of evs){ out.push(...midiVlq(e.t-last),...e.b); last=e.t; }
+  out.push(...midiVlq(Math.max(0,endTick-last)),0xFF,0x2F,0); return midiChunk('MTrk',out);
+}
+function projectToMidi(P){
+  const tm=tmap(P), bb=barBeats(P), totalBeats=P.bars*bb, endTick=Math.round(totalBeats*MIDI_PPQ), sig=(P.sig&&P.sig[0]>0&&P.sig[1]>0)?P.sig:[4,4];
+  const meta=(t,type,data,o)=>({t,o:o==null?0:o,b:[0xFF,type,...midiVlq(data.length),...data]});
+  const cond=[meta(0,0x03,midiText(P.name||'Demo Kit')),meta(0,0x58,[sig[0],Math.round(Math.log2(sig[1])),24,8])];
+  { let lastMp=-1; const cand=new Set([0]); for(let b=0;b<=totalBeats+1e-9;b+=.25) cand.add(+b.toFixed(6)); for(const p of (P.tempo||[])) if(p&&p.b>=0&&p.b<=totalBeats) cand.add(+p.b);
+    for(const b of [...cand].sort((x,y)=>x-y)){ const mp=Math.round(60e6/Math.max(1,tm.bpmAt(b))); if(mp!==lastMp){ cond.push(meta(Math.round(b*MIDI_PPQ),0x51,[(mp>>>16)&255,(mp>>>8)&255,mp&255],-1)); lastMp=mp; } } }
+  const chunks=[midiTrackBytes(cond,endTick)], skipped=[]; let nextCh=0; const melCh=[0,1,2,3,4,5,6,7,8,10,11,12,13,14,15];
+  for(const tr of P.tracks){ if(!tr.notes.length){ continue; } const inst=INSTRUMENTS[tr.inst]||{}, gm=inst.kind==='perc'&&(MIDI_GM_DRUM[tr.inst]||tr.inst==='hat');
+    const ch=gm?9:melCh[nextCh++%melCh.length], ev=[meta(0,0x03,midiText(tr.name||inst.name||'Pista')),meta(0,0x04,midiText(inst.name||tr.inst))];
+    if(!gm) ev.push({t:0,o:1,b:[0xC0|ch,MIDI_PROG[tr.inst]||0]});
+    ev.push({t:0,o:1,b:[0xB0|ch,7,tr.mute?0:Math.max(0,Math.min(127,Math.round((tr.vol==null?1:tr.vol)*100)))]},{t:0,o:1,b:[0xB0|ch,10,Math.max(0,Math.min(127,Math.round(64+(tr.pan||0)*63)))]});
+    const list=tr.notes.map(n=>{ let key=gm?(tr.inst==='hat'?(Math.round(n.m)===1?46:42):MIDI_GM_DRUM[tr.inst]):Math.max(0,Math.min(127,Math.round(inst.kind==='perc'?60+(n.m||0):n.m)));
+      const on=Math.round(n.b*MIDI_PPQ), len=gm?120:Math.max(1,Math.round((n.l||.25)*MIDI_PPQ)); return {key,on,off:on+len,vel:Math.max(1,Math.min(127,Math.round((n.v==null?1:n.v)*100)))}; });
+    const byKey=new Map(); for(const x of list){ if(!byKey.has(x.key)) byKey.set(x.key,[]); byKey.get(x.key).push(x); }
+    for(const arr of byKey.values()){ arr.sort((a,b)=>a.on-b.on); for(let i=0;i+1<arr.length;i++) if(arr[i].off>arr[i+1].on) arr[i].off=Math.max(arr[i].on+1,arr[i+1].on); }   // una misma nota no se solapa consigo misma
+    for(const x of list){ ev.push({t:x.on,o:2,b:[0x90|ch,x.key,x.vel]},{t:x.off,o:1,b:[0x80|ch,x.key,0]}); }
+    chunks.push(midiTrackBytes(ev,Math.max(endTick,...list.map(x=>x.off)))); }
+  const header=midiChunk('MThd',[0,1,(chunks.length>>8)&255,chunks.length&255,(MIDI_PPQ>>8)&255,MIDI_PPQ&255]);
+  return new Uint8Array(header.concat(...chunks));
+}
+function parseMidi(u8){
+  const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength), tag=(i)=>String.fromCharCode(u8[i],u8[i+1],u8[i+2],u8[i+3]);
+  if(u8.length<14||tag(0)!=='MThd') throw new Error('No es un archivo MIDI (falta la cabecera MThd).');
+  const hl=dv.getUint32(4), format=dv.getUint16(8), ntrk=dv.getUint16(10), div=dv.getUint16(12);
+  if(div&0x8000) throw new Error('Este MIDI usa tiempo SMPTE (no compases y pulsos); no sé importarlo.');
+  const ppq=div||480, tracks=[]; let pos=8+hl;
+  while(pos+8<=u8.length&&tracks.length<ntrk+64){ const t=tag(pos), len=dv.getUint32(pos+4), end=Math.min(u8.length,pos+8+len); pos+=8;
+    if(t!=='MTrk'){ pos=end; continue; }
+    const evs=[]; let tick=0, run=0;
+    const vlq=()=>{ let v=0,b; do{ b=u8[pos++]; v=(v<<7)|(b&127); }while((b&128)&&pos<end); return v; };
+    while(pos<end){ tick+=vlq(); let s=u8[pos];
+      if(s===0xFF){ pos++; const ty=u8[pos++], l=vlq(), d=u8.subarray(pos,pos+l); pos+=l; run=0;
+        if(ty===0x03) evs.push({tick,k:'name',text:new TextDecoder('utf-8').decode(d)}); else if(ty===0x51&&l===3) evs.push({tick,k:'tempo',mp:(d[0]<<16)|(d[1]<<8)|d[2]}); else if(ty===0x58&&l>=2) evs.push({tick,k:'sig',n:d[0],d:Math.pow(2,d[1])}); else if(ty===0x2F){ evs.push({tick,k:'end'}); break; } continue; }
+      if(s===0xF0||s===0xF7){ pos++; const l=vlq(); pos+=l; run=0; continue; }
+      if(s&128){ run=s; pos++; } else if(!run) throw new Error('El archivo MIDI está dañado (dato sin estado previo).'); else s=run;
+      const st=run&0xF0, ch=run&15;
+      if(st===0x80||st===0x90||st===0xA0||st===0xB0||st===0xE0){ const a=u8[pos++], b=u8[pos++];
+        if(st===0x90&&b>0) evs.push({tick,k:'on',ch,key:a,vel:b}); else if(st===0x80||st===0x90) evs.push({tick,k:'off',ch,key:a}); else if(st===0xB0) evs.push({tick,k:'cc',ch,c:a,v:b}); }
+      else if(st===0xC0){ evs.push({tick,k:'prog',ch,p:u8[pos++]}); } else if(st===0xD0){ pos++; } else { pos++; } }
+    tracks.push(evs); pos=end; }
+  return {format,ppq,tracks};
+}
+function midiSigToProject(n,d,warn){ const bbs=n*4/d; for(const s of SIGS) if(s[0]===n&&s[1]===d) return [n,d]; for(const s of SIGS) if(Math.abs(s[0]*4/s[1]-bbs)<1e-9) return s.slice(); warn.push('El compás '+n+'/'+d+' no está entre los que soporta el estudio: usé 4/4.'); return [4,4]; }
+function midiToProject(u8,fname){
+  const M=parseMidi(u8), ppq=M.ppq, warn=[], r6b=x=>r6(x/ppq);
+  let tempos=[], sigs=[], projName=null;
+  M.tracks.forEach((evs,ti)=>{ for(const e of evs){ if(e.k==='tempo') tempos.push(e); else if(e.k==='sig') sigs.push(e); else if(e.k==='name'&&ti===0&&!projName&&e.text.trim()) projName=e.text.trim(); } });
+  tempos.sort((a,b)=>a.tick-b.tick); sigs.sort((a,b)=>a.tick-b.tick);
+  const bpm0=tempos.length?60e6/tempos[0].mp:120, P=newProject(projName||String(fname||'MIDI').replace(/\.midi?$/i,''),+Math.max(20,Math.min(400,bpm0)).toFixed(2),8);
+  { const pts=[]; let lastBpm=P.bpm; for(const t of tempos.slice(1)){ const b=+(60e6/t.mp).toFixed(2); if(Math.abs(b-lastBpm)<.005||t.tick===0) continue; pts.push({b:r6b(t.tick),bpm:Math.max(20,Math.min(400,b)),ramp:false}); lastBpm=b; }
+    let kept=pts; if(pts.length>200){ kept=[]; let lb=P.bpm; for(const p of pts) if(Math.abs(p.bpm-lb)/lb>=.005){ kept.push(p); lb=p.bpm; } warn.push('El archivo tiene '+pts.length+' cambios de tempo; simplifiqué a '+kept.length+'.'); }
+    if(kept.length) P.tempo=kept; }
+  if(sigs.length){ const s0=sigs[0]; P.sig=midiSigToProject(s0.n,s0.d,warn); if(sigs.some(s=>s.n!==s0.n||s.d!==s0.d)) warn.push('El archivo cambia de compás a mitad: el estudio usa un solo compás por proyecto, así que tomé el primero ('+s0.n+'/'+s0.d+').'); }
+  const groups=new Map(); const grp=(key,make)=>{ let g=groups.get(key); if(!g){ g=make(); groups.set(key,g); } return g; };
+  const drumTarget=k=>(k===35||k===36)?['kick',0,'Bombo']:(k===38||k===40)?['snare',0,'Caja']:k===39?['clap',0,'Palma']:k===37?['rim',0,'Rim']:(k===42||k===44)?['hat',0,'Hi-hat']:k===46?['hat',1,'Hi-hat']:(k===49||k===57)?['crash',0,'Crash']:k===75?['snap',0,'Chasquido']:['rim',0,'Percusión extra'];
+  const FAM=['Piano','Percusión afinada','Órgano','Guitarra','Bajo','Cuerdas','Ensamble','Metales','Cañas','Flautas','Lead','Pad','Efectos sintéticos','Étnicos','Percusión','Efectos'];
+  const progInst=p=>p>=32&&p<=39?'sub':p>=8&&p<=15?'bell':((p>=40&&p<=55)||(p>=88&&p<=95))?'pad':'sinte';
+  let lastTick=0, nNotes=0, dropped=0; for(const evs of M.tracks) for(const x of evs) if(x.k==='end') lastTick=Math.max(lastTick,x.tick);
+  M.tracks.forEach((evs,ti)=>{
+    const name=(evs.find(e=>e.k==='name')||{}).text, open=new Map(), state={}, seq=[];
+    const st=ch=>state[ch]||(state[ch]={prog:0,vol:null,pan:null,seen:false});
+    for(const e of evs){ if(e.k==='prog'){ const s=st(e.ch); if(!s.seen) s.prog=e.p; } else if(e.k==='cc'){ const s=st(e.ch); if(!s.seen){ if(e.c===7) s.vol=e.v; else if(e.c===10) s.pan=e.v; } }
+      else if(e.k==='on'){ st(e.ch).seen=true; const k=e.ch+':'+e.key; if(!open.has(k)) open.set(k,[]); open.get(k).push(e); }
+      else if(e.k==='off'){ const k=e.ch+':'+e.key, q=open.get(k); if(q&&q.length){ const o=q.shift(); seq.push({ch:e.ch,key:e.key,on:o.tick,off:Math.max(o.tick+1,e.tick),vel:o.vel}); } } }
+    const endT=evs.length?evs[evs.length-1].tick:0; for(const [k,q] of open) for(const o of q) seq.push({ch:o.ch,key:o.key,on:o.tick,off:Math.max(o.tick+1,endT),vel:o.vel});
+    for(const x of seq){ lastTick=Math.max(lastTick,x.off); nNotes++;
+      if(x.ch===9){ const [inst,lane,gname]=drumTarget(x.key), g=grp('d:'+inst+'|'+gname,()=>({inst,name:gname,kind:'perc',s:st(9),notes:[]})); g.notes.push({b:r6b(x.on),l:.25,m:lane,v:r6(x.vel/100)}); }
+      else { const s=st(x.ch), key='m:'+ti+':'+x.ch, g=grp(key,()=>({inst:progInst(s.prog),name:(name&&name.trim())||((FAM[s.prog>>3]||'Pista')+' · canal '+(x.ch+1)),kind:'mel',s,notes:[]})); g.notes.push({b:r6b(x.on),l:Math.max(r6(1/ppq),r6b(x.off-x.on)),m:x.key,v:r6(x.vel/100)}); } } });
+  if(!nNotes) throw new Error('El archivo MIDI no tiene notas.');
+  const bb=barBeats(P); P.bars=Math.max(1,Math.min(256,Math.ceil(lastTick/ppq/bb-1e-9)));
+  if(lastTick/ppq/bb>256) warn.push('El archivo dura más de 256 compases: recorté el proyecto a 256.');
+  const used={}; for(const g of groups.values()){ const tr=newTrack(g.inst,g.name); if(used[g.name]) tr.name=g.name+' '+(++used[g.name]); else used[g.name]=1;
+    if(g.s&&g.s.vol!=null) tr.vol=Math.max(0,Math.min(1.5,g.s.vol/100)); if(g.s&&g.s.pan!=null) tr.pan=Math.max(-1,Math.min(1,(g.s.pan-64)/63));
+    tr.notes=g.notes.sort((a,b)=>a.b-b.b); P.tracks.push(tr); }
+  const rank=['kick','snare','clap','snap','hat','crash','rim']; const ord=t=>{ const i=rank.indexOf(t.inst); return i<0?100:i; };   // la batería arriba, como al convertir demos
+  P.tracks=P.tracks.map((t,i)=>({t,i})).sort((a,b)=>(ord(a.t)-ord(b.t))||(a.i-b.i)).map(x=>x.t);
+  return {project:P,warnings:warn,stats:{tracks:P.tracks.length,notes:nNotes,bars:P.bars,bpm:P.bpm,tempoChanges:(P.tempo||[]).length}};
+}
 // ───────────────────────── conversión de demos → proyecto editable ─────────────────────────
 // Se ejecuta la demo con un "kit grabador": cada llamada a kick/snare/syn/bell/… queda registrada en lugar de sonar.
 // Las funciones auxiliares conocidas (reese, growl, rim, wash, impact) se interceptan reescribiendo su cabecera.
@@ -943,15 +1045,6 @@ function buildProject(events,meta){
     P.sc.table=T; P.sc.rate=R; P.sc.mode='table'; let mn=1; for(const v of T) if(v<mn) mn=v; P.sc.depth=r6(clamp(1-mn,.05,.95)); P.sc.rel=.09; }
   return {project:P,stats:{tracks:P.tracks.length,notes:nItems,clips:ci,clipsTotal}};
 }
-// makeKit (make_kit.js) → adaptador sobre demoKit.metric (salida idéntica muestra a muestra a la original)
-function makeKitOn(metric){ return (sr,BPM,BARS,tail,seed0)=>{ const K=metric(sr,BPM,BARS,tail,seed0), T=K.T, bar=K.bar,
-  soft=x=>x<-3?-1:x>3?1:x*(27+x*x)/(27+9*x*x), k0=K.kick, r0=K.riser, kick=(t0,a,f0,dk)=>{ f0=f0||46; k0(t0,a,{lo:f0,hi:f0+105,dec:dk||6.5}); };
-  return Object.assign(K,{soft,kick,riser:(bs,a)=>r0(T(bs,0),4*bar,a||.5)}); }; }
-function stripMakeKit(src){ const mk=/(^|\n)[ \t]*function\s+makeKit\s*\(/.exec(src), rn=/(^|\n)[ \t]*async\s+function\s+render\w*\s*\(/.exec(src);
-  if(mk&&rn&&mk.index<rn.index) return {src:src.slice(0,mk.index+(mk[1]?1:0))+src.slice(rn.index+(rn[1]?1:0)),used:true}; return {src,used:false}; }
-// compila una demo .js (con demoKit o con makeKit) y devuelve su función render
-function compileDemo(src,fnName,sleepFn){ const st=stripMakeKit(src);
-  return new Function('demoKit','sleep','makeKit',st.src+'\nreturn '+fnName+';')(Kit.make,sleepFn,Kit.make&&Kit.make.metric?makeKitOn(Kit.make.metric):undefined); }
 // ───────────────────────── funciones auxiliares de una demo → plugins automáticos ─────────────────────────
 // Una demo escrita a mano suele definir funciones (clack, tom, sub…) que llaman a add() una y otra vez. Al convertirla, en vez de hornear
 // cada llamada como audio, se copia el código de la función a un plugin cuyos parámetros son los argumentos de la llamada. Antes de aceptarlo
@@ -1113,6 +1206,7 @@ async function recordDemo(src,opts){
   const un=Object.keys(unknown); if(un.length) ws.push('La demo usa funciones de un kit propio que el conversor no conoce ('+un.map(k=>k+' ×'+unknown[k]).join(', ')+'): su sonido no entra en el proyecto.');
   res.warnings=ws; res.makeKit=usedMakeKit; return res;
 }
+//#CONVERTER-END
 //#ENGINE-END
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1767,7 +1861,17 @@ function projectFromFile(o,nombre){   // proyecto → pregunta por los plugins q
 // ───────────── archivos, demos y plugins ─────────────
 const demoName=(txt,fb)=>{ const m=/^\/\/\s*[─\-—–\s]*([^·\n]+?)\s*·/m.exec(txt); return m?m[1].trim():fb; };
 async function ingest(file,opts){
-  const txt=await file.text(), name=file.name;
+  const name=file.name;
+  if(/\.midi?$/i.test(name)){
+    try{
+      if(P.tracks.some(t=>t.notes&&t.notes.length)&&!confirm('Importar «'+name+'» crea un proyecto nuevo y reemplaza el actual (usa Guardar antes si lo quieres conservar). ¿Continuar?')){ toast('Importación cancelada'); return; }
+      const r=midiToProject(new Uint8Array(await file.arrayBuffer()),name);
+      loadProject(r.project); populateAddInst(); closeModal&&closeModal('libModal');
+      toast('MIDI importado: '+r.stats.tracks+' pistas, '+r.stats.notes+' notas'+(r.warnings.length?' · '+r.warnings.join(' · '):'')+'. Los sonidos son una primera asignación: cámbialos a tu gusto.','ok');
+    }catch(e){ console.error(e); toast('No pude importar «'+name+'»: '+e.message,'err'); }
+    return;
+  }
+  const txt=await file.text();
   try{
     if(/^\s*\{/.test(txt)){ const o=JSON.parse(txt); if(o.format==='demokit-studio'){ loadProject(projectFromFile(o,name)); populateAddInst(); toast('Proyecto «'+o.name+'» cargado','ok'); return; } }
     if(/function\s+demoKit\s*\(/.test(txt)){ if(!trustCode('Kit «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código que reemplazará al kit incluido.')){ toast('Kit no cargado','err'); return; } const f=new Function(txt+'\nreturn demoKit;')(); const k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); Kit.make=f; bumpKit(); kitName=name; cache=null; dirty=true; renderLib(); updateStat(); toast('Kit «'+name+'» cargado: los instrumentos y plugins lo usan desde ahora','ok'); return; }
@@ -2091,6 +2195,7 @@ $('bpm').onchange=e=>{ P.bpm=clamp(+e.target.value||120,40,260); e.target.value=
 $('sig').onchange=e=>{ const [a,b]=e.target.value.split('/').map(Number); P.sig=[a,b]; layoutSpacer(); invalidate(); touch(); };
 $('bars').onchange=e=>{ P.bars=clamp(Math.round(+e.target.value)||8,1,256); e.target.value=P.bars; layoutSpacer(); touch(); };
 $('bNew').onclick=()=>{ if(P.tracks.some(t=>t.notes.length)&&!confirm('¿Empezar un proyecto vacío? Se pierde lo no guardado.')) return; loadProject(newProject('Sin título',120,8)); };
+$('bMidiOut').onclick=()=>{ try{ download(new Blob([projectToMidi(P)],{type:'audio/midi'}),(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'.mid'); toast('MIDI exportado (el sonido no viaja: solo notas, tempo, compás, volumen y pan)','ok'); }catch(e){ console.error(e); toast('No pude exportar MIDI: '+e.message,'err'); } };
 $('bSave').onclick=()=>{ try{ download(new Blob([JSON.stringify(projectToJSON(P))],{type:'application/json'}),(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'.demokit.json'); }catch(e){ toast('No pude guardar: '+e.message,'err'); } };
 $('bOpen').onclick=()=>$('fileIn').click(); $('bPick').onclick=()=>$('fileIn').click();
 $('fileIn').onchange=async e=>{ await handleFiles([...e.target.files]); e.target.value=''; };
