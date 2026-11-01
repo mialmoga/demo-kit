@@ -1,4 +1,4 @@
-// ── NEON TIDAL · Drum & Bass procedural suite ──
+// ── 🌊 NEON TIDAL · Drum & Bass procedural suite ──
 // 174 BPM | 64 compases | F# menor | 2-step / liquid-neuro / cinematic DnB
 // Demo Kit · composición procedural determinista · 31-oct-2026
 // Estructura: 0-7 intro / 8-15 groove / 16-31 tema A / 32-39 build
