@@ -43,6 +43,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 ## Funciones
 
 - **Piano roll** con rejilla (1/4 a 1/32, tresillos o libre), zoom, notas fantasma de las otras pistas, selección múltiple, velocidad por nota y **deshacer/rehacer global** (notas, pistas, parámetros, efectos, master, BPM… hasta 100 pasos; los sliders y arrastres cuentan como un solo paso).
+- **Carpetas del repositorio:** en «Demos y plugins» aparece la sección **En el repositorio** con lo que haya en `demos/` (demos `.js`), `plugins/` (plugins `.js`), `proyectos/` o `projects/` (proyectos `.demokit.json`) y `project_examples/` (ejemplos). Cada archivo trae su botón **Cargar** / **Abrir** (y «Cargar todas» en demos). Si una carpeta no existe, el estudio te dice cómo se llama y que la crees junto a `index.html`: en cuanto pongas archivos ahí, aparecen solos. Funciona desde GitHub Pages (consulta la API de GitHub, sin ningún índice que mantener) y desde un servidor local (`python3 -m http.server`); en otros hostings puedes poner un `manifest.json` con la lista de nombres de cada carpeta. Abriendo el HTML como archivo (`file://`) un navegador no puede mirar carpetas y el estudio lo avisa. El código que cargues desde ahí pasa por la misma confirmación de seguridad que cualquier otro.
 - **Compás:** selector junto a «Compases» (2/4, 3/4, 4/4, 5/4, 6/4, 7/4, 3/8, 5/8, 6/8, 7/8, 9/8, 12/8). Cambia las líneas de compás y la regla, el bucle, el conteo de compases, la cuenta previa de la grabación (un clic por tiempo del compás) y copiar/pegar por compases. El «pulso» sigue siendo la negra: 6/8 son 3 pulsos por compás y 7/8 son 3.5. Un compás por proyecto; los proyectos viejos abren como 4/4. En una demo `.js` exportada aparece como `// SIG = 3/4`.
 - **Pista de tempo (♩ Tempo):** botón junto a «Compás». Abre un carril sobre el piano roll con la curva de tempo. El rombo del inicio es el BPM de arriba (arrástralo en vertical o cambia el número); **clic** = punto nuevo (horizontal = pulso, vertical = BPM), **arrastra** para moverlo, **doble clic o clic derecho** para quitarlo. Con un punto seleccionado puedes teclear su BPM exacto y marcar **«rampa hasta aquí»**: el tempo cambia gradualmente desde el punto anterior y llega a ese BPM en ese pulso (acelerando / ritardando); sin la marca salta de golpe. Todo sigue el tempo: notas, sidechain, automatización, el eco (delay), el cursor, la grabación y el bucle; el wobble de un bajo toma el tempo del inicio de cada nota. Cambiar el tempo vuelve a renderizar las pistas. Se guarda como `"tempo": [{"b":16,"bpm":90,"ramp":true}]` y la librería lo respeta.
 - **Pistas / capas ilimitadas**, cada una con su instrumento, volumen, paneo, mute y solo.
@@ -293,6 +294,31 @@ K.rnd()   K.hz(midi)   K.lpc(fc)
 - Una excepción en `play()` desactiva esa pista en el render y aparece un aviso con el nombre de la pista; el resto sigue sonando.
 - Los plugins se guardan en el navegador (`localStorage`), se pueden descargar como `.js` y se cargan arrastrándolos a la ventana. Si un proyecto usa un plugin, el plugin va incluido en el `.demokit.json`.
 - Si cargas **tu propio `demo_kit.js`** (con funciones nuevas), los instrumentos y plugins lo usan desde ese momento: lo que agregues a `K` queda disponible para los plugins.
+
+## Extender el kit
+
+El kit (`demo_kit.js`) es solo una función `demoKit(sr, segundos, semilla)` que devuelve un objeto con herramientas. Puedes escribir **tu propia versión con funciones nuevas** y usarla sin tocar el HTML:
+
+- **En el estudio:** suelta tu `demo_kit.js` en «Demos y plugins» (te pide confirmación, porque es código). Desde ese momento los instrumentos y los plugins usan tu kit y pueden llamar a tus funciones desde `K`. El botón **«Volver al kit incluido»** lo quita; al recargar la página también vuelve el incluido.
+- **En la librería:** `DemoKit.setKit(miDemoKit)` antes de `DemoKit.load(...)`.
+
+**Cómo escribirlo.** Parte de una copia de [`kits/demo_kit.js`](kits/demo_kit.js) (o de la [versión comentada](kits/demo_kit_comentado.js), que explica cada pieza), agrega tus funciones dentro de `demoKit` y devuélvelas en el objeto final:
+
+```js
+function demoKit(sr, seconds, seed0) {
+  /* …todo lo del kit original… */
+  const pluck2 = (t0, midi, a) => syn(mu, t0, .3, hz(midi), a, 0, { dec: 6, lp: 1800 });   // tu función nueva
+  return { n, dr, mu, rnd, hz, lpc, add, kick, snare, clap, snap, hat, crash, syn, bell, chop, riser, sweep, mix, pluck2 };
+}
+// si quieres que las demos con demoKit.metric sigan funcionando, copia también el bloque «demoKit.metric = …» del kit original
+```
+
+**Lo mínimo:** tu función debe llamarse `demoKit`, aceptar `(sr, seconds, seed)` y devolver al menos `syn` y `mix` (el estudio lo comprueba al cargarlo). Conserva las funciones originales tal cual: si cambias su sonido, las canciones ya hechas sonarán distinto.
+
+**Límites a tener presentes**
+- El kit cargado dura **la sesión**: no se guarda entre visitas, y un proyecto no recuerda con qué kit se hizo (solo guarda la versión del formato). Si abres un proyecto o un plugin que dependa de tus funciones sin cargar antes tu kit, fallará o sonará distinto.
+- Al **convertir una demo** en proyecto, solo se registran las funciones conocidas del kit. Si la demo llama a una función tuya, el estudio lo avisa («funciones de un kit propio que el conversor no conoce»): el sonido no entra en el proyecto. Para que sea editable, hazla un **plugin** (instrumento con parámetros) que use tus funciones.
+- Cambiar de kit invalida solo la caché de render del estudio; los proyectos guardados no se tocan.
 
 ## Usar la música en otros proyectos (librería) lib/
 

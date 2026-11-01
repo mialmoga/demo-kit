@@ -221,10 +221,11 @@ details summary{cursor:pointer;color:var(--a)}
   <h3>Demos y plugins <button class="x" data-close="libModal">Cerrar</button></h3>
   <div class="drop" id="drop">Suelta aquí archivos <b>.js</b> o <b>.json</b>: demos (the_void.js, cotton_sugar.js…), plugins de instrumento, un demo_kit.js propio o proyectos guardados.
     <div class="btnrow" style="justify-content:center"><button id="bPick" class="pri">Elegir archivos…</button><button id="bExample">Cargar proyecto de ejemplo</button></div></div>
+  <div class="sec"><h4>En el repositorio <button id="repoRefresh" class="sm" title="Volver a mirar las carpetas">↻</button></h4><div id="repoList" class="desc"></div></div>
   <div class="sec"><h4>Demos cargadas</h4><div id="demoList"></div></div>
   <div class="sec"><h4>Instrumentos de usuario (plugins)</h4><div id="plgList"></div>
     <div class="btnrow"><button id="bNewPlg" class="pri">Escribir un plugin nuevo…</button></div></div>
-  <div class="sec"><h4>Kit de síntesis</h4><div id="kitInfo" class="desc"></div></div>
+  <div class="sec"><h4>Kit de síntesis</h4><div id="kitInfo" class="desc"></div><div class="btnrow"><button id="kitReset" class="sm" hidden>Volver al kit incluido</button></div></div>
 </div></div>
 
 <div id="plgModal" class="modal"><div class="card">
@@ -881,10 +882,11 @@ async function recordDemo(src,opts){
   const fnName=m[1], events=[]; let duckAt=null, seconds=0, seed=null;
   const bm=/\bBPM\s*=\s*([\d.]+)/.exec(src)||/([\d.]+)\s*BPM/i.exec(src); let bpm=bm?+bm[1]:(opts.bpm||120);
   const bake=(fn,len)=>{ const N=Math.max(0,Math.floor(len*SR)),d=new Float32Array(N); for(let i=0;i<N;i++) d[i]=fn(i/SR); return d; };
-  let mBpm=null,mBars=null;
+  let mBpm=null,mBars=null; const unknown={};
   const recKit=(sr,secs,seed0)=>{
     seconds=secs; seed=seed0; const real=Kit.make(sr,.05,seed0), K=Object.assign({},real), rec=(fn,o)=>{events.push(Object.assign({fn},o));};
     K.n=Math.ceil(secs*sr);
+    if(typeof demoKit==='function'){ const std=new Set(Object.keys(demoKit(44100,.01,1))); for(const k of Object.keys(real)) if(!std.has(k)&&typeof real[k]==='function'){ const f0=real[k]; K[k]=function(){ unknown[k]=(unknown[k]||0)+1; return f0.apply(this,arguments); }; } }   // funciones de un kit propio que el conversor no conoce
     K.kick=(t0,a,o)=>rec('kick',{t0,a,o:Object.assign({},o||{})});
     K.snare=(t0,a,o)=>rec('snare',{t0,a,o:Object.assign({},o||{})});
     K.clap=(t0,a)=>rec('clap',{t0,a});
@@ -924,6 +926,7 @@ async function recordDemo(src,opts){
   const res=buildProject(events,{bpm,bars,seed,seconds,duckAt,title});
   const ws=[]; if(res.stats.notes<8) ws.push('Casi no se registraron notas ('+res.stats.notes+'): esta demo probablemente usa un kit propio que el conversor no reconoce.');
   if(res.stats.clips>150) ws.push('Muchos clips ('+res.stats.clips+'): hay funciones propias que se hornean como audio y el proyecto pesará mucho.');
+  const un=Object.keys(unknown); if(un.length) ws.push('La demo usa funciones de un kit propio que el conversor no conoce ('+un.map(k=>k+' ×'+unknown[k]).join(', ')+'): su sonido no entra en el proyecto.');
   res.warnings=ws; res.makeKit=usedMakeKit; return res;
 }
 //#ENGINE-END
@@ -1534,6 +1537,8 @@ ${chunks.join(',\n')}
 }
 $('bDemoJs').onclick=exportDemoJs;
 
+const BUILTIN_KIT=Kit.make;
+$('kitReset').onclick=()=>{ Kit.make=BUILTIN_KIT; bumpKit(); kitName='incluido'; cache=null; dirty=true; renderLib(); updateStat(); toast('Kit incluido restaurado','ok'); };
 // ───────────── seguridad: el código ajeno solo se ejecuta si lo confirmas ─────────────
 // Un plugin, un kit o un proyecto con plugins es JavaScript que corre con los mismos permisos que esta página.
 function trustCode(titulo,detalle){ return confirm('⚠ '+titulo+'\n\n'+detalle+'\n\nEl código se ejecuta en tu navegador con los mismos permisos que esta página. Continúa solo si confías en quien lo hizo.\n\n¿Ejecutarlo?'); }
@@ -1555,6 +1560,54 @@ async function ingest(file){
   }catch(e){ console.error(e); toast('Error con «'+name+'»: '+e.message,'err'); }
 }
 async function handleFiles(list){ for(const f of list) await ingest(f); }
+// ───────────── el repositorio: demos/, plugins/, proyectos/ y project_examples/ aparecen solos ─────────────
+// Funciona cuando el estudio se abre desde GitHub Pages o desde un servidor (python3 -m http.server): mira las carpetas junto a la página.
+// · GitHub Pages: pregunta a la API de GitHub qué hay en la carpeta (no hace falta ningún índice).
+// · Servidor local: lee el listado de la carpeta. · Cualquier hosting: acepta un manifest.json con la lista de nombres.
+const REPO_GROUPS=[
+  {id:'demos',title:'Demos',dirs:['demos'],ext:/\.js$/i,kind:'demo',what:'archivos .js de demos'},
+  {id:'plugins',title:'Plugins de instrumento',dirs:['plugins'],ext:/\.js$/i,kind:'plugin',what:'archivos .js de plugins'},
+  {id:'proyectos',title:'Proyectos',dirs:['proyectos','projects'],ext:/\.json$/i,kind:'project',what:'archivos .demokit.json (proyectos guardados)'},
+  {id:'ejemplos',title:'Ejemplos de proyectos',dirs:['project_examples'],ext:/\.json$/i,kind:'project',what:'archivos .demokit.json de ejemplo'}];
+const REPO_BASE=()=>new URL('.',location.href).href;
+async function fetchT(url,ms,opts){ const c=new AbortController(), t=setTimeout(()=>c.abort(),ms||8000); try{ return await fetch(url,Object.assign({signal:c.signal},opts||{})); } finally{ clearTimeout(t); } }
+function ghRepo(){ const h=location.hostname; if(!/\.github\.io$/i.test(h)) return null; const seg=location.pathname.split('/')[1]; return {owner:h.split('.')[0],repo:seg&&!seg.includes('.')?seg:h}; }
+async function listFolder(dir,ext){            // → {status:'ok'|'missing'|'error', files:[{name,url,size}], note}
+  const base=REPO_BASE(), gh=ghRepo(); let note='';
+  try{ const r=await fetchT(base+dir+'/manifest.json',5000); if(r.ok){ const j=await r.json(), arr=Array.isArray(j)?j:(j.files||[]); return {status:'ok',files:arr.map(x=>typeof x==='string'?x:x.name).filter(n=>ext.test(n)).map(n=>({name:n,url:base+dir+'/'+encodeURI(n)}))}; } }catch(e){}
+  if(gh){ try{ const r=await fetchT('https://api.github.com/repos/'+gh.owner+'/'+gh.repo+'/contents/'+dir,8000,{headers:{Accept:'application/vnd.github+json'}});
+      if(r.status===404) return {status:'missing',files:[]};
+      if(r.ok){ const j=await r.json(); if(Array.isArray(j)) return {status:'ok',files:j.filter(x=>x.type==='file'&&ext.test(x.name)).map(x=>({name:x.name,url:base+dir+'/'+encodeURI(x.name),size:x.size}))}; }
+      note=r.status===403||r.status===429?'GitHub limitó las consultas (reintenta en unos minutos)':'GitHub respondió '+r.status; }catch(e){ note='no pude hablar con GitHub'; } }
+  try{ const r=await fetchT(base+dir+'/',6000); if(r.status===404) return {status:gh?'error':'missing',files:[],note};
+    if(!r.ok) return {status:'error',files:[],note:note||('respondió '+r.status)};
+    const html=await r.text(), files=[], seen=new Set(); for(const m of html.matchAll(/href="([^"#?]+)"/g)){ let n=m[1]; if(/^(\/|https?:|\.\.|mailto:)/i.test(n)||n.endsWith('/')) continue; try{ n=decodeURIComponent(n); }catch(e){} if(ext.test(n)&&!seen.has(n)){ seen.add(n); files.push({name:n,url:base+dir+'/'+encodeURI(n)}); } }
+    return {status:'ok',files}; }catch(e){ return {status:'error',files:[],note:note||'no pude leer la carpeta'}; }
+}
+async function repoScan(force){
+  if(location.protocol==='file:') return {offline:true};
+  try{ if(!force){ const c=JSON.parse(sessionStorage.getItem('demokit-repo-cache')||'null'); if(c&&Date.now()-c.t<300000&&c.base===REPO_BASE()) return c.data; } }catch(e){}
+  const data={}; await Promise.all(REPO_GROUPS.map(async g=>{ const res=await Promise.all(g.dirs.map(d=>listFolder(d,g.ext).then(r=>Object.assign(r,{dir:d})))); data[g.id]=res; }));
+  try{ sessionStorage.setItem('demokit-repo-cache',JSON.stringify({t:Date.now(),base:REPO_BASE(),data})); }catch(e){}
+  return data;
+}
+async function repoLoad(g,f){
+  try{ if(g.kind==='project'&&P.tracks.some(t=>t.notes.length)&&!confirm('Esto reemplaza el proyecto actual. ¿Continuar?')) return;
+    const r=await fetchT(f.url,20000); if(!r.ok) throw new Error('respondió '+r.status); const txt=await r.text(); await ingest(new File([txt],f.name)); if(g.kind==='project') closeModal('libModal'); }
+  catch(e){ console.error(e); toast('No pude cargar «'+f.name+'»: '+e.message,'err'); }
+}
+async function renderRepo(force){
+  const box=$('repoList'); box.textContent='Mirando las carpetas del repositorio…'; const data=await repoScan(force); box.innerHTML='';
+  if(data.offline){ box.append(el('div',{class:'hint',text:'Estás abriendo el estudio como archivo local, y desde ahí un navegador no puede mirar carpetas. Ábrelo desde GitHub Pages o con un servidor (por ejemplo «python3 -m http.server» dentro de la carpeta del repo) y aquí aparecerán solos los archivos de demos/, plugins/, proyectos/ y project_examples/.'})); return; }
+  for(const g of REPO_GROUPS){ const res=data[g.id]||[], found=res.filter(r=>r.status==='ok'), files=found.flatMap(r=>r.files.map(f=>Object.assign({dir:r.dir},f)));
+    const head=el('div',{class:'nm'},el('b',{text:g.title+(found.length?' · '+files.length:'')})); const sec=el('div',{style:'margin:6px 0 10px'},head);
+    if(g.kind==='demo'&&files.length>1){ const b=el('button',{class:'sm',style:'margin-left:8px',text:'Cargar todas',onclick:async()=>{ for(const f of files) await repoLoad(g,f); toast('Demos cargadas: '+files.length,'ok'); }}); head.append(b); }
+    if(!found.length){ const err=res.find(r=>r.status==='error'); sec.append(el('div',{class:'hint',text:err?('No pude mirar «'+err.dir+'/»: '+(err.note||'error')+'.'):('No encontré la carpeta «'+g.dirs[0]+'/». Créala en tu repositorio (junto a index.html) y pon ahí tus '+g.what+': aparecerán aquí solos.')})); }
+    else if(!files.length) sec.append(el('div',{class:'hint',text:'La carpeta «'+found[0].dir+'/» está vacía. Pon ahí tus '+g.what+'.'}));
+    for(const f of files) sec.append(el('div',{class:'item'},el('div',{class:'nm'},el('b',{text:f.name}),el('small',{text:f.dir+'/'+(f.size?' · '+(f.size/1024).toFixed(1)+' KB':'')})),el('button',{class:'sm pri',text:g.kind==='project'?'Abrir':'Cargar',onclick:()=>repoLoad(g,f)})));
+    box.append(sec); }
+}
+$('repoRefresh').onclick=()=>renderRepo(true);
 async function playDemo(d){
   ac(); stop(); try{ $('stat').textContent='Renderizando demo…'; const fn=compileDemo(d.src,d.fn,sleep);
     const out=await fn(SR,p=>prog(p)); d.out=out; prog(0); updateStat(); startPlayback(toAudioBuffer(out),0,false,false); }
@@ -1577,9 +1630,9 @@ function renderLib(){
   for(const u of USER_PLUGINS) pl.append(el('div',{class:'item'},el('div',{class:'nm'},el('b',{text:u.name}),el('small',{text:u.id})),
     el('button',{class:'sm',text:'Editar',onclick:()=>openPlugin(u.code)}),el('button',{class:'sm',text:'＋ Pista',onclick:()=>{ addTrack(u.id); closeModal('libModal'); }}),
     el('button',{class:'sm danger',text:'Quitar',onclick:()=>{ removePlugin(u.id); delete INSTRUMENTS[u.id]; const i=INST_ORDER.indexOf(u.id); if(i>=0) INST_ORDER.splice(i,1); populateAddInst(); renderLib(); }})));
-  $('kitInfo').textContent='Kit en uso: '+kitName+'. Si cargas tu propio demo_kit.js (con funciones nuevas), los plugins podrán usarlas desde K.';
+  $('kitInfo').textContent='Kit en uso: '+kitName+'. Puedes soltar un demo_kit.js propio (con funciones nuevas) para reemplazarlo durante esta sesión: los plugins podrán usar sus funciones desde K. Al recargar la página vuelve el kit incluido. Cómo escribir uno: README → «Extender el kit».'; $('kitReset').hidden=kitName==='incluido';
 }
-const openModal=id=>$(id).classList.add('show'), closeModal=id=>$(id).classList.remove('show');
+const openModal=id=>{ const was=$(id).classList.contains('show'); $(id).classList.add('show'); if(!was&&id==='libModal'&&typeof renderRepo==='function') renderRepo(false); }, closeModal=id=>$(id).classList.remove('show');
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>closeModal(b.dataset.close)));
 for(const m of ['libModal','plgModal']) $(m).addEventListener('pointerdown',e=>{ if(e.target.id===m) closeModal(m); });
 
