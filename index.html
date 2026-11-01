@@ -117,6 +117,11 @@ aside{background:var(--p);overflow:auto;min-height:0}
 details{margin:8px 0;color:#b8bdca}
 details pre{background:#0f1117;border:1px solid var(--b);border-radius:8px;padding:10px;overflow:auto;font-size:12px}
 details summary{cursor:pointer;color:var(--a)}
+.fold>.ft{cursor:pointer;user-select:none}
+.fold>.ft::before{content:'▾';display:inline-block;width:1.1em;color:var(--m)}
+.fold.closed>.ft::before{content:'▸'}
+.fold.closed>*:not(.ft){display:none}
+#repoList .fold{margin:6px 0 10px}
 @media(max-width:1000px){
   body{overflow:auto}
   main{display:block}
@@ -221,11 +226,11 @@ details summary{cursor:pointer;color:var(--a)}
   <h3>Demos y plugins <button class="x" data-close="libModal">Cerrar</button></h3>
   <div class="drop" id="drop">Suelta aquí archivos <b>.js</b> o <b>.json</b>: demos (the_void.js, cotton_sugar.js…), plugins de instrumento, un demo_kit.js propio o proyectos guardados.
     <div class="btnrow" style="justify-content:center"><button id="bPick" class="pri">Elegir archivos…</button><button id="bExample">Cargar proyecto de ejemplo</button></div></div>
-  <div class="sec"><h4>En el repositorio <button id="repoRefresh" class="sm" title="Volver a mirar las carpetas">↻</button></h4><div id="repoList" class="desc"></div></div>
-  <div class="sec"><h4>Demos cargadas</h4><div id="demoList"></div></div>
-  <div class="sec"><h4>Instrumentos de usuario (plugins)</h4><div id="plgList"></div>
+  <div class="sec fold" data-fold="repo"><h4 class="ft">En el repositorio <button id="repoRefresh" class="sm" title="Volver a mirar las carpetas">↻</button></h4><div id="repoList" class="desc"></div></div>
+  <div class="sec fold" data-fold="demos"><h4 class="ft">Demos cargadas</h4><div id="demoList"></div></div>
+  <div class="sec fold" data-fold="plugins"><h4 class="ft">Instrumentos de usuario (plugins)</h4><div id="plgList"></div>
     <div class="btnrow"><button id="bNewPlg" class="pri">Escribir un plugin nuevo…</button></div></div>
-  <div class="sec"><h4>Kit de síntesis</h4><div id="kitInfo" class="desc"></div><div class="btnrow"><button id="kitReset" class="sm" hidden>Volver al kit incluido</button></div></div>
+  <div class="sec fold" data-fold="kit"><h4 class="ft">Kit de síntesis</h4><div id="kitInfo" class="desc"></div><div class="btnrow"><button id="kitReset" class="sm" hidden>Volver al kit incluido</button></div></div>
 </div></div>
 
 <div id="plgModal" class="modal"><div class="card">
@@ -1601,15 +1606,20 @@ async function renderRepo(force){
   const box=$('repoList'); box.textContent='Mirando las carpetas del repositorio…'; const data=await repoScan(force); box.innerHTML='';
   if(data.offline){ box.append(el('div',{class:'hint',text:'Estás abriendo el estudio como archivo local, y desde ahí un navegador no puede mirar carpetas. Ábrelo desde GitHub Pages o con un servidor (por ejemplo «python3 -m http.server» dentro de la carpeta del repo) y aquí aparecerán solos los archivos de demos/, plugins/, proyectos/ y project_examples/.'})); return; }
   for(const g of REPO_GROUPS){ const res=data[g.id]||[], found=res.filter(r=>r.status==='ok'), files=found.flatMap(r=>r.files.map(f=>Object.assign({dir:r.dir},f)));
-    const head=el('div',{class:'nm'},el('b',{text:g.title+(found.length?' · '+files.length:'')})); const sec=el('div',{style:'margin:6px 0 10px'},head);
-    if(g.kind==='demo'&&files.length>1){ const b=el('button',{class:'sm',style:'margin-left:8px',text:'Cargar todas',onclick:async()=>{ for(const f of files) await repoLoad(g,f); toast('Demos cargadas: '+files.length,'ok'); }}); head.append(b); }
+    const head=el('div',{class:'nm ft'},el('b',{text:g.title+(found.length?' · '+files.length:'')})); const sec=el('div',{class:'fold'},head); sec.dataset.fold='repo-'+g.id; applyFold(sec);
+    if(g.kind==='demo'&&files.length>1){ const b=el('button',{class:'sm',style:'margin-left:8px',text:'Cargar todas',onclick:async e=>{ e.stopPropagation(); for(const f of files) await repoLoad(g,f); toast('Demos cargadas: '+files.length,'ok'); }}); head.append(b); }
     if(!found.length){ const err=res.find(r=>r.status==='error'); sec.append(el('div',{class:'hint',text:err?('No pude mirar «'+err.dir+'/»: '+(err.note||'error')+'.'):('No encontré la carpeta «'+g.dirs[0]+'/». Créala en tu repositorio (junto a index.html) y pon ahí tus '+g.what+': aparecerán aquí solos.')})); }
     else if(!files.length) sec.append(el('div',{class:'hint',text:'La carpeta «'+found[0].dir+'/» está vacía. Pon ahí tus '+g.what+'.'}));
     for(const f of files) sec.append(el('div',{class:'item'},el('div',{class:'nm'},el('b',{text:f.name}),el('small',{text:f.dir+'/'+(f.size?' · '+(f.size/1024).toFixed(1)+' KB':'')})),el('button',{class:'sm pri',text:g.kind==='project'?'Abrir':'Cargar',onclick:()=>repoLoad(g,f)})));
     box.append(sec); }
   if(ghRepo()&&REPO_GROUPS.some(g=>(data[g.id]||[]).some(r=>r.src==='api'))) box.append(el('div',{class:'hint',text:'Estas listas salieron de la API de GitHub, que limita las consultas (unas 60 por hora). Para no depender de ella, activa el workflow que genera los manifest.json solo (mira «Carpetas del repositorio» en el README).'}));
 }
-$('repoRefresh').onclick=()=>renderRepo(true);
+$('repoRefresh').onclick=e=>{ e.stopPropagation(); renderRepo(true); };
+// listas plegables del cuadro «Demos y plugins»: flechita ▾/▸, el estado se recuerda en este navegador
+const foldGet=()=>{ try{ return JSON.parse(localStorage.getItem('demokit-folds')||'{}'); }catch(e){ return {}; } };
+function applyFold(sec){ sec.classList.toggle('closed',!!foldGet()[sec.dataset.fold]); }
+document.addEventListener('click',e=>{ const ft=e.target.closest&&e.target.closest('.fold>.ft'); if(!ft||e.target.closest('button')) return; const sec=ft.parentElement; sec.classList.toggle('closed'); try{ const m=foldGet(); if(sec.classList.contains('closed')) m[sec.dataset.fold]=1; else delete m[sec.dataset.fold]; localStorage.setItem('demokit-folds',JSON.stringify(m)); }catch(err){} });
+document.querySelectorAll('#libModal .fold').forEach(applyFold);
 async function playDemo(d){
   ac(); stop(); try{ $('stat').textContent='Renderizando demo…'; const fn=compileDemo(d.src,d.fn,sleep);
     const out=await fn(SR,p=>prog(p)); d.out=out; prog(0); updateStat(); startPlayback(toAudioBuffer(out),0,false,false); }
