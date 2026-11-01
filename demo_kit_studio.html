@@ -918,7 +918,9 @@ function buildProject(events,meta){
   for(const e of events){ const it=mapEvent(e,beat); if(!it) continue; nItems++;
     const key=it.gkey||(it.inst+'|'+it.buf+(it.inst==='clip'?'|'+it.caller:'')); let g=groups.get(key);
     if(!g){ g={inst:it.inst,buf:it.buf,caller:it.caller,items:[]}; groups.set(key,g); } g.items.push(it); }
-  let ci=0; const trs=[], seen={};
+  let ci=0, clipsTotal=0; const trs=[], seen={}, dedup=new Map();   // dedup: huella → [cid] (los clips con audio idéntico comparten cid)
+  const sameData=(a,b)=>{ if(a.length!==b.length) return false; for(let i=0;i<a.length;i++) if(a[i]!==b[i]) return false; return true; };
+  const fingerprint=d=>{ const u=new Uint32Array(d.buffer,d.byteOffset,d.length); let h1=2166136261,h2=5381; for(let i=0;i<u.length;i++){ h1=Math.imul(h1^u[i],16777619); h2=(Math.imul(h2,33)+u[i])|0; } return d.length+':'+(h1>>>0)+':'+(h2>>>0); };
   for(const g of groups.values()){
     const inst=INSTRUMENTS[g.inst], base=defaultParams(inst); let gain=0; for(const it of g.items) gain=Math.max(gain,it.a||0); if(!(gain>0)) gain=1;
     const keys=new Set(); g.items.forEach(it=>Object.keys(it.p).forEach(k=>keys.add(k)));
@@ -927,7 +929,8 @@ function buildProject(events,meta){
     const notes=g.items.map(it=>{
       const nt={b:r6(it.t0/beat),l:it.len!=null?r6(it.len/beat):.25,m:it.m,v:r6((it.a||0)/gain)}; if(it.pan) nt.pan=r6(it.pan);
       const o={}; for(const k of keys){ if(JSON.stringify(it.p[k])!==JSON.stringify(base[k])) o[k]=it.p[k]===undefined?null:it.p[k]; }
-      if(it.data){ const cid='c'+(++ci); P.clips[cid]=it.data; o.cid=cid; }
+      if(it.data){ clipsTotal++; const fp=fingerprint(it.data); let cid=null; for(const c of dedup.get(fp)||[]) if(sameData(P.clips[c],it.data)){ cid=c; break; }
+        if(!cid){ cid='c'+(++ci); P.clips[cid]=it.data; if(!dedup.has(fp)) dedup.set(fp,[]); dedup.get(fp).push(cid); } o.cid=cid; }
       if(Object.keys(o).length) nt.o=o; return nt; }).sort((a,b)=>a.b-b.b);
     let name=guessName(g); seen[name]=(seen[name]||0)+1; if(seen[name]>1) name+=' '+seen[name];
     trs.push({id:uid(),name,inst:g.inst,params:base,vol:1,pan:0,mute:false,solo:false,ducked:g.buf==='mu',sc:g.inst==='kick',notes});
@@ -936,7 +939,7 @@ function buildProject(events,meta){
   P.tracks=trs.map((t,i)=>({t,i})).sort((a,b)=>ord(a.t)-ord(b.t)||a.i-b.i).map(x=>x.t);
   if(meta.duckAt){ const R=800,N=Math.ceil((meta.seconds||0)*R)+2,T=new Float32Array(N); for(let i=0;i<N;i++) T[i]=clamp(meta.duckAt(i/R),0,1.5);
     P.sc.table=T; P.sc.rate=R; P.sc.mode='table'; let mn=1; for(const v of T) if(v<mn) mn=v; P.sc.depth=r6(clamp(1-mn,.05,.95)); P.sc.rel=.09; }
-  return {project:P,stats:{tracks:P.tracks.length,notes:nItems,clips:ci}};
+  return {project:P,stats:{tracks:P.tracks.length,notes:nItems,clips:ci,clipsTotal}};
 }
 // makeKit (make_kit.js) → adaptador sobre demoKit.metric (salida idéntica muestra a muestra a la original)
 function makeKitOn(metric){ return (sr,BPM,BARS,tail,seed0)=>{ const K=metric(sr,BPM,BARS,tail,seed0), T=K.T, bar=K.bar,
@@ -953,9 +956,9 @@ async function recordDemo(src,opts){
   const fnName=m[1], events=[]; let duckAt=null, seconds=0, seed=null;
   const bm=/\bBPM\s*=\s*([\d.]+)/.exec(src)||/([\d.]+)\s*BPM/i.exec(src); let bpm=bm?+bm[1]:(opts.bpm||120);
   const bake=(fn,len)=>{ const N=Math.max(0,Math.floor(len*SR)),d=new Float32Array(N); for(let i=0;i<N;i++) d[i]=fn(i/SR); return d; };
-  let mBpm=null,mBars=null; const unknown={};
+  let mBpm=null,mBars=null; const unknown={}, lastCall={}, sigs={};   // lastCall[nombre] = argumentos de la última llamada a esa función de la demo
   const recKit=(sr,secs,seed0)=>{
-    seconds=secs; seed=seed0; const real=Kit.make(sr,.05,seed0), K=Object.assign({},real), rec=(fn,o)=>{events.push(Object.assign({fn},o));};
+    seconds=secs; seed=seed0; const real=Kit.make(sr,.05,seed0), K=Object.assign({},real), rec=(fn,o)=>{ const ev=Object.assign({fn},o); if(fn==='add'&&ev.caller!=='inline') ev.args=lastCall[ev.caller]||null; events.push(ev); };
     K.n=Math.ceil(secs*sr);
     if(typeof demoKit==='function'){ const std=new Set(Object.keys(demoKit(44100,.01,1))); for(const k of Object.keys(real)) if(!std.has(k)&&typeof real[k]==='function'){ const f0=real[k]; K[k]=function(){ unknown[k]=(unknown[k]||0)+1; return f0.apply(this,arguments); }; } }   // funciones de un kit propio que el conversor no conoce
     K.kick=(t0,a,o)=>rec('kick',{t0,a,o:Object.assign({},o||{})});
@@ -969,7 +972,7 @@ async function recordDemo(src,opts){
     K.chop=(t0,len,mm,a,pan,v)=>rec('chop',{t0,len,m:mm,a,pan:pan||0,v:v||'oh'});
     K.riser=(t0,len,a)=>rec('riser',{t0,len,a});
     K.sweep=(t0,len,f0,f1,a)=>rec('sweep',{t0,len,f0,f1,a});
-    K.add=(buf,t0,len,fn,amp,pan)=>rec('add',{buf:buf===real.mu?'mu':'dr',t0,len,amp,pan:pan||0,data:bake(fn,len),caller:callerName(fnName)});
+    K.add=(buf,t0,len,fn,amp,pan)=>rec('add',{buf:buf===real.mu?'mu':'dr',t0,len,amp,pan:pan||0,data:bake(fn,len),caller:callerName(fnName),args:null});
     K.mix=(d,dk)=>{duckAt=typeof d==='function'?d:null; if(typeof d!=='function'&&K.duckBars) duckAt=K.duckBars(d||[],dk); return{L:new Float32Array(1),R:new Float32Array(1),dur:secs};};
     return K;
   };
@@ -980,10 +983,10 @@ async function recordDemo(src,opts){
     return K;
   };
   const makeKitShim=makeKitOn(recKit.metric);
-  const __enter=(name,args)=>{ if(!HELPERS[name]) return false; events.push({fn:'helper',name,args:args.map(x=>x&&typeof x==='object'?Object.assign({},x):x)}); return true; };
+  const __enter=(name,args)=>{ if(!HELPERS[name]){ lastCall[name]=args; return false; } events.push({fn:'helper',name,args:args.map(x=>x&&typeof x==='object'?Object.assign({},x):x)}); return true; };
   const sm=stripMakeKit(src), work=sm.src, usedMakeKit=sm.used;
   const patched=work.replace(/(^|\n)([ \t]*)function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*\{/g,(mm,pre,ws,name,args)=>{
-    if(/[{\[.]/.test(args)) return mm; const list=args.split(',').map(s=>s.split('=')[0].trim()).filter(Boolean);
+    if(/[{\[.]/.test(args)) return mm; const list=args.split(',').map(s=>s.split('=')[0].trim()).filter(Boolean); sigs[name]=list;
     return pre+ws+'function '+name+'('+args+'){ if(__enter('+JSON.stringify(name)+',['+list.join(',')+'])) return;'; });
   const patched2=patched.replace(/(^|\n)([ \t]*)(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*\(([^)]*)\)\s*=>\s*\{/g,(mm,pre,ws,name,args)=>{
     if(!HELPERS[name]||/[{\[.=]/.test(args)) return mm; const list=args.split(',').map(x=>x.trim()).filter(Boolean);
@@ -995,6 +998,8 @@ async function recordDemo(src,opts){
   const tm=/^\/\/\s*[─\-—–\s]*([^·\n]+?)\s*·/m.exec(src);
   const title=opts.name||(tm?tm[1].trim():fnName);
   const res=buildProject(events,{bpm,bars,seed,seconds,duckAt,title});
+  { const H=new Map(); for(const ev of events){ if(ev.fn!=='add'||!ev.caller||ev.caller==='inline') continue; let h=H.get(ev.caller); if(!h){ h={name:ev.caller,clips:0,calls:new Set(),params:sigs[ev.caller]||[]}; H.set(ev.caller,h); } h.clips++; if(ev.args) h.calls.add(ev.args); }
+    res.stats.helpers=[...H.values()].map(h=>({name:h.name,clips:h.clips,calls:h.calls.size||h.clips,params:h.params})).sort((a,b)=>b.clips-a.clips); }
   const ws=[]; if(res.stats.notes<8) ws.push('Casi no se registraron notas ('+res.stats.notes+'): esta demo probablemente usa un kit propio que el conversor no reconoce.');
   if(res.stats.clips>150) ws.push('Muchos clips ('+res.stats.clips+'): hay funciones propias que se hornean como audio y el proyecto pesará mucho.');
   const un=Object.keys(unknown); if(un.length) ws.push('La demo usa funciones de un kit propio que el conversor no conoce ('+un.map(k=>k+' ×'+unknown[k]).join(', ')+'): su sonido no entra en el proyecto.');
@@ -1738,7 +1743,7 @@ async function convertDemo(d){
   const emb=embeddedProject(d.src); if(emb){ try{ loadProject(projectFromFile(emb,d.name)); populateAddInst(); closeModal('libModal'); toast('«'+d.name+'»: proyecto original recuperado sin pérdidas','ok'); }catch(e){ console.error(e); toast('No pude abrir el proyecto incrustado: '+e.message,'err'); } return; }
   if(!demoOk(d)) return;
   try{ toast('Convirtiendo «'+d.name+'»…'); await tick(); const {project,stats,warnings}=await recordDemo(d.src,{name:d.name}); loadProject(project); closeModal('libModal'); if(warnings&&warnings.length) setTimeout(()=>toast('⚠ '+warnings.join(' '),'err'),300);
-    toast('«'+d.name+'» convertida: '+stats.tracks+' pistas, '+stats.notes+' notas'+(stats.clips?(' y '+stats.clips+' clips horneados (add() en línea que no se puede parametrizar; para rehacerlo usa «Sub con caída» u otro instrumento)'):'')+'. Guarda el proyecto si quieres conservarlo.','ok'); }
+    toast('«'+d.name+'» convertida: '+stats.tracks+' pistas, '+stats.notes+' notas'+(stats.clips?(' y '+stats.clips+' clips horneados'+(stats.clipsTotal>stats.clips?' (de '+stats.clipsTotal+': los idénticos se guardan una sola vez)':'')+(stats.helpers&&stats.helpers.length?'. Salen de funciones de la demo: '+stats.helpers.slice(0,6).map(h=>h.name+' ×'+h.calls).join(', '):' (add() en línea que no se puede parametrizar)')):'')+'. Guarda el proyecto si quieres conservarlo.','ok'); }
   catch(e){ console.error(e); toast('No pude convertir: '+e.message,'err'); }
 }
 function renderLib(){
