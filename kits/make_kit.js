@@ -1,4 +1,4 @@
-// ── makeKit: kit de síntesis (WAVESURFER) ─────────────────────────────
+// ── makeKit: kit de síntesis (Primer kit de WAVESURFER) ─────────────────────────────
 // Devuelve las herramientas para componer: kick, snare, hat, syn, mix, etc.
 function makeKit(sr,BPM,BARS,tail,seed0){
   const beat=60/BPM, bar=beat*4, n=Math.ceil((BARS*bar+tail)*sr);
