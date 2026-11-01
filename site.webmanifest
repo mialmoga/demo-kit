@@ -1,0 +1,22 @@
+{
+  "name": "Demo Kit",
+  "short_name": "DK - DAW",
+  "description": "Kit sintesis de audio (DAW) procedimental para uso ligero en aplicaciones web.",
+  "icons": [
+    {
+      "src": "./assets/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./assets/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#0d1520",
+  "background_color": "#0d1520",
+  "display": "standalone",
+  "orientation": "any",
+  "start_url": "/demo-kit/"
+}
