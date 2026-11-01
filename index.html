@@ -901,12 +901,14 @@ function mapEvent(e,bt){
     case 'riser': return {inst:'riser',buf:'mu',t0:e.t0,len:e.len,m:0,a:e.a,pan:0,p:{}};
     case 'sweep': return {inst:'sweep',buf:'mu',t0:e.t0,len:e.len,m:0,a:e.a,pan:0,p:{f0:e.f0,f1:e.f1}};
     case 'helper':{const h=HELPERS[e.name],x=h.map(e.args,bt);return Object.assign({inst:h.inst,buf:h.buf},x);}
+    case 'auto': return e.item;
     case 'add': return {inst:'clip',buf:e.buf,t0:e.t0,len:e.len,m:0,a:e.amp,pan:e.pan,p:{},data:e.data,caller:e.caller};
   }
   return null;
 }
 const TRACK_NAMES={kick:'Bombo',snare:'Caja',clap:'Palma',snap:'Chasquido',hat:'Hi-hat',crash:'Crash',bell:'Campanas',bellmk:'Campanas',reesemk:'Reese',chop:'Sílabas (chop)',riser:'Riser',sweep:'Barrido',reese:'Reese',growl:'Growl',rim:'Rim',wash:'Viento',impact:'Impacto'};
 function guessName(g){
+  if(g.name) return g.name;
   if(TRACK_NAMES[g.inst]) return TRACK_NAMES[g.inst];
   if(g.inst==='clip') return 'Clip · '+(g.caller==='inline'?'add() en línea':g.caller);
   const p=g.items[0].p; if(p.atk>=.3) return 'Pad'; if(p.w===2) return 'Sub (seno)'; if(p.voices>=5) return 'Supersaw';
@@ -917,7 +919,7 @@ function buildProject(events,meta){
   const groups=new Map(); let nItems=0;
   for(const e of events){ const it=mapEvent(e,beat); if(!it) continue; nItems++;
     const key=it.gkey||(it.inst+'|'+it.buf+(it.inst==='clip'?'|'+it.caller:'')); let g=groups.get(key);
-    if(!g){ g={inst:it.inst,buf:it.buf,caller:it.caller,items:[]}; groups.set(key,g); } g.items.push(it); }
+    if(!g){ g={inst:it.inst,buf:it.buf,caller:it.caller,name:it.gname,items:[]}; groups.set(key,g); } g.items.push(it); }
   let ci=0, clipsTotal=0; const trs=[], seen={}, dedup=new Map();   // dedup: huella → [cid] (los clips con audio idéntico comparten cid)
   const sameData=(a,b)=>{ if(a.length!==b.length) return false; for(let i=0;i<a.length;i++) if(a[i]!==b[i]) return false; return true; };
   const fingerprint=d=>{ const u=new Uint32Array(d.buffer,d.byteOffset,d.length); let h1=2166136261,h2=5381; for(let i=0;i<u.length;i++){ h1=Math.imul(h1^u[i],16777619); h2=(Math.imul(h2,33)+u[i])|0; } return d.length+':'+(h1>>>0)+':'+(h2>>>0); };
@@ -931,7 +933,7 @@ function buildProject(events,meta){
       const o={}; for(const k of keys){ if(JSON.stringify(it.p[k])!==JSON.stringify(base[k])) o[k]=it.p[k]===undefined?null:it.p[k]; }
       if(it.data){ clipsTotal++; const fp=fingerprint(it.data); let cid=null; for(const c of dedup.get(fp)||[]) if(sameData(P.clips[c],it.data)){ cid=c; break; }
         if(!cid){ cid='c'+(++ci); P.clips[cid]=it.data; if(!dedup.has(fp)) dedup.set(fp,[]); dedup.get(fp).push(cid); } o.cid=cid; }
-      if(Object.keys(o).length) nt.o=o; return nt; }).sort((a,b)=>a.b-b.b);
+      if(Object.keys(o).length) nt.o=o; if(it.call&&meta.noteCall) meta.noteCall.set(nt,it.call); return nt; }).sort((a,b)=>a.b-b.b);
     let name=guessName(g); seen[name]=(seen[name]||0)+1; if(seen[name]>1) name+=' '+seen[name];
     trs.push({id:uid(),name,inst:g.inst,params:base,vol:1,pan:0,mute:false,solo:false,ducked:g.buf==='mu',sc:g.inst==='kick',notes});
   }
@@ -950,6 +952,95 @@ function stripMakeKit(src){ const mk=/(^|\n)[ \t]*function\s+makeKit\s*\(/.exec(
 // compila una demo .js (con demoKit o con makeKit) y devuelve su función render
 function compileDemo(src,fnName,sleepFn){ const st=stripMakeKit(src);
   return new Function('demoKit','sleep','makeKit',st.src+'\nreturn '+fnName+';')(Kit.make,sleepFn,Kit.make&&Kit.make.metric?makeKitOn(Kit.make.metric):undefined); }
+// ───────────────────────── funciones auxiliares de una demo → plugins automáticos ─────────────────────────
+// Una demo escrita a mano suele definir funciones (clack, tom, sub…) que llaman a add() una y otra vez. Al convertirla, en vez de hornear
+// cada llamada como audio, se copia el código de la función a un plugin cuyos parámetros son los argumentos de la llamada. Antes de aceptarlo
+// se compara con el audio horneado de varias llamadas reales; si no coincide, esa función se queda como clips (nunca un sonido roto).
+function scanCode(src,onChar){   // recorre el código saltando cadenas, comentarios y expresiones regulares; onChar(ch,i) devuelve true para parar
+  let prev='';
+  for(let i=0;i<src.length;i++){ const c=src[i], d=src[i+1];
+    if(c==='/'&&d==='/'){ while(i<src.length&&src[i]!=='\n') i++; continue; }
+    if(c==='/'&&d==='*'){ i=src.indexOf('*/',i+2); if(i<0) return -1; i++; continue; }
+    if(c==='"'||c==="'"||c==='`'){ for(i++;i<src.length&&src[i]!==c;i++) if(src[i]==='\\') i++; prev='a'; continue; }
+    if(c==='/'&&(prev===''||'(,=:[!&|?{};+-*%<>~^'.includes(prev))){ let cls=false; for(i++;i<src.length;i++){ if(src[i]==='\\') i++; else if(src[i]==='[') cls=true; else if(src[i]===']') cls=false; else if(src[i]==='/'&&!cls) break; } prev='a'; continue; }
+    if(onChar(c,i)) return i; if(!/\s/.test(c)) prev=c; }
+  return -1;
+}
+function matchClose(src,i0,open,close){ let depth=0; const e=scanCode(src.slice(i0),(c)=>{ if(c===open) depth++; else if(c===close){ depth--; if(depth===0) return true; } return false; }); return e<0?-1:i0+e; }
+function stripLiterals(src){ const out=src.split(''); let i=0; const n=src.length;   // mismo largo: cadenas y comentarios quedan en blanco
+  while(i<n){ const c=src[i], d=src[i+1];
+    if(c==='/'&&d==='/'){ while(i<n&&src[i]!=='\n'){ out[i]=' '; i++; } continue; }
+    if(c==='/'&&d==='*'){ const e=src.indexOf('*/',i+2), end=e<0?n:e+2; for(;i<end;i++) if(src[i]!=='\n') out[i]=' '; continue; }
+    if(c==='"'||c==="'"||c==='`'){ const s=i; for(i++;i<n&&src[i]!==c;i++) if(src[i]==='\\') i++; for(let j=s+1;j<i&&j<n;j++) if(src[j]!=='\n') out[j]=' '; i++; continue; }
+    i++; }
+  return out.join('');
+}
+function extractFunction(work,name){        // → {text, params:[…]} de «function name(…){…}» o null
+  const re=new RegExp('(^|[\\n;{}])[ \\t]*function\\s+'+name.replace(/\$/g,'\\$')+'\\s*\\(','g'); const m=re.exec(work); if(!m) return null;
+  const ps=m.index+m[0].length-1, pe=matchClose(work,ps,'(',')'); if(pe<0) return null;
+  const bs=work.indexOf('{',pe); if(bs<0||work.slice(pe+1,bs).trim()) return null; const be=matchClose(work,bs,'{','}'); if(be<0) return null;
+  const fs=work.indexOf('function',m.index+m[1].length);
+  return {text:work.slice(fs,be+1),params:work.slice(ps+1,pe).split(',').map(s=>s.split('=')[0].trim()).filter(Boolean),hasDefaults:/=/.test(work.slice(ps+1,pe))};
+}
+function sceneDecls(work,names,skip){   // declaraciones «const x=…;» de una sola línea del cuerpo de la demo que la función usa (p. ej. sat)
+  const depth=new Int16Array(work.length+1); let cur=0; scanCode(work,(c,i)=>{ if(c==='}') cur--; depth[i]=cur; if(c==='{') cur++; return false; });   // profundidad de llaves: solo cuentan las declaraciones del nivel de la demo (0 o 1), no las locales de otras funciones
+  const have=new Map(), re=/^[ \t]*(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(.+?);[ \t]*(?:\/\/.*)?$/gm; let m; while((m=re.exec(work))){ const at=m.index+m[0].search(/\S/); if(depth[at]<=1&&!have.has(m[1])) have.set(m[1],m[0].trim()); }
+  const out=[], done=new Set(); let want=[...names];
+  for(let r=0;r<3&&want.length;r++){ const next=[]; for(const nm of want){ if(done.has(nm)||skip.has(nm)||!have.has(nm)) continue; done.add(nm); out.push(have.get(nm)); for(const id of stripLiterals(have.get(nm)).match(/(?<![\w$.])[A-Za-z_$][\w$]*/g)||[]) next.push(id); } want=next; }
+  return out;
+}
+const AUTO_AMP=new Set(['a','amp','vol','g','gain','amp0']), AUTO_PITCH=new Set(['m','note','midi','pitch']), AUTO_LEN=new Set(['len','dur','l','L','length','d']);
+function planAuto(name,evs,sig,work,title,kitKeys){      // → {spec,items} | {reason}
+  const calls=new Map(); for(const e of evs){ if(!e.args) return {reason:'no pude capturar sus argumentos'}; let c=calls.get(e.args); if(!c){ c={args:e.args,evs:[]}; calls.set(e.args,c); } c.evs.push(e); }
+  if(!sig||!sig.length) return {reason:'no pude leer su firma'}; if(sig.some(s=>s.startsWith('...'))) return {reason:'usa argumentos «...resto»'};
+  const fx=extractFunction(work,name); if(!fx) return {reason:'no encontré su código'}; if(fx.hasDefaults) return {reason:'usa valores por defecto en los argumentos'};
+  const L=[...calls.values()]; const bufs=new Set(evs.map(e=>e.buf)); if(bufs.size!==1) return {reason:'escribe en dos buffers'}; const buf=[...bufs][0];
+  if(sig.length<1) return {reason:'sin argumentos'};
+  const roles=[], vals=sig.map((_,i)=>L.map(c=>c.args[i]));
+  for(let i=0;i<sig.length;i++){ const v=vals[i], pn=sig[i], allNum=v.every(x=>typeof x==='number'&&isFinite(x));
+    if(i===0){ if(!allNum||!L.every(c=>Math.abs(c.args[0]-c.evs[0].t0)<1e-9)) return {reason:'su primer argumento no es el tiempo'}; roles.push({r:'t'}); continue; }
+    if(allNum&&AUTO_AMP.has(pn)&&!roles.some(x=>x.r==='a')){ roles.push({r:'a'}); continue; }
+    if(allNum&&AUTO_PITCH.has(pn)&&!roles.some(x=>x.r==='m')&&v.every(x=>x>=0&&x<=127)){ roles.push({r:'m'}); continue; }
+    if(allNum&&AUTO_LEN.has(pn)&&!roles.some(x=>x.r==='len')&&v.every(x=>x>0)){ roles.push({r:'len'}); continue; }
+    if(allNum) roles.push({r:'p',type:'num'}); else if(v.every(x=>typeof x==='boolean'||x===undefined)&&v.some(x=>x!==undefined)) roles.push({r:'p',type:'bool'}); else if(v.every(x=>x===undefined)) roles.push({r:'u'}); else return {reason:'el argumento «'+pn+'» no es un número'}; }
+  const hasA=roles.some(x=>x.r==='a'), hasM=roles.some(x=>x.r==='m'), hasLen=roles.some(x=>x.r==='len');
+  // parámetros del plugin
+  const params=[{k:'gain',label:'Ganancia',min:0,max:1.5,step:.005,def:1}], pdefs=[];
+  const nice=x=>{ const e=Math.pow(10,Math.floor(Math.log10(Math.max(1e-9,x)))-2); return +(Math.round(x/e)*e).toPrecision(2); };
+  sig.forEach((pn,i)=>{ const ro=roles[i]; if(ro.r!=='p') return; const v=vals[i];
+    if(ro.type==='bool'){ params.push({k:pn,label:pn,min:0,max:1,step:1,def:v.filter(Boolean).length*2>v.length?1:0}); }
+    else { const lo=Math.min(...v), hi=Math.max(...v), span=hi-lo, pad=Math.max(span,Math.abs(hi),1e-3)*.5, mn=lo>=0?0:lo-pad, mx=hi+pad, cnt=new Map(); let best=v[0],bn=0; for(const x of v){ const c=(cnt.get(x)||0)+1; cnt.set(x,c); if(c>bn){bn=c;best=x;} }
+      const allInt=v.every(Number.isInteger); params.push({k:pn,label:pn,min:+mn.toPrecision(3),max:+mx.toPrecision(3),step:allInt&&mx-mn>=20?1:nice(mx-mn),def:best}); } });
+  const callArgs=sig.map((pn,i)=>{ const ro=roles[i]; return ro.r==='t'?'N.t':ro.r==='a'?'N.a*p.gain':ro.r==='m'?'N.midi':ro.r==='len'?'N.len':ro.r==='u'?'undefined':(ro.type==='bool'?'!!p.'+pn:'p.'+pn); }).join(', ');
+  const localNames=new Set([...sig,'N','p','sr','mu','dr','beat','bar','BPM','add','K',...kitKeys]);
+  const body=stripLiterals(fx.text), ids=new Set(body.match(/(?<![\w$.])[A-Za-z_$][\w$]*/g)||[]);
+  const extra=sceneDecls(work,[...ids],new Set([...localNames,name]));
+  const det=!/\brnd\s*\(|Math\.random/.test(stripLiterals(fx.text+extra.join('\n')));
+  const id='auto-'+slug(title)+'-'+slug(name), dn=name+' · '+title;
+  const kk=kitKeys.filter(k=>k!=='mu'&&k!=='dr'&&k!=='add'&&/^[A-Za-z_$][\w$]*$/.test(k));
+  const code=`// Plugin generado automáticamente desde la función «${name}» de la demo «${title}».\n// Los argumentos de la función son los parámetros: ${sig.join(', ')}.\nregisterInstrument({\n  id:${JSON.stringify(id)}, name:${JSON.stringify(dn)}, kind:${hasM?"'melodic'":"'perc'"},${!hasM&&!hasLen?' oneShot:true,':''} buf:${JSON.stringify(buf)},\n  desc:${JSON.stringify('Generado desde la función '+name+'('+sig.join(', ')+') de «'+title+'».')},\n  params:${JSON.stringify(params)},\n  play(K,N){\n    const p=N.p, sr=N.sr, mu=N.buf, dr=N.buf, beat=N.beat, bar=N.bar, BPM=N.bpm;\n    const {${kk.join(',')}}=K;\n    ${hasA?'const add=K.add;':'const add=(b,t,l,f,amp,pan)=>K.add(b,t,l,f,(amp==null?1:amp)*N.a*p.gain,pan);'}\n${extra.map(s=>'    '+s).join('\n')}\n    ${fx.text.replace(/\n/g,'\n    ')}\n    ${name}(${callArgs});\n  }\n});\n`;
+  const items=L.map(c=>{ const p={}; sig.forEach((pn,i)=>{ const ro=roles[i]; if(ro.r==='p') p[pn]=ro.type==='bool'?(c.args[i]?1:0):c.args[i]; });
+    const g=(r)=>{ const i=roles.findIndex(x=>x.r===r); return i<0?null:c.args[i]; };
+    return {inst:id,buf,t0:c.args[0],len:g('len'),m:g('m')==null?0:g('m'),a:hasA?g('a'):1,pan:0,p,call:c,gname:dn}; });
+  return {spec:{id,name:dn,code,det,helper:name,buf,calls:L.length},items};
+}
+function uninstallPlugin(id){ removePlugin(id); delete INSTRUMENTS[id]; const i=INST_ORDER.indexOf(id); if(i>=0) INST_ORDER.splice(i,1); }
+// compara el plugin con el audio horneado de las primeras llamadas reales → {ok, detail}
+function verifyAuto(P,tr,spec,noteCall){
+  const inst=INSTRUMENTS[spec.id], beat=60/P.bpm, picks=tr.notes.slice(0,4); let pass=0, worst=0; const detail=[];
+  for(const nt of picks){ const c=noteCall.get(nt); if(!c) continue; let end=0; for(const e of c.evs) end=Math.max(end,e.t0+e.len);
+    const dur=Math.min(60,end+.5), K1=Kit.make(SR,dur,7), K2=Kit.make(SR,dur,7); K1.sr=SR; K2.sr=SR;
+    try{ inst.play(K1,noteArgs(K1,P,tr,nt,beat)); }catch(e){ return {ok:false,detail:'error al sonar: '+e.message}; }
+    for(const e of c.evs){ const d=e.data, sr=SR; K2.add(e.buf==='mu'?K2.mu:K2.dr,e.t0,e.len,t=>d[Math.round(t*sr)]||0,e.amp,e.pan); }
+    const A=(tr.ducked?K1.mu:K1.dr), B=(tr.ducked?K2.mu:K2.dr); let ok;
+    if(spec.det){ let num=0,den=0; for(let ch=0;ch<2;ch++){ const a=A[ch],b=B[ch]; for(let i=0;i<a.length;i++){ const x=a[i]-b[i]; num+=x*x; den+=b[i]*b[i]; } } const rel=den>0?Math.sqrt(num/den):(num>0?1:0); worst=Math.max(worst,rel); ok=rel<.02; detail.push(rel.toExponential(1)); }
+    else { const W=Math.max(1,Math.round(SR*.01)), ea=[],eb=[]; let sa=0,sb=0; const n=Math.min(A[0].length,B[0].length);
+      for(let i=0;i<n;i+=W){ let x=0,y=0; for(let ch=0;ch<2;ch++) for(let j=i;j<Math.min(n,i+W);j++){ x+=A[ch][j]*A[ch][j]; y+=B[ch][j]*B[ch][j]; } ea.push(Math.sqrt(x)); eb.push(Math.sqrt(y)); sa+=x; sb+=y; }
+      const ratio=sb>0?sa/sb:(sa>0?99:1); const ma=ea.reduce((s,v)=>s+v,0)/ea.length, mb=eb.reduce((s,v)=>s+v,0)/eb.length; let cov=0,va=0,vb=0; for(let i=0;i<ea.length;i++){ cov+=(ea[i]-ma)*(eb[i]-mb); va+=(ea[i]-ma)**2; vb+=(eb[i]-mb)**2; }
+      const corr=va>0&&vb>0?cov/Math.sqrt(va*vb):(va===vb?1:0); ok=ratio>.5&&ratio<2&&corr>.85; detail.push('E×'+ratio.toFixed(2)+' r='+corr.toFixed(2)); }
+    if(ok) pass++; }
+  const n=Math.max(1,picks.length); return {ok:picks.length>0&&pass>=Math.ceil(n*.75),detail:detail.join(' ')+' · '+pass+'/'+picks.length};
+}
 async function recordDemo(src,opts){
   opts=opts||{};
   const m=/async\s+function\s+(render\w*)\s*\(/.exec(src); if(!m) throw new Error('No encontré una función async render…(sr, onProg) en el archivo.');
@@ -997,8 +1088,25 @@ async function recordDemo(src,opts){
   const beat=60/bpm, bm2=/\bBARS\s*=\s*(\d+)/.exec(src), bars=mBars||(bm2?+bm2[1]:Math.max(1,Math.round((seconds-TAIL)/(beat*4))));
   const tm=/^\/\/\s*[─\-—–\s]*([^·\n]+?)\s*·/m.exec(src);
   const title=opts.name||(tm?tm[1].trim():fnName);
-  const res=buildProject(events,{bpm,bars,seed,seconds,duckAt,title});
-  { const H=new Map(); for(const ev of events){ if(ev.fn!=='add'||!ev.caller||ev.caller==='inline') continue; let h=H.get(ev.caller); if(!h){ h={name:ev.caller,clips:0,calls:new Set(),params:sigs[ev.caller]||[]}; H.set(ev.caller,h); } h.clips++; if(ev.args) h.calls.add(ev.args); }
+  // funciones auxiliares → plugins automáticos (con verificación y plan B: los clips horneados de siempre)
+  const kitKeys=Object.keys(Kit.make(SR,.05,1)), H0=new Map(), shortTitle=(String(title).replace(/^[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9]+/,'').split(/\s+[─—–·|]|\s+\d+\s*BPM|\s*\(/)[0].trim()||'demo').slice(0,40); for(const ev of events){ if(ev.fn!=='add'||!ev.caller||ev.caller==='inline') continue; if(!H0.has(ev.caller)) H0.set(ev.caller,[]); H0.get(ev.caller).push(ev); }
+  const failed=new Map(), few=new Set(); let res, okPlans=[];
+  for(let guard=0;guard<30;guard++){
+    const plans=[], planned=new Set();
+    if(opts.auto!==false) for(const [name,evs] of H0){ if(failed.has(name)||few.has(name)||(opts.autoSkip&&opts.autoSkip.includes(name))) continue;
+      if(new Set(evs.map(x=>x.args)).size<2){ few.add(name); continue; }
+      let pl; try{ pl=planAuto(name,evs,sigs[name],work,shortTitle,kitKeys); }catch(err){ pl={reason:'error al analizarla: '+err.message}; }
+      if(pl.reason){ failed.set(name,pl.reason); continue; }
+      try{ installPlugin(pl.spec.code); }catch(err){ failed.set(name,'el plugin generado no compila: '+err.message); continue; }
+      plans.push(pl); planned.add(name); }
+    const ev2=events.filter(x=>!(x.fn==='add'&&planned.has(x.caller))); for(const pl of plans) for(const it of pl.items) ev2.push({fn:'auto',item:it});
+    const noteCall=new WeakMap(); res=buildProject(ev2,{bpm,bars,seed,seconds,duckAt,title,noteCall}); let bad=0;
+    for(const pl of plans){ const tr=res.project.tracks.find(t=>t.inst===pl.spec.id); let v; try{ v=tr?verifyAuto(res.project,tr,pl.spec,noteCall):{ok:false,detail:'sin pista'}; }catch(err){ v={ok:false,detail:err.message}; }
+      pl.v=v; if(!v.ok){ failed.set(pl.spec.helper,'no coincide con el audio original ('+v.detail+')'); uninstallPlugin(pl.spec.id); bad++; } }
+    if(!bad){ okPlans=plans; break; } }
+  res.stats.auto=okPlans.map(pl=>({name:pl.spec.helper,id:pl.spec.id,calls:pl.spec.calls,exact:pl.spec.det,check:pl.v.detail}));
+  res.stats.autoFailed=[...failed].map(([name,reason])=>({name,reason}));
+  { const done=new Set(okPlans.map(pl=>pl.spec.helper)), H=new Map(); for(const ev of events){ if(ev.fn!=='add'||!ev.caller||ev.caller==='inline'||done.has(ev.caller)) continue; let h=H.get(ev.caller); if(!h){ h={name:ev.caller,clips:0,calls:new Set(),params:sigs[ev.caller]||[]}; H.set(ev.caller,h); } h.clips++; if(ev.args) h.calls.add(ev.args); }
     res.stats.helpers=[...H.values()].map(h=>({name:h.name,clips:h.clips,calls:h.calls.size||h.clips,params:h.params})).sort((a,b)=>b.clips-a.clips); }
   const ws=[]; if(res.stats.notes<8) ws.push('Casi no se registraron notas ('+res.stats.notes+'): esta demo probablemente usa un kit propio que el conversor no reconoce.');
   if(res.stats.clips>150) ws.push('Muchos clips ('+res.stats.clips+'): hay funciones propias que se hornean como audio y el proyecto pesará mucho.');
@@ -1742,8 +1850,8 @@ async function convertDemo(d){
   if(P.tracks.some(t=>t.notes.length)&&!confirm('Esto reemplaza el proyecto actual. ¿Continuar?')) return;
   const emb=embeddedProject(d.src); if(emb){ try{ loadProject(projectFromFile(emb,d.name)); populateAddInst(); closeModal('libModal'); toast('«'+d.name+'»: proyecto original recuperado sin pérdidas','ok'); }catch(e){ console.error(e); toast('No pude abrir el proyecto incrustado: '+e.message,'err'); } return; }
   if(!demoOk(d)) return;
-  try{ toast('Convirtiendo «'+d.name+'»…'); await tick(); const {project,stats,warnings}=await recordDemo(d.src,{name:d.name}); loadProject(project); closeModal('libModal'); if(warnings&&warnings.length) setTimeout(()=>toast('⚠ '+warnings.join(' '),'err'),300);
-    toast('«'+d.name+'» convertida: '+stats.tracks+' pistas, '+stats.notes+' notas'+(stats.clips?(' y '+stats.clips+' clips horneados'+(stats.clipsTotal>stats.clips?' (de '+stats.clipsTotal+': los idénticos se guardan una sola vez)':'')+(stats.helpers&&stats.helpers.length?'. Salen de funciones de la demo: '+stats.helpers.slice(0,6).map(h=>h.name+' ×'+h.calls).join(', '):' (add() en línea que no se puede parametrizar)')):'')+'. Guarda el proyecto si quieres conservarlo.','ok'); }
+  try{ toast('Convirtiendo «'+d.name+'»…'); await tick(); const {project,stats,warnings}=await recordDemo(d.src,{name:d.name}); loadProject(project); populateAddInst(); renderLib(); closeModal('libModal'); if(warnings&&warnings.length) setTimeout(()=>toast('⚠ '+warnings.join(' '),'err'),300);
+    toast('«'+d.name+'» convertida: '+stats.tracks+' pistas, '+stats.notes+' notas'+(stats.auto&&stats.auto.length?' · '+stats.auto.length+' función(es) de la demo convertidas en plugins editables ('+stats.auto.map(a=>a.name).join(', ')+')':'')+(stats.autoFailed&&stats.autoFailed.length?' · se quedan como audio: '+stats.autoFailed.map(a=>a.name+' ('+a.reason+')').join('; '):'')+(stats.clips?(' y '+stats.clips+' clips horneados'+(stats.clipsTotal>stats.clips?' (de '+stats.clipsTotal+': los idénticos se guardan una sola vez)':'')+(stats.helpers&&stats.helpers.length?'. Salen de funciones de la demo: '+stats.helpers.slice(0,6).map(h=>h.name+' ×'+h.calls).join(', '):' (add() en línea que no se puede parametrizar)')):'')+'. Guarda el proyecto si quieres conservarlo.','ok'); }
   catch(e){ console.error(e); toast('No pude convertir: '+e.message,'err'); }
 }
 function renderLib(){
