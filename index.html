@@ -57,7 +57,18 @@ aside{background:var(--p);overflow:auto;min-height:0}
 .trk .sw.act{background:var(--a);color:#0b0d14;border-color:var(--a)}
 .trk .mu.act{background:#ffd166;color:#0b0d14;border-color:#ffd166}
 #roll{display:flex;flex-direction:column;min-width:0;min-height:0}
-.rtool{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:6px 8px;background:var(--p);border-bottom:1px solid var(--b)}
+.rtool{padding:6px 8px;background:var(--p);border-bottom:1px solid var(--b);position:sticky;top:0;z-index:6}
+.rbar,#rmore{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+#rmore{margin-top:6px;padding-top:6px;border-top:1px solid var(--b)}
+#rmore[hidden],#selAct[hidden]{display:none}
+#rMoreBtn.on{background:#26304f;border-color:var(--a)}
+.rbar button i{font-style:normal}
+.rbar .nm{max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#mSel.on,#mDraw.on,#mNav.on,#mErase.on{background:#26304f;border-color:var(--a)}
+#hToggle{display:none}
+.trk .tn{display:flex;align-items:center;gap:2px;min-width:0}
+.trk span.tname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:2px 4px}
+.trk .ed{padding:0 5px;opacity:.75;background:transparent;border-color:transparent}
 .rtool .nm{font-weight:600}
 .rtool .sp{flex:1}
 .rtool .live{gap:4px;padding-left:10px;border-left:1px solid var(--b)}
@@ -122,6 +133,14 @@ details summary{cursor:pointer;color:var(--a)}
 .fold.closed>.ft::before{content:'▸'}
 .fold.closed>*:not(.ft){display:none}
 #repoList .fold{margin:6px 0 10px}
+@media(max-width:700px){
+  #hToggle{display:inline-flex}
+  header.hclosed .hx{display:none!important}
+  .rbar .lb{display:none}
+  .rbar button.sm{padding:6px 10px;font-size:15px}
+  .rbar{gap:6px}
+  .rbar .nm{max-width:none;flex:1 0 100%}
+}
 @media(max-width:1000px){
   body{overflow:auto}
   main{display:block}
@@ -136,24 +155,25 @@ details summary{cursor:pointer;color:var(--a)}
 <body>
 <header>
   <div class="brand"><img src="assets/icon.png" onerror="this.onerror=null;this.src='favicon.ico'" alt="dk" width="28" height="28" style="vertical-align:middle;border-radius:7px;margin-right:6px"> Demo Kit</div>
+  <button id="hToggle" class="sm" aria-expanded="false" title="Mostrar u ocultar el resto de controles del proyecto">☰ Proyecto</button>
   <div class="grp">
     <button id="bPlay" class="pri">▶ Play</button>
     <label class="chk"><input type="checkbox" id="loop"> bucle</label>
-    <label class="chk" title="Evita que se apague la pantalla mientras suena (Wake Lock)"><input type="checkbox" id="wake" checked> 🔆 pantalla activa</label>
+    <label class="chk hx" title="Evita que se apague la pantalla mientras suena (Wake Lock)"><input type="checkbox" id="wake" checked> 🔆 pantalla activa</label>
     <button id="bRec" title="Grabar lo que toques">⏺ Grabar</button>
-    <label class="chk" title="Ajusta inicio y largo de lo grabado a la Rejilla (si la rejilla está en «libre», se graba tal cual)"><input type="checkbox" id="recQ" checked> cuantizar</label>
-    <label class="chk" title="Un compás de metrónomo antes de empezar a grabar"><input type="checkbox" id="recCount" checked> cuenta previa</label>
-    <label class="chk" title="Retraso entre que tocas y que se oye (audio + teclado). Lo grabado se adelanta esos milisegundos. Vacío = automático (latencia de salida del navegador)">latencia <input type="number" id="recLat" min="0" max="500" step="5" placeholder="auto" style="width:58px"> ms</label>
-    <button id="bCalib" class="sm" title="8 clics de metrónomo: toca cualquier tecla (o haz clic) al ritmo y se calcula tu latencia">Calibrar</button>
+    <label class="chk hx" title="Ajusta inicio y largo de lo grabado a la Rejilla (si la rejilla está en «libre», se graba tal cual)"><input type="checkbox" id="recQ" checked> cuantizar</label>
+    <label class="chk hx" title="Un compás de metrónomo antes de empezar a grabar"><input type="checkbox" id="recCount" checked> cuenta previa</label>
+    <label class="chk hx" title="Retraso entre que tocas y que se oye (audio + teclado). Lo grabado se adelanta esos milisegundos. Vacío = automático (latencia de salida del navegador)">latencia <input type="number" id="recLat" min="0" max="500" step="5" placeholder="auto" style="width:58px"> ms</label>
+    <button id="bCalib" class="sm hx" title="8 clics de metrónomo: toca cualquier tecla (o haz clic) al ritmo y se calcula tu latencia">Calibrar</button>
   </div>
   <div class="grp">
-    <input type="text" id="pname" value="Sin título" aria-label="Nombre del proyecto">
+    <input type="text" class="hx" id="pname" value="Sin título" aria-label="Nombre del proyecto">
     <label>BPM <input type="number" id="bpm" min="40" max="260" step="1" value="120"></label>
-    <label>Compases <input type="number" id="bars" min="1" max="256" step="1" value="8"></label>
-    <button id="tempoOn" class="sm" title="Pista de tempo: cambios de tempo y rampas (acelerando / ritardando)">♩ Tempo</button>
-    <label title="Compás: cuántos pulsos tiene cada compás. El pulso del proyecto es la negra (6/8 = 3 pulsos por compás)">Compás <select id="sig"></select></label>
+    <label class="hx">Compases <input type="number" id="bars" min="1" max="256" step="1" value="8"></label>
+    <button id="tempoOn" class="sm hx" title="Pista de tempo: cambios de tempo y rampas (acelerando / ritardando)">♩ Tempo</button>
+    <label class="hx" title="Compás: cuántos pulsos tiene cada compás. El pulso del proyecto es la negra (6/8 = 3 pulsos por compás)">Compás <select id="sig"></select></label>
   </div>
-  <div class="grp">
+  <div class="grp hx">
     <button id="bNew" title="Proyecto vacío">Nuevo</button>
     <button id="bSave" title="Descarga el proyecto (.json)">Guardar</button>
     <button id="bOpen" title="Abre proyectos, demos (.js), plugins y kits">Cargar archivos…</button>
@@ -163,7 +183,7 @@ details summary{cursor:pointer;color:var(--a)}
     <button id="bStems" title="Un WAV por pista dentro de un .zip (para mezclar en otro DAW)">⬇ Stems</button>
     <button id="bLib">Demos y plugins</button>
   </div>
-  <a id="repo" href="https://github.com/mialmoga/demo-kit" target="_blank" rel="noopener" title="Código en GitHub">GitHub ↗</a>
+  <a id="repo" class="hx" href="https://github.com/mialmoga/demo-kit" target="_blank" rel="noopener" title="Código en GitHub">GitHub ↗</a>
   <div id="stat"></div>
   <div id="prog"></div>
 </header>
@@ -174,15 +194,27 @@ details summary{cursor:pointer;color:var(--a)}
   </aside>
   <section id="roll">
     <div class="rtool">
-      <span class="nm" id="rtName">—</span>
-      <span class="grp">
-        <button id="mDraw" class="on sm" title="Dibujar / mover notas">✏️ Dibujar</button>
-        <button id="mNav" class="sm" title="Desplazar con el dedo">✋ Navegar</button>
-        <button id="mErase" class="sm" title="Tocar una nota la borra">🧽 Borrar</button>
-      </span>
+      <div class="rbar">
+        <span class="nm" id="rtName">—</span>
+        <span class="grp">
+          <button id="mDraw" class="on sm" title="Dibujar / mover notas"><i>✏️</i><span class="lb"> Dibujar</span></button>
+          <button id="mNav" class="sm" title="Desplazar con el dedo"><i>✋</i><span class="lb"> Navegar</span></button>
+          <button id="mErase" class="sm" title="Tocar una nota la borra"><i>🧽</i><span class="lb"> Borrar</span></button>
+          <button id="mSel" class="sm" title="Seleccionar: arrastra un rectángulo o toca notas para sumarlas o quitarlas"><i>⬚</i><span class="lb"> Seleccionar</span></button>
+        </span>
+        <span class="grp"><button id="bUndo" class="sm" title="Deshacer (Ctrl+Z)" disabled>↶</button><button id="bRedo" class="sm" title="Rehacer (Ctrl+Shift+Z o Ctrl+Y)" disabled>↷</button></span>
+        <span class="grp"><button id="zOut" class="sm" title="Alejar">−</button><button id="zIn" class="sm" title="Acercar">＋</button></span>
+        <span class="grp" id="selAct" hidden>
+          <button id="sDup" class="sm" title="Duplicar la selección justo después (Ctrl+D)">⧉<span class="lb"> Duplicar</span></button>
+          <button id="sUp" class="sm" title="Subir la selección un semitono (en percusión, un carril)">▲</button>
+          <button id="sDn" class="sm" title="Bajar la selección un semitono (en percusión, un carril)">▼</button>
+          <button id="sDel" class="sm danger" title="Borrar la selección (Supr)">🗑<span class="lb"> Borrar</span></button>
+        </span>
+        <button id="rMoreBtn" class="sm" aria-expanded="false" title="Rejilla, tocar con teclado o MIDI, escala, acorde y teclado en pantalla">⋯ Más</button>
+      </div>
+      <div id="rmore" hidden>
       <span class="grp"><label>Rejilla <select id="snap"></select></label>
-        <button id="zOut" class="sm">−</button><button id="zIn" class="sm">＋</button></span>
-      <span class="grp"><button id="bUndo" class="sm" title="Deshacer (Ctrl+Z)" disabled>↶</button><button id="bRedo" class="sm" title="Rehacer (Ctrl+Shift+Z o Ctrl+Y)" disabled>↷</button></span>
+        </span>
       <span class="grp live">
         <button id="bLive" class="sm on" title="Tocar la pista activa con el teclado de la compu (Z S X D C V… y Q 2 W 3 E R…)">⌨ Tocar</button>
         <button id="oDn" class="sm" title="Octava abajo (tecla −)">−</button><span id="oct" title="Octava de la fila de abajo">C4</span><button id="oUp" class="sm" title="Octava arriba (tecla =)">＋</button>
@@ -195,8 +227,8 @@ details summary{cursor:pointer;color:var(--a)}
         <label title="Al dibujar o tocar, suena el acorde completo">Acorde <select id="kChord" aria-label="Acorde"></select></label>
         <button id="bOsk" class="sm" title="Teclado en pantalla (ratón o dedo)">🎹 Teclado</button>
       </span>
-      <span class="sp"></span>
       <span class="hint" id="rtHint">clic = nota · arrastra el borde = largo · Shift+arrastrar = seleccionar · Supr = borrar · Ctrl+D = duplicar · Ctrl+Z = deshacer</span>
+      </div>
     </div>
     <div id="osk" hidden></div>
     <div id="tbar" class="abar" hidden>
@@ -1177,11 +1209,11 @@ cv.addEventListener('pointerdown',e=>{
   cv.setPointerCapture(e.pointerId); const h=hit(tr,info,inst,px,py);
   if(mode==='erase'){ if(h){ pushUndo(); tr.notes.splice(tr.notes.indexOf(h.n),1); selNotes.delete(h.n); touch(); } return; }
   if(h){
-    if(e.shiftKey){ if(selNotes.has(h.n)) selNotes.delete(h.n); else selNotes.add(h.n); } else if(!selNotes.has(h.n)) selNotes=new Set([h.n]);
-    drag={kind:h.edge?'resize':'move',startBeat:bx,startM:m,undone:false,orig:[...selNotes].map(n=>({n,b:n.b,m:n.m,l:n.l||.25}))};
+    let tap=null; if(mode==='select'){ if(!selNotes.has(h.n)) selNotes.add(h.n); else tap=h.n; } else if(e.shiftKey){ if(selNotes.has(h.n)) selNotes.delete(h.n); else selNotes.add(h.n); } else if(!selNotes.has(h.n)) selNotes=new Set([h.n]);
+    drag={kind:h.edge?'resize':'move',tap,startBeat:bx,startM:m,undone:false,orig:[...selNotes].map(n=>({n,b:n.b,m:n.m,l:n.l||.25}))};
     if(!h.edge) previewNote(h.n); renderSelInfo(); invalidate(); return;
   }
-  if(e.shiftKey){ drag={kind:'rubber',x0:px,y0:py,x1:px,y1:py}; return; }
+  if(e.shiftKey||mode==='select'){ if(mode==='select'&&!e.shiftKey){ selNotes=new Set(); renderSelInfo(); invalidate(); } drag={kind:'rubber',x0:px,y0:py,x1:px,y1:py}; return; }
   if(info.perc?(m<0||m>=info.rows):(m<0||m>127)) return;
   pushUndo(); const b=Math.max(0,snap>0?Math.floor(bx/snap+1e-9)*snap:bx);
   const mm=info.perc?m:(KEY().fit&&scaleOn()?fitScale(m):m), n={b,l:inst.oneShot?.25:(inst.kind==='perc'?4:lastLen),m:mm,v:1}, extra=[];
@@ -1190,7 +1222,7 @@ cv.addEventListener('pointerdown',e=>{
 });
 cv.addEventListener('pointermove',e=>{
   const tr=P.tracks[sel]; const r=cv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
-  if(!drag){ if(mode==='draw'&&tr&&px>=KW&&py>=RUL){ const info=trackInfo(tr),inst=INSTRUMENTS[tr.inst]||{}; const h=hit(tr,info,inst,px,py); cv.style.cursor=h?(h.edge?'ew-resize':'pointer'):'crosshair'; } else cv.style.cursor=mode==='erase'?'not-allowed':'default'; return; }
+  if(!drag){ if(mode==='draw'&&tr&&px>=KW&&py>=RUL){ const info=trackInfo(tr),inst=INSTRUMENTS[tr.inst]||{}; const h=hit(tr,info,inst,px,py); cv.style.cursor=h?(h.edge?'ew-resize':'pointer'):'crosshair'; } else cv.style.cursor=mode==='erase'?'not-allowed':(mode==='select'?'crosshair':'default'); return; }
   const info=trackInfo(tr), bx=pxToBeat(px), m=pyToM(info,py), minL=snap>0?snap:.0625;
   const undoOnce=()=>{ if(!drag.undone){ pushUndo(); drag.undone=true; } };
   if(drag.kind==='move'){
@@ -1203,11 +1235,11 @@ cv.addEventListener('pointermove',e=>{
     if(L>=minL&&Math.abs(L-drag.n.l)>1e-9&&!(INSTRUMENTS[tr.inst]||{}).oneShot){ drag.n.l=L; for(const x of drag.extra||[]) x.l=L; drag.moved=true; lastLen=L; touch(); }
   } else if(drag.kind==='rubber'){
     drag.x1=px; drag.y1=py; const xa=Math.min(drag.x0,px),xb=Math.max(drag.x0,px),ya=Math.min(drag.y0,py),yb=Math.max(drag.y0,py);
-    const inst=INSTRUMENTS[tr.inst]||{}, ba=pxToBeat(xa), bb=pxToBeat(xb), ma=pyToM(info,yb), mb=pyToM(info,ya);
+    const inst=INSTRUMENTS[tr.inst]||{}, ba=pxToBeat(xa), bb=pxToBeat(xb), top=info.perc?info.rows-1:127, ma=clamp(pyToM(info,yb),0,top), mb=clamp(pyToM(info,ya),0,top);   // el rectángulo puede pasarse de las filas: se recorta
     selNotes=new Set(tr.notes.filter(n=>n.b+visLen(inst,n)>=ba&&n.b<=bb&&Math.round(n.m)>=ma&&Math.round(n.m)<=mb)); invalidate();
   }
 });
-const endDrag=()=>{ if(!drag) return; const k=drag.kind; drag=null; if(k!=='rubber') fitBars(); renderSelInfo(); invalidate(); };
+const endDrag=()=>{ if(!drag) return; const k=drag.kind; if(k==='move'&&drag.tap&&!drag.undone) selNotes.delete(drag.tap); drag=null; if(k!=='rubber') fitBars(); renderSelInfo(); invalidate(); };
 cv.addEventListener('pointerup',endDrag); cv.addEventListener('pointercancel',endDrag);
 cv.addEventListener('contextmenu',e=>{ e.preventDefault(); const tr=P.tracks[sel]; if(!tr) return; const r=cv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
   if(px<KW||py<RUL) return; const h=hit(tr,trackInfo(tr),INSTRUMENTS[tr.inst]||{},px,py); if(h){ pushUndo(); tr.notes.splice(tr.notes.indexOf(h.n),1); selNotes.delete(h.n); touch(); renderSelInfo(); } });
@@ -1215,7 +1247,7 @@ wrap.addEventListener('scroll',invalidate);
 wrap.addEventListener('wheel',e=>{ if(e.ctrlKey||e.metaKey){ e.preventDefault(); zoom(e.deltaY<0?1.15:1/1.15); } },{passive:false});
 new ResizeObserver(()=>{ layoutSpacer(); invalidate(); }).observe(wrap);
 function zoom(f){ const c=(wrap.scrollLeft+wrap.clientWidth/2-KW)/BW; BW=clamp(BW*f,6,260); layoutSpacer(); wrap.scrollLeft=Math.max(0,c*BW-(wrap.clientWidth/2-KW)); invalidate(); }
-function setMode(m){ mode=m; for(const [id,k] of [['mDraw','draw'],['mNav','nav'],['mErase','erase']]) $(id).classList.toggle('on',k===m); cv.style.touchAction=m==='nav'?'auto':'none'; }
+function setMode(m){ mode=m; for(const [id,k] of [['mDraw','draw'],['mNav','nav'],['mErase','erase'],['mSel','select']]) $(id).classList.toggle('on',k===m); cv.style.touchAction=m==='nav'?'auto':'none'; }
 
 // teclado
 document.addEventListener('keydown',e=>{
@@ -1228,10 +1260,9 @@ document.addEventListener('keydown',e=>{
   if(ctrl&&e.key.toLowerCase()==='z'){ e.preventDefault(); if(e.shiftKey) redo(); else undo(); return; }
   if(ctrl&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); return; }
   if(!tr) return;
-  if(e.key==='Delete'||e.key==='Backspace'){ if(selNotes.size){ e.preventDefault(); pushUndo(); tr.notes=tr.notes.filter(n=>!selNotes.has(n)); selNotes.clear(); touch(); renderSelInfo(); } }
+  if(e.key==='Delete'||e.key==='Backspace'){ if(selNotes.size){ e.preventDefault(); delSel(); } }
   else if(ctrl&&e.key.toLowerCase()==='a'){ e.preventDefault(); selNotes=new Set(tr.notes); renderSelInfo(); invalidate(); }
-  else if(ctrl&&e.key.toLowerCase()==='d'){ e.preventDefault(); if(!selNotes.size) return; pushUndo(); const arr=[...selNotes]; let a=Infinity,b=0; for(const n of arr){ a=Math.min(a,n.b); b=Math.max(b,n.b+(n.l||.25)); }
-    let sh=b-a; if(snap>0) sh=Math.ceil(sh/snap-1e-9)*snap; const copies=arr.map(n=>Object.assign(JSON.parse(JSON.stringify(n)),{b:r6(n.b+sh)})); tr.notes.push(...copies); selNotes=new Set(copies); fitBars(); touch(); renderSelInfo(); }
+  else if(ctrl&&e.key.toLowerCase()==='d'){ e.preventDefault(); dupSel(); }
   else if(e.key==='Escape'){ selNotes.clear(); renderSelInfo(); invalidate(); }
   else if(e.key==='Home'){ setCursor(0); wrap.scrollLeft=0; }
   else if(e.key.startsWith('Arrow')&&selNotes.size){ e.preventDefault(); const info=trackInfo(tr); pushUndo();
@@ -1242,16 +1273,34 @@ document.addEventListener('keydown',e=>{
     fitBars(); touch(); }
 });
 
+// acciones sobre la selección: las usan el teclado y los botones de la franja
+function delSel(){ const tr=P.tracks[sel]; if(!tr||!selNotes.size) return; pushUndo(); tr.notes=tr.notes.filter(n=>!selNotes.has(n)); selNotes.clear(); touch(); renderSelInfo(); }
+function dupSel(){ const tr=P.tracks[sel]; if(!tr||!selNotes.size) return; pushUndo(); const arr=[...selNotes]; let a=Infinity,b=0; for(const n of arr){ a=Math.min(a,n.b); b=Math.max(b,n.b+(n.l||.25)); }
+  let sh=b-a; if(snap>0) sh=Math.ceil(sh/snap-1e-9)*snap; const copies=arr.map(n=>Object.assign(JSON.parse(JSON.stringify(n)),{b:r6(n.b+sh)})); tr.notes.push(...copies); selNotes=new Set(copies); fitBars(); touch(); renderSelInfo(); }
+function shiftSel(up){ const tr=P.tracks[sel]; if(!tr||!selNotes.size) return; const info=trackInfo(tr); pushUndo(); for(const n of selNotes) n.m=info.perc?clamp(n.m+(up?-1:1),0,info.rows-1):clamp(n.m+(up?1:-1),0,127); touch(); }
+$('sDup').onclick=dupSel; $('sDel').onclick=delSel; $('sUp').onclick=()=>shiftSel(true); $('sDn').onclick=()=>shiftSel(false);
+// la franja y la cabecera se pliegan; en pantallas chicas arrancan cerradas (el estado se recuerda en este navegador)
+const lsGet=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } }, lsSet=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} }, smallScr=()=>matchMedia('(max-width:700px)').matches;
+function setMore(open,save){ $('rmore').hidden=!open; $('rMoreBtn').classList.toggle('on',open); $('rMoreBtn').setAttribute('aria-expanded',String(open)); if(save) lsSet('demokit-rmore',open?'1':'0'); }
+$('rMoreBtn').onclick=()=>setMore($('rmore').hidden,true); { const v=lsGet('demokit-rmore'); setMore(v==null?!smallScr():v==='1'); }
+const HDR=document.querySelector('header');
+function setHead(open,save){ HDR.classList.toggle('hclosed',!open); $('hToggle').classList.toggle('on',open); $('hToggle').setAttribute('aria-expanded',String(open)); if(save) lsSet('demokit-head',open?'1':'0'); }
+$('hToggle').onclick=()=>setHead(HDR.classList.contains('hclosed'),true); setHead(lsGet('demokit-head')==='1');
+
 // ───────────── pistas ─────────────
-function selectTrack(i){ if(i===sel||!P.tracks[i]) return; recCloseAll(); sel=i; selNotes.clear(); for(const [j,r] of [...$('tlist').children].entries()) r.classList.toggle('sel',j===i); renderInspector(); centerTrack(); invalidate(); }
+function selectTrack(i){ if(i===sel||!P.tracks[i]) return; recCloseAll(); sel=i; selNotes.clear(); for(const [j,r] of [...$('tlist').children].entries()) r.classList.toggle('sel',j===i); renderInspector(); renderSelInfo(); centerTrack(); invalidate(); }
 function refreshCounts(){ [...$('tlist').children].forEach((r,i)=>{ const c=r.querySelector('.cnt'); if(c&&P.tracks[i]) c.textContent=P.tracks[i].notes.length+' notas'; }); }
+function renameTrack(i,span){      // el teclado del teléfono solo se abre al tocar ✎
+  const tr=P.tracks[i]; if(!tr) return; const inp=el('input',{class:'tname',value:tr.name,maxLength:40,'aria-label':'Nombre de la pista'}); span.replaceWith(inp); inp.focus(); inp.select(); let done=false;
+  const fin=ok=>{ if(done) return; done=true; const v=inp.value.trim(); if(ok&&v&&v!==tr.name){ pushUndo(); tr.name=v; touch(); } renderTracks(); renderInspector(); };
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); fin(true); } else if(e.key==='Escape'){ e.preventDefault(); fin(false); } }); inp.addEventListener('blur',()=>fin(true)); inp.addEventListener('click',e=>e.stopPropagation()); }
 function renderTracks(){
   const box=$('tlist'); box.innerHTML='';
   P.tracks.forEach((tr,i)=>{
     const inst=INSTRUMENTS[tr.inst];
     const row=el('div',{class:'trk'+(i===sel?' sel':''),onclick:e=>{ if(!e.target.closest('input,button')) selectTrack(i); }},
       el('span',{class:'dot',style:'background:'+trackColor(i)}),
-      el('input',{class:'tname',value:tr.name,onpointerdown:()=>selectTrack(i),onchange:e=>{ tr.name=e.target.value; if(i===sel) renderInspector(); touch(); }}),
+      (()=>{ const nm=el('span',{class:'tname',text:tr.name,title:tr.name}); return el('span',{class:'tn'},nm,el('button',{class:'sm ed',text:'✎',title:'Cambiar el nombre',onclick:e=>{ e.stopPropagation(); selectTrack(i); renameTrack(i,nm); }})); })(),
       el('span',{class:'btns'},
         el('button',{class:'sm mu'+(tr.mute?' act':''),text:'M',title:'Silenciar',onclick:e=>{ tr.mute=!tr.mute; e.target.classList.toggle('act',tr.mute); touch(); }}),
         el('button',{class:'sm sw'+(tr.solo?' act':''),text:'S',title:'Solo',onclick:e=>{ tr.solo=!tr.solo; e.target.classList.toggle('act',tr.solo); touch(); }})),
@@ -1281,7 +1330,7 @@ function sliderRow(label,get,set,min,max,step,def,fmt){
   if(def!=null) inp.addEventListener('dblclick',()=>{ inp.value=def; set(def); show(); previewTrack(); });
   show(); return el('div',{class:'row'},el('label',{text:label,title:label}),inp,out);
 }
-function renderSelInfo(){ const e=$('selInfo'); if(!e) return; const tr=P.tracks[sel]; e.textContent=tr?(tr.notes.length+' notas · '+selNotes.size+' seleccionadas'):''; const v=$('selVel'); if(v){ v.disabled=!selNotes.size; if(selNotes.size){ const x=[...selNotes][0].v; v.value=x==null?1:x; if(v.nextElementSibling) v.nextElementSibling.textContent=fmtNum(+v.value); } } }
+function renderSelInfo(){ const sa=$('selAct'); if(sa) sa.hidden=!selNotes.size; const e=$('selInfo'); if(!e) return; const tr=P.tracks[sel]; e.textContent=tr?(tr.notes.length+' notas · '+selNotes.size+' seleccionadas'):''; const v=$('selVel'); if(v){ v.disabled=!selNotes.size; if(selNotes.size){ const x=[...selNotes][0].v; v.value=x==null?1:x; if(v.nextElementSibling) v.nextElementSibling.textContent=fmtNum(+v.value); } } }
 function setFx(tr,g,k,v){ tr.fx=tr.fx||{}; tr.fx[g]=Object.assign({},FX_DEF[g],tr.fx[g]); tr.fx[g][k]=v; touch(); }
 function fxBlock(tr){
   const T=[['1/16',.25],['1/8',.5],['1/8 punteado',.75],['1/4',1],['1/4 punteado',1.5],['1/2',2]];
@@ -1878,7 +1927,7 @@ $('bExample').onclick=()=>{ loadProject(starterProject()); closeModal('libModal'
 $('bNewPlg').onclick=()=>openPlugin();
 $('bWav').onclick=async()=>{ if(dirty||!cache){ if(!(await doRender())) return; } download(encodeWav(cache.L,cache.R,SR),(P.name||'cancion').replace(/[^\w\-]+/g,'_')+'.wav'); };
 $('bAdd').onclick=()=>addTrack($('addInst').value);
-$('mDraw').onclick=()=>setMode('draw'); $('mNav').onclick=()=>setMode('nav'); $('mErase').onclick=()=>setMode('erase');
+$('mDraw').onclick=()=>setMode('draw'); $('mNav').onclick=()=>setMode('nav'); $('mErase').onclick=()=>setMode('erase'); $('mSel').onclick=()=>setMode('select');
 $('zIn').onclick=()=>zoom(1.25); $('zOut').onclick=()=>zoom(1/1.25);
 { const s=$('snap'); for(const [v,l] of [[1,'1/4'],[.5,'1/8'],[.25,'1/16'],[.125,'1/32'],[1/3,'1/8 tresillo'],[1/6,'1/16 tresillo'],[0,'libre']]) s.append(el('option',{value:v,text:l})); s.value=.25; s.onchange=()=>{ snap=+s.value; invalidate(); }; }
 const drop=$('drop'); for(const ev of ['dragenter','dragover']) window.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add('over'); });

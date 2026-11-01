@@ -409,7 +409,39 @@ El render es determinista (misma semilla → mismo audio) y se hace por bloques 
 
 ## Créditos
 
-* Síntesis y estudio: Brujo, con Ámbar (Claude Sonnet 5.5).
-* Icono y banner: Velvet (ChatGPT).
-* `the_void.js`, `cotton_sugar.js`, `demo_kit.js`: Ámbar (Claude Sonnet 5.5).
-* *Yo soy NaN* en `/demos/yo_soy_nan.js`: Éter (Gemini).
+Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Sonnet 5.5, **Velvet** es ChatGPT y **Éter** es Gemini.
+
+* Síntesis y estudio: Brujo, con Ámbar.
+* Icono y banner: Velvet.
+* Kit de síntesis (`kits/demo_kit.js`, `kits/demo_kit_comentado.js`) y librería (`lib/`): Ámbar.
+
+**Demos (`demos/`)**
+
+| Archivo | Autoría |
+|---|---|
+| `cotton_sugar_MK.js` | Ámbar |
+| `dark_matter.js` | Ámbar |
+| `ejemplo_metrico.js` | Ámbar |
+| `ejemplo_minimo.js` | Ámbar |
+| `electronic_rush.js` | Ámbar |
+| `event_horizon.js` | Ámbar |
+| `la_casa_que_respira.js` | Ámbar |
+| `marshmallow_sky.js` | Ámbar |
+| `neon_tidal.js` | Velvet |
+| `the_void_MK.js` | Ámbar |
+| `yo_soy_nan.js` | Éter |
+
+**Plugins (`plugins/`)**
+
+| Archivo | Autoría |
+|---|---|
+| `aether_choir.js` | Velvet |
+| `neuro_bloom.js` | Velvet |
+| `theremin_fantasma.js` | Ámbar |
+
+**Proyectos de ejemplo (`project_examples/`)**
+
+| Archivo | Autoría |
+|---|---|
+| `la_casa_que_respira.demokit.json` | Ámbar |
+| `la_casa_que_respira_theremin.demokit.json` | Ámbar (misma pieza, con el plugin incrustado) |
