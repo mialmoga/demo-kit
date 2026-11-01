@@ -128,6 +128,10 @@ aside{background:var(--p);overflow:auto;min-height:0}
 details{margin:8px 0;color:#b8bdca}
 details pre{background:#0f1117;border:1px solid var(--b);border-radius:8px;padding:10px;overflow:auto;font-size:12px}
 details summary{cursor:pointer;color:var(--a)}
+.kgrp h4{margin:12px 0 6px;color:var(--m);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.kt{display:grid;grid-template-columns:minmax(120px,auto) 1fr;gap:6px 14px;align-items:start;font-size:13px}
+@media(max-width:700px){.kt{grid-template-columns:1fr}.kt>span:nth-child(odd){margin-top:6px}}
+kbd{display:inline-block;min-width:1.5em;text-align:center;padding:1px 6px;border:1px solid var(--b);border-bottom-width:2px;border-radius:5px;background:#12151d;font:600 12px ui-monospace,Menlo,Consolas,monospace;color:var(--t)}
 .fold>.ft{cursor:pointer;user-select:none}
 .fold>.ft::before{content:'▾';display:inline-block;width:1.1em;color:var(--m)}
 .fold.closed>.ft::before{content:'▸'}
@@ -156,9 +160,11 @@ details summary{cursor:pointer;color:var(--a)}
 <header>
   <div class="brand"><img src="assets/icon.png" onerror="this.onerror=null;this.src='favicon.ico'" alt="dk" width="28" height="28" style="vertical-align:middle;border-radius:7px;margin-right:6px"> Demo Kit</div>
   <button id="hToggle" class="sm" aria-expanded="false" title="Mostrar u ocultar el resto de controles del proyecto">☰ Proyecto</button>
+  <button id="bKeys" class="sm" title="Atajos y gestos (F1)">?</button>
   <div class="grp">
     <button id="bPlay" class="pri">▶ Play</button>
     <label class="chk"><input type="checkbox" id="loop"> bucle</label>
+    <label class="chk" title="Clic de metrónomo mientras suena el proyecto (sigue el compás y el mapa de tempo; en la grabación suena también)"><input type="checkbox" id="metro"> metrónomo</label>
     <label class="chk hx" title="Evita que se apague la pantalla mientras suena (Wake Lock)"><input type="checkbox" id="wake" checked> 🔆 pantalla activa</label>
     <button id="bRec" title="Grabar lo que toques">⏺ Grabar</button>
     <label class="chk hx" title="Ajusta inicio y largo de lo grabado a la Rejilla (si la rejilla está en «libre», se graba tal cual)"><input type="checkbox" id="recQ" checked> cuantizar</label>
@@ -256,7 +262,7 @@ details summary{cursor:pointer;color:var(--a)}
 
 <div id="libModal" class="modal"><div class="card">
   <h3>Demos y plugins <button class="x" data-close="libModal">Cerrar</button></h3>
-  <div class="drop" id="drop">Suelta aquí archivos <b>.js</b> o <b>.json</b>: demos (the_void.js, cotton_sugar.js…), plugins de instrumento, un demo_kit.js propio o proyectos guardados.
+  <div class="drop" id="drop">Suelta aquí archivos <b>.js</b> o <b>.json</b>: demos (.js), plugins de instrumento, un demo_kit.js propio o proyectos guardados.
     <div class="btnrow" style="justify-content:center"><button id="bPick" class="pri">Elegir archivos…</button><button id="bExample">Cargar proyecto de ejemplo</button></div></div>
   <div class="sec fold" data-fold="repo"><h4 class="ft">En el repositorio <button id="repoRefresh" class="sm" title="Volver a mirar las carpetas">↻</button></h4><div id="repoList" class="desc"></div></div>
   <div class="sec fold" data-fold="demos"><h4 class="ft">Demos cargadas</h4><div id="demoList"></div></div>
@@ -276,6 +282,34 @@ details summary{cursor:pointer;color:var(--a)}
     <button id="plgTpl">Plantilla</button>
   </div>
   <details><summary>Referencia rápida del kit</summary><pre id="plgDoc"></pre></details>
+</div></div>
+
+<div id="keysModal" class="modal"><div class="card">
+  <h3>Atajos y gestos <button class="x" data-close="keysModal">Cerrar</button></h3>
+  <div class="kgrp"><h4>General</h4><div class="kt">
+    <span><kbd>Espacio</kbd></span><span>Reproducir / detener</span>
+    <span><kbd>F1</kbd></span><span>Abrir esta hoja</span>
+    <span><kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>Ctrl</kbd>+<kbd>Y</kbd></span><span>Deshacer · rehacer (también <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>)</span>
+    <span><kbd>Home</kbd></span><span>Cursor al inicio</span></div></div>
+  <div class="kgrp"><h4>Piano roll</h4><div class="kt">
+    <span>Clic / toque en vacío</span><span>Nueva nota (arrastra hacia la derecha para alargarla)</span>
+    <span>Arrastrar una nota</span><span>Moverla (el borde derecho cambia el largo)</span>
+    <span>Clic derecho · modo 🧽</span><span>Borrar una nota</span>
+    <span><kbd>Shift</kbd>+arrastrar · modo ⬚</span><span>Seleccionar con un rectángulo; en modo ⬚ tocar una nota la suma o la quita</span>
+    <span><kbd>Ctrl</kbd>+<kbd>A</kbd></span><span>Seleccionar todas las notas de la pista</span>
+    <span><kbd>Ctrl</kbd>+<kbd>C</kbd> · <kbd>Ctrl</kbd>+<kbd>V</kbd></span><span>Copiar · pegar en el cursor</span>
+    <span><kbd>Ctrl</kbd>+<kbd>D</kbd></span><span>Duplicar la selección justo después</span>
+    <span><kbd>Supr</kbd></span><span>Borrar la selección</span>
+    <span><kbd>←</kbd> <kbd>→</kbd></span><span>Mover la selección (un paso de rejilla; con <kbd>Shift</kbd>, un pulso)</span>
+    <span><kbd>↑</kbd> <kbd>↓</kbd></span><span>Subir / bajar un semitono (con <kbd>Shift</kbd>, una octava)</span>
+    <span><kbd>Esc</kbd></span><span>Quitar la selección</span>
+    <span><kbd>Ctrl</kbd>+rueda</span><span>Zoom horizontal</span>
+    <span>Doble clic en un control</span><span>Vuelve a su valor por defecto</span></div></div>
+  <div class="kgrp"><h4>Tocar con el teclado de la compu</h4><div class="kt">
+    <span><kbd>Z</kbd> <kbd>S</kbd> <kbd>X</kbd> <kbd>D</kbd> <kbd>C</kbd> <kbd>V</kbd> <kbd>G</kbd> <kbd>B</kbd> <kbd>H</kbd> <kbd>N</kbd> <kbd>J</kbd> <kbd>M</kbd></span><span>Fila de abajo: notas desde la octava indicada (en percusión, <kbd>Z X C V B N M</kbd> son los carriles)</span>
+    <span><kbd>Q</kbd> <kbd>2</kbd> <kbd>W</kbd> <kbd>3</kbd> <kbd>E</kbd> <kbd>R</kbd> …</span><span>Fila de arriba: una octava más alto</span>
+    <span><kbd>−</kbd> · <kbd>=</kbd></span><span>Octava abajo · arriba</span></div></div>
+  <p class="desc" style="color:var(--m)">En el teléfono: ✋ navega con el dedo, ⬚ selecciona, ⋯ Más abre rejilla, teclado en pantalla, escala y acorde, y ☰ Proyecto muestra el resto de controles.</p>
 </div></div>
 
 <div id="toasts"></div>
@@ -1007,10 +1041,10 @@ function startPlayback(buf,offset,loop,isProject,delay){
   playLoopEnd=0; if(loop&&isProject){ s.loopStart=0; s.loopEnd=playLoopEnd=Math.min(buf.duration,tmap(P).sec(P.bars*barBeats(P))); if(offset>=playLoopEnd-.01) offset=0; }
   s.onended=()=>{ if(srcNode===s) stop(); };
   playStartCtx=a.currentTime+.02+(delay||0); playOffset=offset; playLoop=!!loop; playDur=buf.duration; playIsProject=!!isProject;
-  s.start(playStartCtx,offset); srcNode=s; playing=true; $('bPlay').textContent='■ Detener'; acquireWake(); invalidate();
+  s.start(playStartCtx,offset); srcNode=s; playing=true; $('bPlay').textContent='■ Detener'; acquireWake(); invalidate(); if(isProject) startMetro();
 }
 function stopSource(){ if(srcNode){ srcNode.onended=null; try{srcNode.stop();}catch(e){} srcNode=null; } }
-function stop(){ recFinish(); for(const o of clickNodes){ try{o.stop();}catch(e){} } clickNodes.length=0; stopSource(); playing=false; $('bPlay').textContent='▶ Play'; releaseWake(); invalidate(); }
+function stop(){ stopMetro(); recFinish(); for(const o of clickNodes){ try{o.stop();}catch(e){} } clickNodes.length=0; stopSource(); playing=false; $('bPlay').textContent='▶ Play'; releaseWake(); invalidate(); }
 function playheadBeat(){ if(!playing||!ctx||!playIsProject) return null; let pos=playOffset+Math.max(0,ctx.currentTime-playStartCtx); if(playLoop&&playDur>0) pos%=(playLoopEnd||playDur); return tmap(P).beat(pos); }
 async function togglePlay(){
   if(playing){ stop(); return; }
@@ -1286,6 +1320,22 @@ $('rMoreBtn').onclick=()=>setMore($('rmore').hidden,true); { const v=lsGet('demo
 const HDR=document.querySelector('header');
 function setHead(open,save){ HDR.classList.toggle('hclosed',!open); $('hToggle').classList.toggle('on',open); $('hToggle').setAttribute('aria-expanded',String(open)); if(save) lsSet('demokit-head',open?'1':'0'); }
 $('hToggle').onclick=()=>setHead(HDR.classList.contains('hclosed'),true); setHead(lsGet('demokit-head')==='1');
+
+// metrónomo: clics programados por adelantado sobre el mismo reloj del audio (sigue compás, mapa de tempo, bucle y punto de inicio)
+let metroT=null;
+function stopMetro(){ if(metroT){ clearInterval(metroT); metroT=null; } }
+function startMetro(){
+  stopMetro(); if(!$('metro').checked||!playing||!playIsProject||!ctx) return;
+  const A=ctx, tm=tmap(P), nc=P.sig?P.sig[0]:4, pulse=barBeats(P)/nc, per=P.bars*nc, loopLen=playLoop?(playLoopEnd||playDur):0, off=playOffset, t0=playStartCtx;
+  const timeOf=(c,j)=>(c===0?t0-off:t0+(loopLen-off)+(c-1)*loopLen)+tm.sec(j*pulse);
+  let c=0,j=0; const adv=()=>{ j++; if(j>=per){ if(!loopLen) return false; j=0; c++; } return true; };
+  for(let g=0;g<50000;g++){ if(!((c===0&&tm.sec(j*pulse)<off-1e-6)||timeOf(c,j)<A.currentTime-.01)) break; if(!adv()) return; }   // salta lo que ya pasó
+  const tick=()=>{ while(playing){ const t=timeOf(c,j); if(t>A.currentTime+.15) break; if(t>=A.currentTime-.01) clickAt(t,j%nc===0,.22); if(!adv()){ stopMetro(); break; } } };
+  metroT=setInterval(tick,30); tick();
+}
+{ const v=lsGet('demokit-metro'); $('metro').checked=v==='1'; $('metro').onchange=()=>{ lsSet('demokit-metro',$('metro').checked?'1':'0'); if($('metro').checked) startMetro(); else stopMetro(); }; }
+$('bKeys').onclick=()=>openModal('keysModal');
+document.addEventListener('keydown',e=>{ if(e.key==='F1'){ e.preventDefault(); openModal('keysModal'); } });
 
 // ───────────── pistas ─────────────
 function selectTrack(i){ if(i===sel||!P.tracks[i]) return; recCloseAll(); sel=i; selNotes.clear(); for(const [j,r] of [...$('tlist').children].entries()) r.classList.toggle('sel',j===i); renderInspector(); renderSelInfo(); centerTrack(); invalidate(); }
@@ -1603,12 +1653,12 @@ function projectFromFile(o,nombre){   // proyecto → pregunta por los plugins q
 }
 // ───────────── archivos, demos y plugins ─────────────
 const demoName=(txt,fb)=>{ const m=/^\/\/\s*[─\-—–\s]*([^·\n]+?)\s*·/m.exec(txt); return m?m[1].trim():fb; };
-async function ingest(file){
+async function ingest(file,opts){
   const txt=await file.text(), name=file.name;
   try{
     if(/^\s*\{/.test(txt)){ const o=JSON.parse(txt); if(o.format==='demokit-studio'){ loadProject(projectFromFile(o,name)); populateAddInst(); toast('Proyecto «'+o.name+'» cargado','ok'); return; } }
     if(/function\s+demoKit\s*\(/.test(txt)){ if(!trustCode('Kit «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código que reemplazará al kit incluido.')){ toast('Kit no cargado','err'); return; } const f=new Function(txt+'\nreturn demoKit;')(); const k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); Kit.make=f; bumpKit(); kitName=name; cache=null; dirty=true; renderLib(); updateStat(); toast('Kit «'+name+'» cargado: los instrumentos y plugins lo usan desde ahora','ok'); return; }
-    if(/async\s+function\s+render\w*\s*\(/.test(txt)){ const fn=/async\s+function\s+(render\w*)/.exec(txt)[1]; const d={name:demoName(txt,name.replace(/\.js$/,'')),fn,src:txt,out:null}; const i=demos.findIndex(x=>x.name===d.name); if(i>=0) demos[i]=d; else demos.push(d); renderLib(); openModal('libModal'); toast('Demo «'+d.name+'» lista: reprodúcela o conviértela','ok'); return; }
+    if(/async\s+function\s+render\w*\s*\(/.test(txt)){ const fn=/async\s+function\s+(render\w*)/.exec(txt)[1]; const d={name:demoName(txt,name.replace(/\.js$/,'')),fn,src:txt,out:null,trusted:!!(opts&&opts.trusted)}; const i=demos.findIndex(x=>x.name===d.name); if(i>=0) demos[i]=d; else demos.push(d); renderLib(); openModal('libModal'); toast('Demo «'+d.name+'» lista: reprodúcela o conviértela','ok'); return; }
     if(/registerInstrument\s*\(/.test(txt)){ if(!trustCode('Plugin «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código. Empieza así:\n'+txt.slice(0,160).replace(/\s+/g,' ')+'…')){ toast('Plugin no instalado','err'); return; } const def=installPlugin(txt); populateAddInst(); renderLib(); toast('Plugin «'+def.name+'» registrado','ok'); return; }
     toast('No reconocí «'+name+'» (¿demo, plugin, kit o proyecto?)','err');
   }catch(e){ console.error(e); toast('Error con «'+name+'»: '+e.message,'err'); }
@@ -1648,7 +1698,7 @@ async function repoScan(force){
 }
 async function repoLoad(g,f){
   try{ if(g.kind==='project'&&P.tracks.some(t=>t.notes.length)&&!confirm('Esto reemplaza el proyecto actual. ¿Continuar?')) return;
-    const r=await fetchT(f.url,20000); if(!r.ok) throw new Error('respondió '+r.status); const txt=await r.text(); await ingest(new File([txt],f.name)); if(g.kind==='project') closeModal('libModal'); }
+    const r=await fetchT(f.url,20000); if(!r.ok) throw new Error('respondió '+r.status); const txt=await r.text(); await ingest(new File([txt],f.name),{trusted:g.kind==='demo'}); if(g.kind==='project') closeModal('libModal'); }
   catch(e){ console.error(e); toast('No pude cargar «'+f.name+'»: '+e.message,'err'); }
 }
 async function renderRepo(force){
@@ -1669,21 +1719,30 @@ const foldGet=()=>{ try{ return JSON.parse(localStorage.getItem('demokit-folds')
 function applyFold(sec){ sec.classList.toggle('closed',!!foldGet()[sec.dataset.fold]); }
 document.addEventListener('click',e=>{ const ft=e.target.closest&&e.target.closest('.fold>.ft'); if(!ft||e.target.closest('button')) return; const sec=ft.parentElement; sec.classList.toggle('closed'); try{ const m=foldGet(); if(sec.classList.contains('closed')) m[sec.dataset.fold]=1; else delete m[sec.dataset.fold]; localStorage.setItem('demokit-folds',JSON.stringify(m)); }catch(err){} });
 document.querySelectorAll('#libModal .fold').forEach(applyFold);
+// una demo .js es código: la primera vez que se ejecuta una que no viene de las carpetas del repo se pide confirmación (se recuerda por contenido)
+function hashStr(t){ let h=2166136261>>>0; for(let i=0;i<t.length;i++){ h^=t.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return h.toString(36)+'.'+t.length.toString(36); }
+function demoOk(d){
+  if(d.trusted) return true; const h=hashStr(d.src); let L=[]; try{ L=JSON.parse(localStorage.getItem('demokit-trusted-demos')||'[]'); }catch(e){}
+  if(L.includes(h)){ d.trusted=true; return true; }
+  if(!trustCode('Demo «'+d.name+'» (no viene del repositorio)',((d.src.length/1024).toFixed(1))+' KB de código. Si aceptas, la recuerdo en este navegador y no vuelvo a preguntar por esta demo.')) return false;
+  d.trusted=true; L.push(h); try{ localStorage.setItem('demokit-trusted-demos',JSON.stringify(L.slice(-300))); }catch(e){} return true;
+}
 async function playDemo(d){
-  ac(); stop(); try{ $('stat').textContent='Renderizando demo…'; const fn=compileDemo(d.src,d.fn,sleep);
+  if(!demoOk(d)) return; ac(); stop(); try{ $('stat').textContent='Renderizando demo…'; const fn=compileDemo(d.src,d.fn,sleep);
     const out=await fn(SR,p=>prog(p)); d.out=out; prog(0); updateStat(); startPlayback(toAudioBuffer(out),0,false,false); }
   catch(e){ prog(0); updateStat(); console.error(e); toast('Error en la demo: '+e.message,'err'); }
 }
-async function demoWav(d){ if(!d.out){ try{ const fn=compileDemo(d.src,d.fn,sleep); d.out=await fn(SR,p=>prog(p)); prog(0); }catch(e){ prog(0); toast('Error: '+e.message,'err'); return; } } download(encodeWav(d.out.L,d.out.R,SR),d.name.replace(/\W+/g,'_')+'.wav'); }
+async function demoWav(d){ if(!d.out){ if(!demoOk(d)) return; try{ const fn=compileDemo(d.src,d.fn,sleep); d.out=await fn(SR,p=>prog(p)); prog(0); }catch(e){ prog(0); toast('Error: '+e.message,'err'); return; } } download(encodeWav(d.out.L,d.out.R,SR),d.name.replace(/\W+/g,'_')+'.wav'); }
 async function convertDemo(d){
   if(P.tracks.some(t=>t.notes.length)&&!confirm('Esto reemplaza el proyecto actual. ¿Continuar?')) return;
   const emb=embeddedProject(d.src); if(emb){ try{ loadProject(projectFromFile(emb,d.name)); populateAddInst(); closeModal('libModal'); toast('«'+d.name+'»: proyecto original recuperado sin pérdidas','ok'); }catch(e){ console.error(e); toast('No pude abrir el proyecto incrustado: '+e.message,'err'); } return; }
+  if(!demoOk(d)) return;
   try{ toast('Convirtiendo «'+d.name+'»…'); await tick(); const {project,stats,warnings}=await recordDemo(d.src,{name:d.name}); loadProject(project); closeModal('libModal'); if(warnings&&warnings.length) setTimeout(()=>toast('⚠ '+warnings.join(' '),'err'),300);
     toast('«'+d.name+'» convertida: '+stats.tracks+' pistas, '+stats.notes+' notas'+(stats.clips?(' y '+stats.clips+' clips horneados (add() en línea que no se puede parametrizar; para rehacerlo usa «Sub con caída» u otro instrumento)'):'')+'. Guarda el proyecto si quieres conservarlo.','ok'); }
   catch(e){ console.error(e); toast('No pude convertir: '+e.message,'err'); }
 }
 function renderLib(){
-  const dl=$('demoList'); dl.innerHTML=''; if(!demos.length) dl.append(el('div',{class:'hint',text:'Aún no hay demos. Suelta the_void.js o cotton_sugar.js arriba.'}));
+  const dl=$('demoList'); dl.innerHTML=''; if(!demos.length) dl.append(el('div',{class:'hint',text:'Aún no hay demos. Suelta un archivo .js arriba o cárgalo desde el repositorio.'}));
   for(const d of demos) dl.append(el('div',{class:'item'},el('div',{class:'nm'},el('b',{text:d.name}),el('small',{text:d.fn+'() · '+(d.src.length/1024).toFixed(1)+' KB'})),
     el('button',{class:'sm',text:'▶ Original',onclick:()=>playDemo(d)}),el('button',{class:'sm pri',text:'✎ Convertir en editable',onclick:()=>convertDemo(d)}),el('button',{class:'sm',text:'⬇ WAV',onclick:()=>demoWav(d)}),
     el('button',{class:'sm danger',text:'✕',onclick:()=>{ demos.splice(demos.indexOf(d),1); renderLib(); }})));
@@ -1851,9 +1910,9 @@ function startCalib(){
 }
 $('bCalib').onclick=startCalib;
 const recQ=()=>$('recQ').checked&&snap>0;
-function clickAt(t,accent){ const a=ctx,o=a.createOscillator(),g=a.createGain(); o.frequency.value=accent?1500:1000;
-  g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.35,t+.002); g.gain.exponentialRampToValueAtTime(.0001,t+.05);
-  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+.06); clickNodes.push(o); }
+function clickAt(t,accent,vol){ const a=ctx,o=a.createOscillator(),g=a.createGain(); o.frequency.value=accent?1500:1000;
+  g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(vol||.35,t+.002); g.gain.exponentialRampToValueAtTime(.0001,t+.05);
+  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+.06); clickNodes.push(o); o.onended=()=>{ const i=clickNodes.indexOf(o); if(i>=0) clickNodes.splice(i,1); }; }
 function recLen(o,raw){ if(o.one) return .25; return r6(recQ()?Math.max(snap,Math.round(raw/snap)*snap):Math.max(.0625,raw)); }
 function recOn(id,m,vel,tr){
   if(!rec.active) return; const raw=recBeat(); if(raw==null) return;                  // durante la cuenta previa no se graba
