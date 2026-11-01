@@ -1,6 +1,6 @@
 <div align="center">
 
-![Demo Kit — Make sound from code](assets/banner.png)
+![Demo Kit](assets/banner.png)
 
 # Demo Kit
 
@@ -8,6 +8,8 @@
 Un pequeño estudio de síntesis procedural que corre en el navegador: piano roll, capas, instrumentos parametrizables y plugins, todo sobre `demo_kit.js`.
 
 ### 🎹 [Abrir Demo Kit en el navegador](https://mialmoga.github.io/demo-kit/)
+
+![Make sound from code](assets/screenshoot.png)
 
 </div>
 
@@ -43,30 +45,53 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 ## Funciones
 
 - **Piano roll** con rejilla (1/4 a 1/32, tresillos o libre), zoom, notas fantasma de las otras pistas, selección múltiple, velocidad por nota y **deshacer/rehacer global** (notas, pistas, parámetros, efectos, master, BPM… hasta 100 pasos; los sliders y arrastres cuentan como un solo paso).
+
 - **Carpetas del repositorio:** en «Demos y plugins» aparece la sección **En el repositorio** con lo que haya en `demos/` (demos `.js`), `plugins/` (plugins `.js`), `proyectos/` o `projects/` (proyectos `.demokit.json`) y `project_examples/` (ejemplos). Cada archivo trae su botón **Cargar** / **Abrir** (y «Cargar todas» en demos). Si una carpeta no existe, el estudio te dice cómo se llama y que la crees junto a `index.html`: en cuanto pongas archivos ahí, aparecen solos. Cómo encuentra los archivos, en este orden: (1) un `manifest.json` dentro de la carpeta (una lista de nombres, p. ej. `["cancion.js","otra.js"]`); (2) la API de GitHub si está en GitHub Pages; (3) el listado de carpeta de un servidor local (`python3 -m http.server`). **Recomendado:** el repo trae un workflow (`.github/workflows/manifests.yml`) que, en cada push a esas carpetas, regenera solo el `manifest.json` de cada una; así el estudio nunca toca la API de GitHub (que limita a unas 60 consultas por hora) y funciona igual en cualquier hosting. No tienes que hacer nada más que subir tus archivos. Si el workflow no corre en tu fork, actívalo en la pestaña *Actions* o genera los manifest a mano con `node .github/scripts/gen-manifests.js`. Ojo: si existe un `manifest.json`, el estudio confía en él, así que si subes archivos sin que el workflow corra, no aparecerán hasta que se regenere. Abriendo el HTML como archivo (`file://`) un navegador no puede mirar carpetas y el estudio lo avisa. El código que cargues desde ahí pasa por la misma confirmación de seguridad que cualquier otro.
+  
 - **Compás:** selector junto a «Compases» (2/4, 3/4, 4/4, 5/4, 6/4, 7/4, 3/8, 5/8, 6/8, 7/8, 9/8, 12/8). Cambia las líneas de compás y la regla, el bucle, el conteo de compases, la cuenta previa de la grabación (un clic por tiempo del compás) y copiar/pegar por compases. El «pulso» sigue siendo la negra: 6/8 son 3 pulsos por compás y 7/8 son 3.5. Un compás por proyecto; los proyectos viejos abren como 4/4. En una demo `.js` exportada aparece como `// SIG = 3/4`.
+  
 - **Pista de tempo (♩ Tempo):** botón junto a «Compás». Abre un carril sobre el piano roll con la curva de tempo. El rombo del inicio es el BPM de arriba (arrástralo en vertical o cambia el número); **clic** = punto nuevo (horizontal = pulso, vertical = BPM), **arrastra** para moverlo, **doble clic o clic derecho** para quitarlo. Con un punto seleccionado puedes teclear su BPM exacto y marcar **«rampa hasta aquí»**: el tempo cambia gradualmente desde el punto anterior y llega a ese BPM en ese pulso (acelerando / ritardando); sin la marca salta de golpe. Todo sigue el tempo: notas, sidechain, automatización, el eco (delay), el cursor, la grabación y el bucle; el wobble de un bajo toma el tempo del inicio de cada nota. Cambiar el tempo vuelve a renderizar las pistas. Se guarda como `"tempo": [{"b":16,"bpm":90,"ramp":true}]` y la librería lo respeta.
+  
 - **Pistas / capas ilimitadas**, cada una con su instrumento, volumen, paneo, mute y solo.
+  
 - **Instrumentos base parametrizables** (cada uno con sus sliders):
   - *Melódicos:* Sinte genérico, Supersaw, Pluck, Arpegio cuadrado, Pad, Sub, Sub con caída, Reese, Growl, Campana, Chop vocal.
   - *Percusión y efectos:* Bombo, Caja, Palma, Chasquido, Hi-hat (cerrado/abierto), Crash, Riser, Barrido, Viento, Impacto, Rim.
+    
 - **Sidechain:** las pistas «ducked» (la música) bajan de volumen cada vez que suena una pista marcada como disparador (normalmente el bombo). Profundidad y relajación ajustables.
+  
 - **Efectos por pista:** *delay* (tiempo en negras/corcheas, repeticiones, tono, mezcla, ping-pong) y *reverb* (tamaño, amortiguación, mezcla, pre-delay). Se aplican sobre el audio ya renderizado de la pista, así que moverlos **no vuelve a renderizar el instrumento**. También suenan al tocar en vivo y en la vista previa.
+  
 - **Automatización por pista:** botón «📈 Automatización» bajo el piano roll. Curvas de **volumen**, **paneo** y **filtro** (pasa-bajos de 80 Hz a 18 kHz) con puntos en pulsos: clic = punto, arrastrar = mover (respeta la rejilla), doble clic o clic derecho = quitar, `Ctrl+Z` deshace. Se aplican al mezclar, después de los efectos, así que editarlas no vuelve a renderizar el instrumento. Se oyen al dar Play, en el WAV y en los stems; no al tocar en vivo.
+  
 - **Escalas y acordes:** elige tónica y escala (mayor, menor natural/armónica, pentatónicas, dórica, frigia, mixolidia, blues): el piano roll resalta las notas de la escala y la tónica. «Ajustar» mueve a la escala lo que dibujas. El selector **Acorde** (tríada, séptima, quinta, sus4, octava) hace que cada clic en el roll, cada tecla o cada nota MIDI suene y escriba el acorde completo, apilado sobre los grados de la escala si hay una elegida. La escala se guarda con el proyecto.
+  
 - **Teclado en pantalla** (🎹 Teclado): dos octavas para tocar con el ratón o el dedo, con los mismos acordes, grabación y efectos que el teclado de la compu. En pistas de percusión muestra un pad por carril.
+  
 - **Edición de notas:** transponer (±1, ±12), cuantizar inicios y largos a la rejilla, forzar a la escala, y copiar/pegar notas entre pistas (`Ctrl+C` / `Ctrl+V`, se pega en el cursor). Actúan sobre la selección, o sobre toda la pista si no hay. Todo se deshace con `Ctrl+Z`.
+  
 - **Carril de velocidad:** en el mismo carril de la automatización, «Velocidad de notas» muestra una barra por nota; arrástrala para cambiarla (si la nota está seleccionada, cambia toda la selección; si no, las notas que empiezan en ese pulso).
+  
 - **Master:** graves y agudos (shelves de ±12 dB en 120 Hz y 7 kHz), ganancia y limitador con anticipación y techo ajustable. Con todo neutro el sonido original queda intacto.
+  
 - **Tocar en vivo** la pista activa con el teclado de la compu o con un controlador MIDI, para afinar parámetros escuchando (ver [abajo](#tocar-en-vivo)).
+  
 - **Grabar lo que tocas** en el piano roll, con cuenta previa, cuantizado, bucle con overdub y un solo `Ctrl+Z` por toma (ver [abajo](#grabar-lo-que-tocas)).
+  
 - **Plugins:** instrumentos nuevos escritos en JavaScript, con editor integrado.
+  
 - **Demos editables:** convierte las demos del kit en proyectos con pistas y notas.
+  
 - **Pantalla activa** mientras suena (Wake Lock, con un video invisible de respaldo en navegadores que no lo soportan).
+  
 - **Render por pista con caché:** cada pista se renderiza sola y se guarda. Editar una pista solo vuelve a renderizar esa pista, y cambiar volumen, mute o solo no renderiza nada. Un Play tras un cambio pequeño tarda una fracción de segundo.
+  
 - **Exportación a WAV** (estéreo, 16 bits, 44.1 kHz) y **a stems**: un ZIP con un WAV por pista (incluidas las silenciadas), con los efectos de cada pista pero sin el master, para seguir mezclando en otro DAW. No hay exportación MIDI a propósito: el kit suena mejor que cualquier sinte MIDI genérico.
+  
 - **Guardar / cargar** proyectos `.demokit.json`.
+  
 - **Guardar compacto** («⬇ Compacto»): el mismo `.demokit.json` pero para producción: notas en arreglos, sin los parámetros que son los de fábrica. El ejemplo del estudio baja de 13.7 KB a 6 KB (≈1.3 KB con gzip). Al descargarlo muestra un **reporte de peso** y avisa si los clips horneados o los plugins lo inflan. Las notas se guardan con 5 decimales de pulso (error menor a 0.01 ms); «Guardar» normal conserva todo tal cual.
+  
 - **Exportar como demo `.js`** («⬇ Demo .js»): una demo autónoma, con la forma `async function renderXxx(sr, onProg)` y `BPM`/`BARS` en el encabezado, que lleva dentro el proyecto editable y el motor del estudio. Suena **igual** que en el estudio (la diferencia medida contra el render del estudio fue 0, con efectos, automatización y master) y solo necesita `demoKit`, como cualquier demo: sirve para cargarla en un juego como WAVESURFER. Al cargarla de nuevo en el estudio, «Convertir en editable» recupera el proyecto **sin pérdidas** (incluye plugins usados, automatización, efectos, escala y clips). Pesa unos 50 KB (el motor va incrustado); si el proyecto tiene clips horneados (como The Void convertida) pesa mucho más (≈13 MB).
 
 ## Controles
@@ -103,10 +128,15 @@ Q W E R T Y U I O P
 ```
 
 - **Octava:** `−` / `=` (o los botones de la barra). La octava base se muestra junto al botón.
+  
 - **Percusión:** en pistas de un solo carril (bombo, caja…) cualquier tecla del mapa lo dispara. En pistas de varios carriles (hi-hat: cerrado/abierto), las teclas `Z X C V B N M` son los carriles 1, 2, 3…
+  
 - **MIDI:** pulsa **🎛 MIDI**, acepta el permiso del navegador y elige la entrada. Soporta velocidad, pedal de sustain (CC64) y «all notes off». En percusión, un teclado MIDI usa las notas a partir de C1 (36), una por carril. Web MIDI funciona en Chrome, Edge y Opera; Firefox lo pide como permiso y Safari no lo tiene. Necesita HTTPS (GitHub Pages lo cumple) o `localhost`.
+
 - **Latencia:** cada nota se renderiza una vez y queda en caché; tocar es solo disparar un buffer ya listo. Al elegir una pista (o al soltar un slider) se precalientan en segundo plano las tres octavas del teclado. Una nota fuera de ese rango, o la primera tras cambiar un parámetro, tarda unos 10–50 ms en renderizarse.
+  
 - **Largo de las notas:** al tocar, cada nota dura como máximo ~2 s y, al soltar la tecla, tiene un fundido de salida de 90 ms. La percusión y los sonidos cortos suenan completos.
+  
 - Las teclas del modo **Tocar** no interfieren con los atajos de edición (todos usan `Ctrl`, flechas, `Supr`, `Espacio`…) y se desactivan solas mientras escribes en un campo de texto o hay una ventana abierta.
 
 ## Grabar lo que tocas
@@ -417,6 +447,8 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 
 **Demos (`demos/`)**
 
+<div align="center">
+  
 | Archivo | Autoría |
 |---|---|
 | `cotton_sugar_MK.js` | Ámbar |
@@ -445,3 +477,5 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 |---|---|
 | `la_casa_que_respira.demokit.json` | Ámbar |
 | `la_casa_que_respira_theremin.demokit.json` | Ámbar (misma pieza, con el plugin incrustado) |
+
+</div>
