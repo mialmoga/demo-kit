@@ -1563,7 +1563,8 @@ async function handleFiles(list){ for(const f of list) await ingest(f); }
 // ───────────── el repositorio: demos/, plugins/, proyectos/ y project_examples/ aparecen solos ─────────────
 // Funciona cuando el estudio se abre desde GitHub Pages o desde un servidor (python3 -m http.server): mira las carpetas junto a la página.
 // · GitHub Pages: pregunta a la API de GitHub qué hay en la carpeta (no hace falta ningún índice).
-// · Servidor local: lee el listado de la carpeta. · Cualquier hosting: acepta un manifest.json con la lista de nombres.
+// · Servidor local: lee el listado de la carpeta. · Cualquier hosting: acepta un manifest.json (en cada carpeta) con la lista de nombres;
+//   el workflow .github/workflows/manifests.yml lo regenera solo en cada push, y entonces no se toca la API.
 const REPO_GROUPS=[
   {id:'demos',title:'Demos',dirs:['demos'],ext:/\.js$/i,kind:'demo',what:'archivos .js de demos'},
   {id:'plugins',title:'Plugins de instrumento',dirs:['plugins'],ext:/\.js$/i,kind:'plugin',what:'archivos .js de plugins'},
@@ -1572,17 +1573,17 @@ const REPO_GROUPS=[
 const REPO_BASE=()=>new URL('.',location.href).href;
 async function fetchT(url,ms,opts){ const c=new AbortController(), t=setTimeout(()=>c.abort(),ms||8000); try{ return await fetch(url,Object.assign({signal:c.signal},opts||{})); } finally{ clearTimeout(t); } }
 function ghRepo(){ const h=location.hostname; if(!/\.github\.io$/i.test(h)) return null; const seg=location.pathname.split('/')[1]; return {owner:h.split('.')[0],repo:seg&&!seg.includes('.')?seg:h}; }
-async function listFolder(dir,ext){            // → {status:'ok'|'missing'|'error', files:[{name,url,size}], note}
-  const base=REPO_BASE(), gh=ghRepo(); let note='';
-  try{ const r=await fetchT(base+dir+'/manifest.json',5000); if(r.ok){ const j=await r.json(), arr=Array.isArray(j)?j:(j.files||[]); return {status:'ok',files:arr.map(x=>typeof x==='string'?x:x.name).filter(n=>ext.test(n)).map(n=>({name:n,url:base+dir+'/'+encodeURI(n)}))}; } }catch(e){}
+async function listFolder(dir,ext0){            // → {status:'ok'|'missing'|'error', files:[{name,url,size}], src:'manifest'|'api'|'listado', note}
+  const base=REPO_BASE(), gh=ghRepo(); let note=''; const ext={test:n=>ext0.test(n)&&!/(^|\/)manifest\.json$/i.test(n)};
+  try{ const r=await fetchT(base+dir+'/manifest.json',5000); if(r.ok){ const j=await r.json(), arr=Array.isArray(j)?j:(j.files||[]); return {status:'ok',src:'manifest',files:arr.map(x=>typeof x==='string'?x:x.name).filter(n=>ext.test(n)).map(n=>({name:n,url:base+dir+'/'+encodeURI(n)}))}; } }catch(e){}
   if(gh){ try{ const r=await fetchT('https://api.github.com/repos/'+gh.owner+'/'+gh.repo+'/contents/'+dir,8000,{headers:{Accept:'application/vnd.github+json'}});
       if(r.status===404) return {status:'missing',files:[]};
-      if(r.ok){ const j=await r.json(); if(Array.isArray(j)) return {status:'ok',files:j.filter(x=>x.type==='file'&&ext.test(x.name)).map(x=>({name:x.name,url:base+dir+'/'+encodeURI(x.name),size:x.size}))}; }
+      if(r.ok){ const j=await r.json(); if(Array.isArray(j)) return {status:'ok',src:'api',files:j.filter(x=>x.type==='file'&&ext.test(x.name)).map(x=>({name:x.name,url:base+dir+'/'+encodeURI(x.name),size:x.size}))}; }
       note=r.status===403||r.status===429?'GitHub limitó las consultas (reintenta en unos minutos)':'GitHub respondió '+r.status; }catch(e){ note='no pude hablar con GitHub'; } }
   try{ const r=await fetchT(base+dir+'/',6000); if(r.status===404) return {status:gh?'error':'missing',files:[],note};
     if(!r.ok) return {status:'error',files:[],note:note||('respondió '+r.status)};
     const html=await r.text(), files=[], seen=new Set(); for(const m of html.matchAll(/href="([^"#?]+)"/g)){ let n=m[1]; if(/^(\/|https?:|\.\.|mailto:)/i.test(n)||n.endsWith('/')) continue; try{ n=decodeURIComponent(n); }catch(e){} if(ext.test(n)&&!seen.has(n)){ seen.add(n); files.push({name:n,url:base+dir+'/'+encodeURI(n)}); } }
-    return {status:'ok',files}; }catch(e){ return {status:'error',files:[],note:note||'no pude leer la carpeta'}; }
+    return {status:'ok',src:'listado',files}; }catch(e){ return {status:'error',files:[],note:note||'no pude leer la carpeta'}; }
 }
 async function repoScan(force){
   if(location.protocol==='file:') return {offline:true};
@@ -1606,6 +1607,7 @@ async function renderRepo(force){
     else if(!files.length) sec.append(el('div',{class:'hint',text:'La carpeta «'+found[0].dir+'/» está vacía. Pon ahí tus '+g.what+'.'}));
     for(const f of files) sec.append(el('div',{class:'item'},el('div',{class:'nm'},el('b',{text:f.name}),el('small',{text:f.dir+'/'+(f.size?' · '+(f.size/1024).toFixed(1)+' KB':'')})),el('button',{class:'sm pri',text:g.kind==='project'?'Abrir':'Cargar',onclick:()=>repoLoad(g,f)})));
     box.append(sec); }
+  if(ghRepo()&&REPO_GROUPS.some(g=>(data[g.id]||[]).some(r=>r.src==='api'))) box.append(el('div',{class:'hint',text:'Estas listas salieron de la API de GitHub, que limita las consultas (unas 60 por hora). Para no depender de ella, activa el workflow que genera los manifest.json solo (mira «Carpetas del repositorio» en el README).'}));
 }
 $('repoRefresh').onclick=()=>renderRepo(true);
 async function playDemo(d){

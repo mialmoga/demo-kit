@@ -1,0 +1,45 @@
+# Mantiene al día los manifest.json de demos/, plugins/, proyectos/ y project_examples/.
+# Cada vez que subes, agregas o quitas archivos en esas carpetas, este workflow regenera
+# el manifest.json de cada una y lo guarda en el repo. El estudio lo lee primero y no
+# necesita consultar la API de GitHub (que limita a ~60 consultas por hora).
+name: Actualizar manifest.json
+
+on:
+  push:
+    paths:
+      - 'demos/**'
+      - 'plugins/**'
+      - 'proyectos/**'
+      - 'projects/**'
+      - 'project_examples/**'
+      - '.github/scripts/gen-manifests.js'
+  workflow_dispatch:        # también puedes lanzarlo a mano desde la pestaña Actions
+
+permissions:
+  contents: write           # para poder guardar los manifest.json
+
+concurrency:
+  group: manifests
+  cancel-in-progress: false
+
+jobs:
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Generar manifest.json
+        run: node .github/scripts/gen-manifests.js
+      - name: Guardar si cambió algo
+        run: |
+          if [ -n "$(git status --porcelain -- '*manifest.json')" ]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -- '*manifest.json'
+            git commit -m "Actualizar manifest.json de las carpetas"
+            git push
+          else
+            echo "Los manifest.json ya estaban al día."
+          fi
