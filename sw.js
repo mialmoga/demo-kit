@@ -1,7 +1,7 @@
 // Demo Kit · service worker
 // Para que la app instalada abra sin conexión. Solo la versión en línea (index.html) lo registra.
 // Sube VERSION cuando cambies index.html o los iconos, para que los usuarios reciban la versión nueva.
-const VERSION = 'dk-v1';
+const VERSION = 'dk-v1.1.0';
 const SHELL = ['./', './index.html', './favicon.ico', './site.webmanifest',
   './assets/android-chrome-192x192.png', './assets/android-chrome-512x512.png', './assets/logo.png', './assets/icon.png'];
 
