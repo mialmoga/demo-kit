@@ -39,7 +39,7 @@ button.danger:hover{border-color:var(--err);color:var(--err)}
 #fullscreen-btn {
     background: none;
     border: 1px solid transparent;
-    color: var(--text-secondary);
+    color: #ffd166;
     font-size: 14px;
     cursor: pointer;
     width: 34px;
@@ -53,8 +53,8 @@ button.danger:hover{border-color:var(--err);color:var(--err)}
 }
 #fullscreen-btn:hover {
     opacity: 1;
-    border-color: var(--border-color);
-    background: rgba(100,200,255,0.05);
+    border-color: #14161c;
+    background: #14161c;
 }
 /* Fullscreen siempre visible — en iOS abre en modo PWA */
 /* @media (max-width: 767px) {
@@ -2433,7 +2433,7 @@ if (fsBtn) {
     const updateFsIcon = () => {
         const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement);
         fsBtn.textContent = isFull ? '✕' : '⛶';
-        fsBtn.title = isFull ? t('tooltips.fullscreen_exit') : t('tooltips.fullscreen');
+        fsBtn.title = isFull ? 'Salir de pantalla completa' : 'Pantalla completa';
     };
     fsBtn.addEventListener('click', () => {
         const el = document.documentElement;
