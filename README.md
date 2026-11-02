@@ -1,15 +1,15 @@
 <div align="center">
 
-![Demo Kit](assets/banner.png)
+![Demo Kit — Make sound from code](assets/banner.png)
 
 # Demo Kit
 
 **Make sound from code.**
-Un pequeño estudio de síntesis procedural que corre en el navegador: piano roll, capas, instrumentos parametrizables y plugins, todo sobre `demo_kit.js`.
+Un pequeño estudio de síntesis procedural que corre en el navegador: piano roll, capas, instrumentos parametrizables, automatización, plugins (hasta una voz que canta la letra que escribas sobre las notas) y exportación a WAV, stems y MIDI, todo sobre `demo_kit.js`.
 
 ### 🎹 [Abrir Demo Kit en el navegador](https://mialmoga.github.io/demo-kit/)
 
-![Make sound from code](assets/screenshoot.png)
+![Demo Kit en acción](assets/screenshoot.png)
 
 </div>
 
@@ -17,82 +17,122 @@ Un pequeño estudio de síntesis procedural que corre en el navegador: piano rol
 
 ## Qué es
 
-Demo Kit es un DAW de juguete (pero poderoso) contenido en **un solo archivo HTML**, sin dependencias, sin servidor, sin archivos de audio. Todo el sonido se calcula muestra a muestra en JavaScript con el kit de síntesis `demo_kit.js` (que va incrustado), el mismo que genera las demos *The Void* y *Cotton Sugar*.
+Demo Kit es un DAW de juguete (pero poderoso) contenido en **un solo archivo HTML**, sin dependencias, sin servidor, sin archivos de audio. Todo el sonido se calcula muestra a muestra en JavaScript con el kit de síntesis `demo_kit.js` (que va incrustado), el mismo con el que están hechas las demos de la carpeta `demos/`.
 
-Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un proyecto editable** (pistas, notas y parámetros) para ver cómo está construida.
+Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un proyecto editable** (pistas, notas y parámetros) para ver cómo está construida. También funciona en el teléfono (hay una interfaz pensada para pantallas chicas) y se puede **instalar como app** desde el navegador (`site.webmanifest` y `sw.js`, solo en la versión en línea): una vez instalada o visitada, abre también sin conexión con lo que ya hayas cargado.
 
 ## Uso rápido
 
 1. Abre la versión en línea: **<https://mialmoga.github.io/demo-kit/>**. O descarga `demo_kit_studio.html` y ábrelo con doble clic (no necesita servidor; el favicon y las imágenes vienen de `favicon.ico` y `assets/`, así que sin ellos el HTML funciona igual pero sin iconos).
 2. «Demos y plugins» → «Cargar proyecto de ejemplo», y dale **Play**.
-3. O arrastra algún demo de la carpeta demos/ a la ventana y pulsa **«✎ Convertir en editable»**.
+3. O arrastra algún demo de la carpeta demos/ a la ventana y pulsa **«✎ Convertir en editable»**. También puedes abrir lo que hay en las carpetas del repositorio desde la sección **En el repositorio** (ver más abajo).
+4. Pulsa **?** (o `F1`) para ver la hoja de atajos y gestos.
 
-| Archivo | Demo | Función |
+| Archivo | Demo | Editable |
 |---|---|---|
-| `electronic_rush.js` | ⚡ Electronic Rush - Ws | `no editable`|
-| `the_void_MK.js` | 🕳️ The Void - Ws | `no editable` |
-| `cotton_sugar_MK.js` | 🍬 Cotton Sugar - Ws | `no editable` |
-| `event_horizon.js` | 🌑 Event Horizon - Ws | `renderVoidV2` |
-| `marshmallow_sky.js` | ☁️ Marshmallow Sky - Ws | `renderCottonV2` |
-| `dark_matter.js` | 🌌 Dark Matter - Ws | `renderDarkMatter` |
-| `yo_soy_nan.js` | ♾️ You Soy NaN (by Éter) | `renderYoSoyNaN` |
+| `electronic_rush.js` | ⚡ Electronic Rush - Ws | no |
+| `the_void_MK.js` | 🕳️ The Void - Ws | no |
+| `cotton_sugar_MK.js` | 🍬 Cotton Sugar - Ws | no |
+| `event_horizon.js` | 🌑 Event Horizon - Ws | sí |
+| `marshmallow_sky.js` | ☁️ Marshmallow Sky - Ws | sí |
+| `dark_matter.js` | 🌌 Dark Matter - Ws | sí |
+| `yo_soy_nan.js` | ♾️ You Soy NaN (by Éter) | sí |
+| `kinetic_drift.js` | Kinetic Drift (by Éter) | sí |
+| `neon_tidal.js` | Neon Tidal (by Velvet) | sí |
+| `phantom_minds_ear.js` | Phantom Mind's Ear (by Velvet) | sí |
 
-> las marcadas como no editables se pueden reproducir y exportar a .WAV usan un kit diferente que viene incrustado.
+> Las marcadas como no editables se pueden reproducir y exportar a .WAV, pero usan un kit diferente que viene incrustado.
 > Todas las marcadas - Ws forman parte del proyecto Wavesurfer  **<https://mialmoga.github.io/Wavesurfer/>**
+>
+> La carpeta `demos/` trae también `la_casa_que_respira`, `ejemplo_minimo` y `ejemplo_metrico`; la autoría de cada demo está en [Créditos](#créditos).
+
+**Aviso de seguridad al ejecutar demos:** la primera vez que reproduces o conviertes una demo `.js` que no viene del repositorio, el estudio te pregunta antes de ejecutarla (es código). Recuerda tu respuesta por contenido, así que no vuelve a preguntar por la misma demo.
 
 > El audio solo se genera cuando pulsas Play o WAV: Demo Kit renderiza el proyecto completo y luego lo reproduce. Si cambias algo, el indicador de arriba a la derecha muestra «cambios sin renderizar» y el siguiente Play vuelve a renderizar.
 
 ## Funciones
 
-- **Piano roll** con rejilla (1/4 a 1/32, tresillos o libre), zoom, notas fantasma de las otras pistas, selección múltiple, velocidad por nota y **deshacer/rehacer global** (notas, pistas, parámetros, efectos, master, BPM… hasta 100 pasos; los sliders y arrastres cuentan como un solo paso).
+- **Piano roll** con rejilla (1/4 a 1/32, tresillos o libre), zoom, notas fantasma de las otras pistas, selección múltiple, velocidad por nota y **deshacer/rehacer global** (notas, pistas, parámetros, efectos, master, BPM… hasta 100 pasos; los sliders y arrastres cuentan como un solo paso). Con el ratón, **clic derecho** sobre una nota la borra; en pantallas táctiles hay modos **Dibujar / Navegar / Borrar / Seleccionar**.
 
-- **Carpetas del repositorio:** en «Demos y plugins» aparece la sección **En el repositorio** con lo que haya en `demos/` (demos `.js`), `plugins/` (plugins `.js`), `proyectos/` o `projects/` (proyectos `.demokit.json`) y `project_examples/` (ejemplos). Cada archivo trae su botón **Cargar** / **Abrir** (y «Cargar todas» en demos). Si una carpeta no existe, el estudio te dice cómo se llama y que la crees junto a `index.html`: en cuanto pongas archivos ahí, aparecen solos. Cómo encuentra los archivos, en este orden: (1) un `manifest.json` dentro de la carpeta (una lista de nombres, p. ej. `["cancion.js","otra.js"]`); (2) la API de GitHub si está en GitHub Pages; (3) el listado de carpeta de un servidor local (`python3 -m http.server`). **Recomendado:** el repo trae un workflow (`.github/workflows/manifests.yml`) que, en cada push a esas carpetas, regenera solo el `manifest.json` de cada una; así el estudio nunca toca la API de GitHub (que limita a unas 60 consultas por hora) y funciona igual en cualquier hosting. No tienes que hacer nada más que subir tus archivos. Si el workflow no corre en tu fork, actívalo en la pestaña *Actions* o genera los manifest a mano con `node .github/scripts/gen-manifests.js`. Ojo: si existe un `manifest.json`, el estudio confía en él, así que si subes archivos sin que el workflow corra, no aparecerán hasta que se regenere. Abriendo el HTML como archivo (`file://`) un navegador no puede mirar carpetas y el estudio lo avisa. El código que cargues desde ahí pasa por la misma confirmación de seguridad que cualquier otro.
-  
-- **Compás:** selector junto a «Compases» (2/4, 3/4, 4/4, 5/4, 6/4, 7/4, 3/8, 5/8, 6/8, 7/8, 9/8, 12/8). Cambia las líneas de compás y la regla, el bucle, el conteo de compases, la cuenta previa de la grabación (un clic por tiempo del compás) y copiar/pegar por compases. El «pulso» sigue siendo la negra: 6/8 son 3 pulsos por compás y 7/8 son 3.5. Un compás por proyecto; los proyectos viejos abren como 4/4. En una demo `.js` exportada aparece como `// SIG = 3/4`.
-  
-- **Pista de tempo (♩ Tempo):** botón junto a «Compás». Abre un carril sobre el piano roll con la curva de tempo. El rombo del inicio es el BPM de arriba (arrástralo en vertical o cambia el número); **clic** = punto nuevo (horizontal = pulso, vertical = BPM), **arrastra** para moverlo, **doble clic o clic derecho** para quitarlo. Con un punto seleccionado puedes teclear su BPM exacto y marcar **«rampa hasta aquí»**: el tempo cambia gradualmente desde el punto anterior y llega a ese BPM en ese pulso (acelerando / ritardando); sin la marca salta de golpe. Todo sigue el tempo: notas, sidechain, automatización, el eco (delay), el cursor, la grabación y el bucle; el wobble de un bajo toma el tempo del inicio de cada nota. Cambiar el tempo vuelve a renderizar las pistas. Se guarda como `"tempo": [{"b":16,"bpm":90,"ramp":true}]` y la librería lo respeta.
-  
+- **Carpetas del repositorio:** en «Demos y plugins» aparece la sección **En el repositorio** con lo que haya en `demos/` (demos `.js`), `plugins/` (plugins `.js`), `proyectos/` o `projects/` (proyectos `.demokit.json`) y `project_examples/` (ejemplos). Cada archivo trae su botón **Cargar** / **Abrir** (y «Cargar todas» en demos).
+  - Si una carpeta no existe, el estudio te dice cómo se llama y que la crees junto a `index.html`: en cuanto pongas archivos ahí, aparecen solos.
+  - Cómo encuentra los archivos, en este orden: (1) un `manifest.json` dentro de la carpeta (una lista de nombres, p. ej. `["cancion.js","otra.js"]`); (2) la API de GitHub si está en GitHub Pages; (3) el listado de carpeta de un servidor local (`python3 -m http.server`).
+  - **Recomendado:** el repo trae un workflow (`.github/workflows/manifests.yml`) que, en cada push a esas carpetas, regenera solo el `manifest.json` de cada una. Así el estudio nunca toca la API de GitHub (que limita a unas 60 consultas por hora) y funciona igual en cualquier hosting. Si el workflow no corre en tu fork, actívalo en la pestaña *Actions* o genera los manifest a mano con `node .github/scripts/gen-manifests.js`.
+  - Ojo: si existe un `manifest.json`, el estudio confía en él; si subes archivos sin que el workflow corra, no aparecerán hasta que se regenere.
+  - Abriendo el HTML como archivo (`file://`) un navegador no puede mirar carpetas, y el estudio lo avisa. El código que cargues desde ahí pasa por la misma confirmación de seguridad que cualquier otro.
+
+- **Compás:** selector junto a «Compases» (2/4, 3/4, 4/4, 5/4, 6/4, 7/4, 3/8, 5/8, 6/8, 7/8, 9/8, 12/8).
+  - Cambia las líneas de compás y la regla, el bucle, el conteo de compases, el metrónomo, la cuenta previa de la grabación (un clic por tiempo del compás) y copiar/pegar por compases.
+  - El «pulso» sigue siendo la negra: 6/8 son 3 pulsos por compás y 7/8 son 3.5. El selector es el compás **inicial**; los proyectos viejos abren como 4/4.
+  - **Cambios a mitad de canción:** en la pista de tempo (siguiente punto), pestaña **Compás**: clic en un compás = cambio nuevo (con el compás elegido en el selector), arrastra para moverlo a otro compás, doble clic o clic derecho (o «Quitar cambio») para quitarlo.
+  - Los cambios solo caen en límites de compás y **las notas no se mueven** (siguen en pulsos): lo que cambia es dónde caen las barras. En una demo `.js` exportada aparece como `// SIG = 3/4`.
+
+- **Pista de tempo (♩ Tempo):** botón junto a «Compás». Abre un carril sobre el piano roll con dos pestañas, **BPM** y **Compás** (la que no está activa queda en transparencia). En la pestaña BPM está la curva de tempo.
+  - El rombo del inicio es el BPM de arriba (arrástralo en vertical o cambia el número). **Clic** = punto nuevo (horizontal = pulso, vertical = BPM), **arrastra** para moverlo, **doble clic o clic derecho** para quitarlo.
+  - Con un punto seleccionado puedes teclear su BPM exacto y marcar **«rampa hasta aquí»**: el tempo cambia gradualmente desde el punto anterior y llega a ese BPM en ese pulso (acelerando / ritardando); sin la marca salta de golpe.
+  - Todo sigue el tempo: notas, sidechain, automatización, el eco (delay), el cursor, la grabación y el bucle; el wobble de un bajo toma el tempo del inicio de cada nota. Cambiar el tempo vuelve a renderizar las pistas.
+  - Se guarda como `"tempo": [{"b":16,"bpm":90,"ramp":true}]` y la librería lo respeta.
+
 - **Pistas / capas ilimitadas**, cada una con su instrumento, volumen, paneo, mute y solo.
-  
-- **Instrumentos base parametrizables** (cada uno con sus sliders):
+
+- **Instrumentos base parametrizables** (cada uno con sus sliders; los plugins instalados se suman a esta lista):
   - *Melódicos:* Sinte genérico, Supersaw, Pluck, Arpegio cuadrado, Pad, Sub, Sub con caída, Reese, Growl, Campana, Chop vocal.
   - *Percusión y efectos:* Bombo, Caja, Palma, Chasquido, Hi-hat (cerrado/abierto), Crash, Riser, Barrido, Viento, Impacto, Rim.
-    
+
 - **Sidechain:** las pistas «ducked» (la música) bajan de volumen cada vez que suena una pista marcada como disparador (normalmente el bombo). Profundidad y relajación ajustables.
-  
+
 - **Efectos por pista:** *delay* (tiempo en negras/corcheas, repeticiones, tono, mezcla, ping-pong) y *reverb* (tamaño, amortiguación, mezcla, pre-delay). Se aplican sobre el audio ya renderizado de la pista, así que moverlos **no vuelve a renderizar el instrumento**. También suenan al tocar en vivo y en la vista previa.
-  
+
 - **Automatización por pista:** botón «📈 Automatización» bajo el piano roll. Curvas de **volumen**, **paneo** y **filtro** (pasa-bajos de 80 Hz a 18 kHz) con puntos en pulsos: clic = punto, arrastrar = mover (respeta la rejilla), doble clic o clic derecho = quitar, `Ctrl+Z` deshace. Se aplican al mezclar, después de los efectos, así que editarlas no vuelve a renderizar el instrumento. Se oyen al dar Play, en el WAV y en los stems; no al tocar en vivo.
-  
+
+- **Parámetros del instrumento automatizables:** en el mismo selector del carril aparecen también los parámetros del instrumento de la pista (cutoff, índice FM, lo que tenga).
+  - Estas curvas **escalonan**: el valor se toma al inicio de cada nota y se reparte en **8 niveles** (o **16**, con el selector «niveles»). El sonido por nota queda un poco «artificial» a propósito, como una característica.
+  - Un parámetro fijado a mano en una nota (punto blanco) tiene prioridad sobre la curva. Cambiarlas vuelve a renderizar solo esa pista.
+
+- **Hornear barrido** (solo con parámetros automatizados): si quieres que el parámetro se mueva de forma **continua dentro de cada nota**, el botón «Hornear barrido» renderiza la nota seleccionada (o toda la pista) varias veces con el valor en distintos puntos y las funde.
+  - Es caro, así que solo ocurre al pulsarlo. Las notas horneadas pasan a una pista «<nombre> · bake» (con audio estéreo guardado en el proyecto, que pesa), y las notas idénticas comparten el mismo clip.
+  - **Deshornear** (con la pista bake seleccionada) las devuelve a su pista original, o `Ctrl+Z`.
+
 - **Escalas y acordes:** elige tónica y escala (mayor, menor natural/armónica, pentatónicas, dórica, frigia, mixolidia, blues): el piano roll resalta las notas de la escala y la tónica. «Ajustar» mueve a la escala lo que dibujas. El selector **Acorde** (tríada, séptima, quinta, sus4, octava) hace que cada clic en el roll, cada tecla o cada nota MIDI suene y escriba el acorde completo, apilado sobre los grados de la escala si hay una elegida. La escala se guarda con el proyecto.
-  
+
 - **Teclado en pantalla** (🎹 Teclado): dos octavas para tocar con el ratón o el dedo, con los mismos acordes, grabación y efectos que el teclado de la compu. En pistas de percusión muestra un pad por carril.
-  
+
 - **Edición de notas:** transponer (±1, ±12), cuantizar inicios y largos a la rejilla, forzar a la escala, y copiar/pegar notas entre pistas (`Ctrl+C` / `Ctrl+V`, se pega en el cursor). Actúan sobre la selección, o sobre toda la pista si no hay. Todo se deshace con `Ctrl+Z`.
-  
+
 - **Carril de velocidad:** en el mismo carril de la automatización, «Velocidad de notas» muestra una barra por nota; arrástrala para cambiarla (si la nota está seleccionada, cambia toda la selección; si no, las notas que empiezan en ese pulso).
-  
+
 - **Master:** graves y agudos (shelves de ±12 dB en 120 Hz y 7 kHz), ganancia y limitador con anticipación y techo ajustable. Con todo neutro el sonido original queda intacto.
-  
+
 - **Tocar en vivo** la pista activa con el teclado de la compu o con un controlador MIDI, para afinar parámetros escuchando (ver [abajo](#tocar-en-vivo)).
-  
+
 - **Grabar lo que tocas** en el piano roll, con cuenta previa, cuantizado, bucle con overdub y un solo `Ctrl+Z` por toma (ver [abajo](#grabar-lo-que-tocas)).
-  
-- **Plugins:** instrumentos nuevos escritos en JavaScript, con editor integrado.
-  
+
+- **Plugins:** instrumentos nuevos escritos en JavaScript, con editor integrado. Si una demo `.js` repite funciones auxiliares (`clack`, `sub`, `ping`…), la conversión las convierte **automáticamente en plugins** (verificados contra el audio original, con plan B a clips): Event Horizon pasó de 284 clips a ninguno y de ~11 MB a ~140 KB.
+
+- **Voz cantada (plugin `automata_vocal.js`):** un sintetizador de formantes en español. Escribes una sílaba o palabra sobre cada nota y la voz la canta con el tono de la nota (ver [Letra sobre las notas](#letra-sobre-las-notas-voz-cantada)).
+
 - **Demos editables:** convierte las demos del kit en proyectos con pistas y notas.
-  
+
 - **Pantalla activa** mientras suena (Wake Lock, con un video invisible de respaldo en navegadores que no lo soportan).
-  
+
 - **Render por pista con caché:** cada pista se renderiza sola y se guarda. Editar una pista solo vuelve a renderizar esa pista, y cambiar volumen, mute o solo no renderiza nada. Un Play tras un cambio pequeño tarda una fracción de segundo.
-  
-- **Exportación a WAV** (estéreo, 16 bits, 44.1 kHz) y **a stems**: un ZIP con un WAV por pista (incluidas las silenciadas), con los efectos de cada pista pero sin el master, para seguir mezclando en otro DAW. No hay exportación MIDI a propósito: el kit suena mejor que cualquier sinte MIDI genérico.
-  
-- **Guardar / cargar** proyectos `.demokit.json`.
-  
-- **Guardar compacto** («⬇ Compacto»): el mismo `.demokit.json` pero para producción: notas en arreglos, sin los parámetros que son los de fábrica. El ejemplo del estudio baja de 13.7 KB a 6 KB (≈1.3 KB con gzip). Al descargarlo muestra un **reporte de peso** y avisa si los clips horneados o los plugins lo inflan. Las notas se guardan con 5 decimales de pulso (error menor a 0.01 ms); «Guardar» normal conserva todo tal cual.
-  
-- **Exportar como demo `.js`** («⬇ Demo .js»): una demo autónoma, con la forma `async function renderXxx(sr, onProg)` y `BPM`/`BARS` en el encabezado, que lleva dentro el proyecto editable y el motor del estudio. Suena **igual** que en el estudio (la diferencia medida contra el render del estudio fue 0, con efectos, automatización y master) y solo necesita `demoKit`, como cualquier demo: sirve para cargarla en un juego como WAVESURFER. Al cargarla de nuevo en el estudio, «Convertir en editable» recupera el proyecto **sin pérdidas** (incluye plugins usados, automatización, efectos, escala y clips). Pesa unos 50 KB (el motor va incrustado); si el proyecto tiene clips horneados (como The Void convertida) pesa mucho más (≈13 MB).
+
+- **Exportación a WAV** (estéreo, 16 bits, 44.1 kHz) y **a stems**: un ZIP con un WAV por pista (incluidas las silenciadas), con los efectos de cada pista pero sin el master, para seguir mezclando en otro DAW.
+
+- **MIDI:** «⬇ MIDI» descarga un `.mid` con una pista por pista, más tempo, compás (con sus cambios), volumen y paneo (las pistas silenciadas salen con volumen 0; la automatización no se exporta). **Cargar archivos** acepta `.mid`/`.midi` y lo abre como **proyecto nuevo** (con los cambios de tempo y de compás que traiga; si un cambio de compás no cae en límite de compás, se ajusta y se avisa). Es para llevar las notas a otro programa y de vuelta: el sonido de Demo Kit no viaja en el MIDI.
+
+- **Metrónomo:** casilla «metrónomo» en la cabecera; sigue el compás y el mapa de tempo, y suena también al grabar.
+
+- **Guardar / cargar** proyectos `.demokit.json`. También hay autoguardado en el navegador (salvo en proyectos con clips horneados).
+
+- **Guardar compacto** («⬇ Compacto»): el mismo `.demokit.json` pero para producción: notas en arreglos, sin los parámetros que son los de fábrica.
+  - El ejemplo del estudio baja de 13.7 KB a 6 KB (≈1.3 KB con gzip). Al descargarlo muestra un **reporte de peso** y avisa si los clips horneados o los plugins lo inflan.
+  - Las notas se guardan con 5 decimales de pulso (error menor a 0.01 ms); «Guardar» normal conserva todo tal cual.
+
+- **Exportar como demo `.js`** («⬇ Demo .js»): una demo autónoma, con la forma `async function renderXxx(sr, onProg)` y `BPM`/`BARS` en el encabezado, que lleva dentro el proyecto editable y el motor del estudio.
+  - Suena **igual** que en el estudio (la diferencia medida contra el render del estudio fue 0, con efectos, automatización y master) y solo necesita `demoKit`, como cualquier demo: sirve para cargarla en un juego como WAVESURFER.
+  - Al cargarla de nuevo en el estudio, «Convertir en editable» recupera el proyecto **sin pérdidas** (incluye plugins usados, automatización, efectos, escala y clips).
+  - Pesa unos 50 KB (el motor va incrustado); si el proyecto tiene clips horneados pesa mucho más.
 
 ## Controles
 
@@ -103,7 +143,8 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 | Cambiar el largo | arrastrar el borde derecho de la nota |
 | Mover | arrastrar la nota (también vertical para cambiar el tono) |
 | Seleccionar varias | `Shift` + arrastrar un recuadro, o `Shift` + clic |
-| Borrar | `Supr` / `Retroceso`, clic derecho sobre la nota, o modo «Borrar» |
+| Borrar | `Supr` / `Retroceso`, clic derecho sobre la nota, el botón 🗑 de la selección, o modo «Borrar» |
+| Escribir la letra de una nota (pistas de voz) | doble clic / doble toque, mantener pulsada la nota, `Intro` con la nota seleccionada, o el botón «✎ Letra» |
 | Duplicar selección | `Ctrl/⌘ + D` |
 | Seleccionar todo | `Ctrl/⌘ + A` |
 | Deshacer / rehacer | `Ctrl/⌘ + Z` / `Ctrl/⌘ + Shift + Z` o `Ctrl + Y` (también los botones ↶ ↷ de la barra) |
@@ -113,7 +154,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 | Zoom | botones ＋ / −, o `Ctrl` + rueda |
 | Escuchar una tecla | clic en el teclado de la izquierda |
 
-En pantallas táctiles hay un modo **✋ Navegar** para desplazarse con el dedo sin dibujar notas.
+El modo **✋ Navegar** sirve para desplazarse sin dibujar notas: con el dedo en pantallas táctiles, o arrastrando con el ratón. `F1` o el botón **?** abren la hoja completa de atajos y gestos. En pantallas chicas la cabecera se pliega, los botones de modo y deshacer quedan junto a la regla y los controles menos usados (rejilla, tocar, escala, acorde, teclado) viven bajo el botón **⋯**.
 
 ## Tocar en vivo
 
@@ -128,15 +169,10 @@ Q W E R T Y U I O P
 ```
 
 - **Octava:** `−` / `=` (o los botones de la barra). La octava base se muestra junto al botón.
-  
 - **Percusión:** en pistas de un solo carril (bombo, caja…) cualquier tecla del mapa lo dispara. En pistas de varios carriles (hi-hat: cerrado/abierto), las teclas `Z X C V B N M` son los carriles 1, 2, 3…
-  
 - **MIDI:** pulsa **🎛 MIDI**, acepta el permiso del navegador y elige la entrada. Soporta velocidad, pedal de sustain (CC64) y «all notes off». En percusión, un teclado MIDI usa las notas a partir de C1 (36), una por carril. Web MIDI funciona en Chrome, Edge y Opera; Firefox lo pide como permiso y Safari no lo tiene. Necesita HTTPS (GitHub Pages lo cumple) o `localhost`.
-
 - **Latencia:** cada nota se renderiza una vez y queda en caché; tocar es solo disparar un buffer ya listo. Al elegir una pista (o al soltar un slider) se precalientan en segundo plano las tres octavas del teclado. Una nota fuera de ese rango, o la primera tras cambiar un parámetro, tarda unos 10–50 ms en renderizarse.
-  
 - **Largo de las notas:** al tocar, cada nota dura como máximo ~2 s y, al soltar la tecla, tiene un fundido de salida de 90 ms. La percusión y los sonidos cortos suenan completos.
-  
 - Las teclas del modo **Tocar** no interfieren con los atajos de edición (todos usan `Ctrl`, flechas, `Supr`, `Espacio`…) y se desactivan solas mientras escribes en un campo de texto o hay una ventana abierta.
 
 ## Grabar lo que tocas
@@ -168,19 +204,20 @@ Resultado actual con las demos incluidas:
 | Demo | Pistas | Notas | Clips horneados |
 |---|---|---|---|
 | Marshmallow Sky | 15 | 1928 | 0 |
-| Dark Matter | 17 | 1693 | 58 |
-| Event Horizon | 21 | 1288 | 284 |
+| Dark Matter | 17 | 1693 | 8 |
+| Event Horizon | 21 | 1288 | 0 (los 284 clips son ahora plugins automáticos) |
 | Yo soy NaN | 11 | 322 | 0 |
 | Ejemplo mínimo | 5 | 72 | 0 |
 
-Las demos `_MK`, Electronic Rush y cualquier demo que traiga su propio kit no se convierten (suenan y exportan a WAV, pero no son editables).
+Electronic Rush y cualquier demo que traiga su propio kit no se convierten (suenan y exportan a WAV, pero no son editables).
 
 Límites a tener en cuenta:
 
 - **No es idéntica muestra por muestra.** Las fases iniciales de los osciladores y el ruido salen de un generador que cambia con el orden de las llamadas. La energía por segundo coincide (diferencia media de ~3 % en Cotton Sugar y ~1 % en The Void), pero no son bit a bit iguales.
-- Los `add()` con funciones propias que no se pueden parametrizar (el sub del drop de The Void, por ejemplo) quedan como pista **«Clip»** con audio horneado. Funcionan, pero no son editables, y hacen que el proyecto guardado pese más (≈ 9 MB en The Void). Rehacer esa pista con un instrumento como «Sub con caída» la vuelve editable.
+- Los `add()` sueltos con funciones propias que no se pueden parametrizar quedan como pista **«Clip»** con audio horneado (Dark Matter conserva 8). Funcionan, pero no son editables, y hacen que el proyecto guardado pese más. Rehacer esa pista con un instrumento como «Sub con caída» la vuelve editable.
+- Las **funciones auxiliares** que la demo llama dos o más veces (`clack`, `sub`, `tail`, `tom`, `ping`, `rev`…) se convierten en **plugins automáticos** (`auto-<demo>-<función>`), verificados contra el audio horneado; si no pasan la verificación, se usan clips como respaldo. Las que dependen de ruido quedan equivalentes en energía (±0.5 dB por ventana de 50 ms), no idénticas.
 - Los ajustes que cambian nota por nota (un filtro que se abre a lo largo de una sección, por ejemplo) se conservan por nota y se marcan con un punto blanco; hay un botón para unificarlos con los controles de la pista.
-- La conversión reconoce funciones auxiliares conocidas (`reese`, `growl`, `rim`, `wash`, `impact`) por su nombre. Una demo con helpers nuevos los trata como `add()` horneados.
+- La conversión reconoce funciones auxiliares conocidas (`reese`, `growl`, `rim`, `wash`, `impact`) por su nombre, y construye plugins para las demás que se repiten.
 
 ## Escribir demos compatibles (para humanos e IAs)
 
@@ -215,7 +252,7 @@ async function renderLoQueSea(sr, onProg) {
 }
 ```
 
-**Demos hechas con `make_kit.js`** (`makeKit(sr,BPM,BARS,tail,seed)`): el estudio y la librería las ejecutan y convierten solas, sustituyendo `makeKit` por un adaptador sobre `demoKit.metric` (el audio sale idéntico). El `reese` de 4 sierras y la campana en línea de esas demos se reconocen como «Reese 4 sierras (MK)» y «Campana (MK)».
+**Demos hechas con `make_kit.js`** (`makeKit(sr,BPM,BARS,tail,seed)`, como `the_void_MK.js` y `cotton_sugar_MK.js`): el estudio y la librería las ejecutan y convierten solas, sustituyendo `makeKit` por un adaptador sobre `demoKit.metric` (el audio sale idéntico). El `reese` de 4 sierras y la campana en línea de esas demos se reconocen como «Reese 4 sierras (MK)» y «Campana (MK)».
 
 **Qué se convierte en notas editables**
 
@@ -295,14 +332,17 @@ registerInstrument({
 |---|---|
 | `name`, `id` | nombre visible; `id` opcional (por defecto sale del nombre) |
 | `kind` | `'melodic'` o `'perc'` |
-| `params` | lista de controles; aparecen como sliders en el inspector. Tipos: número (`min`, `max`, `step`, `def`) y `type:'choice'` con `opts` y `vals` |
+| `params` | lista de controles; aparecen como sliders en el inspector. Tipos: número (`min`, `max`, `step`, `def`), `type:'choice'` con `opts` y `vals`, y `type:'text'` (cuadro de texto) |
 | `lanes` | solo `perc`: carriles del piano roll (`[{name:'Cerrado'},{name:'Abierto'}]`) |
 | `oneShot` | las notas se dibujan cortas (sonidos que no dependen del largo) |
 | `play(K, n)` | se llama una vez por nota |
+| `lyrics` | `true` = el piano roll deja escribir una palabra sobre cada nota (llega en `n.note.w`) |
+| `noteParams` | lista de claves de `params` que se ajustan **por nota** con sliders propios en «Notas» (guardadas en `o` de cada nota) |
+| `presets`, `syllables` | opcionales: un objeto `{nombre: {param: valor}}` para el selector «Preajuste», y una función `texto → [sílabas]` para «Pegar letra…» |
 
 **`n` (la nota)**
 
-`t` (segundo de inicio) · `len` (segundos) · `midi` · `hz` · `lane` · `a` (amplitud: velocidad × volumen de pista) · `pan` · `p` (parámetros de la pista) · `buf` (canal destino) · `bpm` · `beat` · `bar` · `sr` · `note` · `clips`.
+`t` (segundo de inicio) · `len` (segundos) · `midi` · `hz` · `lane` · `a` (amplitud: velocidad × volumen de pista) · `pan` · `p` (parámetros de la pista, ya con los valores propios de la nota y la automatización aplicados) · `buf` (canal destino) · `bpm` · `beat` · `bar` · `sr` · `note` · `clips`.
 
 `n.buf` apunta a `K.mu` (música, con sidechain) o `K.dr` (batería, sin él) según la casilla «Ducked» de la pista.
 
@@ -325,11 +365,21 @@ K.rnd()   K.hz(midi)   K.lpc(fc)
 - Los plugins se guardan en el navegador (`localStorage`), se pueden descargar como `.js` y se cargan arrastrándolos a la ventana. Si un proyecto usa un plugin, el plugin va incluido en el `.demokit.json`.
 - Si cargas **tu propio `demo_kit.js`** (con funciones nuevas), los instrumentos y plugins lo usan desde ese momento: lo que agregues a `K` queda disponible para los plugins.
 
+## Letra sobre las notas (voz cantada)
+
+El plugin [`plugins/automata_vocal.js`](plugins/automata_vocal.js) («Voz cantada (Autómata)») es el sintetizador de voz robótica en español *Autómata Vocal* convertido en instrumento: conversión del texto a fonemas, silabeo, formantes y un modelo glotal con «ADN» de voz. Cárgalo desde **En el repositorio → plugins** (o arrástralo a la ventana) y añade una pista con ese instrumento.
+
+- **Escribir la letra:** doble clic o doble toque sobre una nota, mantenerla pulsada, `Intro` con una nota seleccionada, o el botón **✎ Letra**. Aparece un cuadro sobre la nota; la palabra se dibuja encima de la barra y se guarda en el proyecto. Cada nota canta lo que lleva escrito, repartiendo sus sílabas dentro de su duración, con el tono de la nota.
+- **Saltar a la siguiente nota mientras escribes:** `Espacio`, guion `-` o `Tab` confirman la palabra y pasan a la siguiente nota (en el teclado de Android también funciona el `Espacio`). `Shift+Tab` o `Retroceso` con el cuadro vacío vuelven a la anterior; `Intro` cierra; `Esc` cancela. Un `Espacio` sin escribir nada salta la nota sin cambiarla. Si pegas varias palabras de golpe, se reparten una por nota. Una sesión de escritura es un solo paso de deshacer.
+- **Pegar letra…** (en el inspector): partes un texto en sílabas y se reparte una por nota, en orden de tiempo, desde la nota seleccionada. **Borrar letra** quita todas las palabras de la pista.
+- **Por nota: Energía, Sorpresa y Cansancio** (sliders en «Notas», para las notas seleccionadas o todas si no hay selección): energía = brillo y volumen, sorpresa = inflexión de tono al entrar y al terminar, cansancio = caída de tono, más aire y menos vibrato. Los demás controles (género, tono, formantes, aspereza, aire, vibrato, timbre, agua, coro de 1 a 4 voces, ADN…) son de la pista, con **preajustes** Robot, Neutra, Grave, Aguda y Hueca.
+- **Límites:** cada nota es una voz independiente (no hay portamento entre notas); no hay modo hablado aparte (para una voz plana, deja Sorpresa y Cansancio en 0 y el vibrato bajo, con notas largas del mismo tono), y las voces guardadas en el `localStorage` del Autómata original no se importan.
+
 ## Extender el kit
 
 El kit (`demo_kit.js`) es solo una función `demoKit(sr, segundos, semilla)` que devuelve un objeto con herramientas. Puedes escribir **tu propia versión con funciones nuevas** y usarla sin tocar el HTML:
 
-- **En el estudio:** suelta tu `demo_kit.js` en «Demos y plugins» (te pide confirmación, porque es código). Desde ese momento los instrumentos y los plugins usan tu kit y pueden llamar a tus funciones desde `K`. El botón **«Volver al kit incluido»** lo quita; al recargar la página también vuelve el incluido.
+- **En el estudio:** suelta tu `demo_kit.js` en «Demos y plugins» (te pide confirmación, porque es código). Desde ese momento los instrumentos y los plugins usan tu kit y pueden llamar a tus funciones desde `K`, y el navegador lo recuerda entre visitas. El botón **«Volver al kit incluido»** lo quita.
 - **En la librería:** `DemoKit.setKit(miDemoKit)` antes de `DemoKit.load(...)`.
 
 **Cómo escribirlo.** Parte de una copia de [`kits/demo_kit.js`](kits/demo_kit.js) (o de la [versión comentada](kits/demo_kit_comentado.js), que explica cada pieza), agrega tus funciones dentro de `demoKit` y devuélvelas en el objeto final:
@@ -346,13 +396,13 @@ function demoKit(sr, seconds, seed0) {
 **Lo mínimo:** tu función debe llamarse `demoKit`, aceptar `(sr, seconds, seed)` y devolver al menos `syn` y `mix` (el estudio lo comprueba al cargarlo). Conserva las funciones originales tal cual: si cambias su sonido, las canciones ya hechas sonarán distinto.
 
 **Límites a tener presentes**
-- El kit cargado dura **la sesión**: no se guarda entre visitas, y un proyecto no recuerda con qué kit se hizo (solo guarda la versión del formato). Si abres un proyecto o un plugin que dependa de tus funciones sin cargar antes tu kit, fallará o sonará distinto.
+- El kit cargado en el estudio **se recuerda en el navegador** hasta que pulses «Volver al kit incluido» (si el kit guardado ya no carga, vuelve el incluido). Un proyecto no recuerda con qué kit se hizo (solo guarda la versión del formato). Si abres un proyecto o un plugin que dependa de tus funciones sin cargar antes tu kit, fallará o sonará distinto.
 - Al **convertir una demo** en proyecto, solo se registran las funciones conocidas del kit. Si la demo llama a una función tuya, el estudio lo avisa («funciones de un kit propio que el conversor no conoce»): el sonido no entra en el proyecto. Para que sea editable, hazla un **plugin** (instrumento con parámetros) que use tus funciones.
 - Cambiar de kit invalida solo la caché de render del estudio; los proyectos guardados no se tocan.
 
 ## Usar la música en otros proyectos (librería) lib/
 
-`demokit.min.js` (≈29 KB, ≈12 KB con gzip; `demokit.js` es la versión legible) es el kit, el motor y un reproductor, **sin interfaz**. Carga canciones `.demokit.json` (las del estudio) **o** demos `.js` escritas a mano, las sintetiza en el momento y las reproduce con Web Audio. No hay muestras: la canción es solo código o datos.
+`demokit.min.js` (≈39 KB, ≈16 KB con gzip; `demokit.js` es la versión legible, v1.4) es el kit, el motor y un reproductor, **sin interfaz**. Carga canciones `.demokit.json` (las del estudio) **o** demos `.js` escritas a mano, las sintetiza en el momento y las reproduce con Web Audio. No hay muestras: la canción es solo código o datos.
 
 ```html
 <script src="demokit.min.js"></script>
@@ -368,7 +418,7 @@ function demoKit(sr, seconds, seed0) {
 
 | | |
 |---|---|
-| `DemoKit.load(fuente, opciones)` | `fuente`: URL, texto del archivo u objeto de proyecto. `opciones`: `onProgress(p)`, `allowPlugins`, `cache` (activa por defecto) |
+| `DemoKit.load(fuente, opciones)` | `fuente`: URL, texto del archivo u objeto de proyecto (con parámetros automatizados, clips horneados, cambios de tempo y de compás; todo se respeta). `opciones`: `onProgress(p)`, `allowPlugins`, `cache` (activa por defecto) |
 | `song.play({loop, volume, fadeIn, offset, loopStart, loopEnd})` | devuelve un manejador: `stop(fundido)`, `setVolume(v, fundido)`, `ended` (promesa) |
 | `song.stop(fundido)` | detiene todas las reproducciones de esa canción |
 | `song.L`, `song.R`, `song.duration`, `song.bpm`, `song.bars`, `song.name`, `song.warnings` | el audio (Float32Array a 44.1 kHz) y sus datos |
@@ -384,7 +434,8 @@ function demoKit(sr, seconds, seed0) {
 - **Plugins:** el código de plugins que traiga un `.demokit.json` **no se ejecuta** salvo que pases `allowPlugins: true` (esas pistas se omiten y aparece un aviso en `song.warnings`). Las demos `.js` sí ejecutan su código: cárgalas solo si son tuyas o confías en ellas.
 - **Cualquier demo con `async function render…(sr, onProg)` suena**, aunque no use `demoKit` (por ejemplo Electronic Rush, que lo trae todo integrado); solo las que usan las funciones del kit se pueden convertir en proyecto editable.
 - La librería se genera con `build_lib.py` a partir de los mismos archivos del estudio, para que suenen idéntico.
-- `ejemplo/libreria.html` es una página mínima que carga y toca las demos de `demos/`. Necesita un servidor (por ejemplo `python3 -m http.server` desde la raíz del repo), porque usa `fetch`.
+- `ejemplo/libreria.html` es una página mínima que carga y toca las demos de `demos/`, y `ejemplo/exportado.js` es un ejemplo de demo exportada desde el estudio. Necesitan un servidor (por ejemplo `python3 -m http.server` desde la raíz del repo), porque usan `fetch`.
+- Los plugins que traiga un proyecto (incluida la voz cantada) solo suenan con `allowPlugins: true`.
 
 ## Formato de proyecto (`.demokit.json`)
 
@@ -392,23 +443,26 @@ function demoKit(sr, seconds, seed0) {
 {
   "format": "demokit-studio", "v": 1, "kit": 1,
   "name": "...", "bpm": 128, "bars": 8, "seed": 20261015,
-  "sig": [3, 4],            // compás (solo si no es 4/4); el pulso del proyecto es la negra
+  "sig": [3, 4],            // compás inicial (solo si no es 4/4); el pulso del proyecto es la negra
+  "sigs": [{"bar": 8, "sig": [6, 8]}],   // cambios de compás (opcional); "bar" cuenta desde 0 (8 = el compás 9)
   "tempo": [{"b": 16, "bpm": 90, "ramp": true}],   // cambios de tempo (opcional); "bpm" de arriba es el tempo inicial
   "sc": { "mode": "param|table", "depth": 0.7, "rel": 0.12, "rate": 800, "table": "<base64>" },
   "tracks": [{
     "name": "Bajo", "inst": "subfall", "vol": 1, "pan": 0,
     "mute": false, "solo": false, "ducked": true, "sc": false,
     "params": { "gain": 0.45, "decay": 0.9 },
-    "notes": [{ "b": 0, "l": 3.6, "m": 36, "v": 1, "pan": 0, "o": {} }]
+    "notes": [{ "b": 0, "l": 3.6, "m": 36, "v": 1, "pan": 0, "o": {}, "w": "la" }],
+    "auto": { "vol": [{"b": 0, "v": 1}], "p:cutoff": [{"b": 4, "v": 800}] },   // opcional: curvas; «p:<parámetro>» = parámetro del instrumento
+    "alv": 16                                    // opcional: niveles de las curvas de parámetro (8 por defecto)
   }],
   "clips": { "c1": "<base64 int16>" },
   "plugins": [{ "id": "...", "name": "...", "code": "..." }]
 }
 ```
 
-`b` = pulso de inicio, `l` = largo en pulsos, `m` = nota MIDI (en percusión, el carril), `v` = velocidad, `o` = parámetros propios de esa nota. `kit` es la versión del kit con que se guardó (si no coincide, la librería avisa en `song.warnings`).
+`b` = pulso de inicio, `l` = largo en pulsos, `m` = nota MIDI (en percusión, el carril), `v` = velocidad, `o` = parámetros propios de esa nota, `w` = palabra de la nota (instrumentos con letra). `kit` es la versión del kit con que se guardó (si no coincide, la librería avisa en `song.warnings`).
 
-**Formato compacto** (`"v": 2`, el de «⬇ Compacto»): las notas van como arreglos `[b, l, m, v, pan, o]` en `n` (los últimos valores se omiten si son los de fábrica: `[0, 0.5, 60]` es una nota con velocidad 1 y sin paneo) y `params` solo trae lo que difiere del instrumento. El estudio y la librería leen los dos formatos.
+**Formato compacto** (`"v": 2`, el de «⬇ Compacto»): las notas van como arreglos `[b, l, m, v, pan, o, w]` en `n` (los últimos valores se omiten si son los de fábrica: `[0, 0.5, 60]` es una nota con velocidad 1 y sin paneo) y `params` solo trae lo que difiere del instrumento. El estudio y la librería leen los dos formatos.
 
 ## Arquitectura
 
@@ -431,11 +485,12 @@ El render es determinista (misma semilla → mismo audio) y se hace por bloques 
 - Un stem exportado pasa por el mismo sidechain y saturación suave del master, solo con esa pista. La suma de todos los stems no es bit a bit idéntica al WAV de la mezcla completa, porque la saturación y el limitador no son lineales.
 - El autoguardado en el navegador no se activa en proyectos con clips horneados (serían demasiado grandes): guarda con «Guardar».
 - En iOS/Safari, el audio solo arranca tras un gesto del usuario (el botón Play ya lo es).
-- La automatización es solo de volumen, paneo y filtro por pista; los parámetros del instrumento y de los efectos no se automatizan todavía (cada cambio exigiría volver a renderizar). El paneo automatizado actúa como balance sobre el paneo fijo de la pista.
+- Los parámetros de los **efectos** (delay, reverb) no se automatizan; los del instrumento sí, pero escalonados por nota (8/16 niveles) salvo que hornees el barrido. El paneo automatizado actúa como balance sobre el paneo fijo de la pista.
+- Los clips horneados (barridos y conversiones) pesan: se guardan como audio dentro del proyecto. «⬇ Compacto» avisa cuánto.
 - La demo exportada no es legible como código de síntesis (es el motor más los datos del proyecto); si quieres una demo escrita a mano, usa la guía de arriba.
-- No hay exportación MIDI (a propósito). Los efectos son solo delay y reverb por pista; no hay compresor ni EQ por pista.
+- El MIDI exportado lleva las notas, no el sonido ni la automatización. Los efectos son solo delay y reverb por pista; no hay compresor ni EQ por pista.
 - La reverb tiene cola de ~0.8 s (tamaño .2) a ~5 s (tamaño 1) y su nivel está calibrado de forma aproximada, afínalo de oído. Los efectos añaden a la caché (unos 230 MB en The Void con 5 pistas con efectos; tope 320 MB).
-- La grabación **no compensa la latencia** de tu equipo (teclado, interfaz de audio o Bluetooth); el tiempo se toma cuando llega la tecla o el mensaje MIDI. Con audífonos Bluetooth puede sentirse desfasada.
+- La grabación compensa la latencia de salida que reporta el navegador (ver «Latencia» arriba), pero con Bluetooth conviene calibrarla.
 
 ## Créditos
 
@@ -447,8 +502,6 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 
 **Demos (`demos/`)**
 
-<div align="center">
-  
 | Archivo | Autoría |
 |---|---|
 | `cotton_sugar_MK.js` | Ámbar |
@@ -457,9 +510,11 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 | `ejemplo_minimo.js` | Ámbar |
 | `electronic_rush.js` | Ámbar |
 | `event_horizon.js` | Ámbar |
+| `kinetic_drift.js` | Éter |
 | `la_casa_que_respira.js` | Ámbar |
 | `marshmallow_sky.js` | Ámbar |
 | `neon_tidal.js` | Velvet |
+| `phantom_minds_ear.js` | Velvet |
 | `the_void_MK.js` | Ámbar |
 | `yo_soy_nan.js` | Éter |
 
@@ -468,14 +523,19 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 | Archivo | Autoría |
 |---|---|
 | `aether_choir.js` | Velvet |
+| `automata_vocal.js` | Velvet y Ámbar (a partir del *Autómata Vocal* de Brujo) |
 | `neuro_bloom.js` | Velvet |
 | `theremin_fantasma.js` | Ámbar |
 
-**Proyectos de ejemplo (`project_examples/`)**
+**Proyectos**
 
 | Archivo | Autoría |
 |---|---|
-| `la_casa_que_respira.demokit.json` | Ámbar |
-| `la_casa_que_respira_theremin.demokit.json` | Ámbar (misma pieza, con el plugin incrustado) |
+| `project_examples/COTTON_SUGAR_140_BPM.demokit.json` y `MARSHMALLOW_SKY_150_BPM.demokit.json` | Ámbar (guardados tras convertir las demos) |
+| `projects/` (todos traen al menos un plugin incrustado): `la_casa_que_respira_theremin.demokit.json` | Ámbar (misma pieza que `la_casa_que_respira`, con el plugin incrustado) |
+| `projects/tres_constantes_completa.demokit.json` | Ámbar |
+| `projects/el_manifiesto.demokit.json` | Ámbar |
+| `proyectos/la_casa_que_respira.demokit.json` | Ámbar |
+| `proyectos/Nexo_Latente.demokit.json` | Velvet |
 
-</div>
+`rendered/` trae dos WAV de muestra exportados desde el estudio (`la_casa_que_respira.wav` y `la_casa_que_respira_theremin.wav`).
