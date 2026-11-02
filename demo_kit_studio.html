@@ -686,10 +686,11 @@ function makeDuck(P,beat){
 }
 // ───────────────────────── efectos: delay, reverb (por pista) y master (EQ + limitador) ─────────────────────────
 // Trabajan sobre el audio ya renderizado, así que cambiar un efecto no vuelve a renderizar el instrumento.
-const FX_DEF={delay:{on:false,time:.75,fb:.4,tone:4500,mix:.3,pp:true},reverb:{on:false,size:.65,damp:.5,mix:.25,pre:12}};
+const FX_DEF={eq:{on:false,low:0,mid:0,midF:1000,midQ:1,high:0},comp:{on:false,thr:-18,ratio:3,atk:10,rel:120,knee:6,makeup:0,mix:1},delay:{on:false,time:.75,fb:.4,tone:4500,mix:.3,pp:true},reverb:{on:false,size:.65,damp:.5,mix:.25,pre:12}};
 const MASTER_DEF={low:0,high:0,gain:1,limit:true,ceil:.97};
-const fxOf=tr=>{ const f=(tr&&tr.fx)||{}; return {delay:Object.assign({},FX_DEF.delay,f.delay),reverb:Object.assign({},FX_DEF.reverb,f.reverb)}; };
-const fxActive=fx=>!!((fx.delay.on&&fx.delay.mix>0)||(fx.reverb.on&&fx.reverb.mix>0));
+const fxOf=tr=>{ const f=(tr&&tr.fx)||{}; return {eq:Object.assign({},FX_DEF.eq,f.eq),comp:Object.assign({},FX_DEF.comp,f.comp),delay:Object.assign({},FX_DEF.delay,f.delay),reverb:Object.assign({},FX_DEF.reverb,f.reverb)}; };
+const eqOn=e=>!!(e.on&&(e.low||e.mid||e.high)), compOn=c=>!!(c.on&&c.mix>0&&c.ratio>1);
+const fxActive=fx=>!!(eqOn(fx.eq)||compOn(fx.comp)||(fx.delay.on&&fx.delay.mix>0)||(fx.reverb.on&&fx.reverb.mix>0));
 const masterOf=P=>Object.assign({},MASTER_DEF,P.master);
 const REV_WET=.74;      // calibración de la reverb (ver pruebas): con mezcla = 1 el nivel del agua ≈ nivel de la entrada
 const revFbk=size=>.7+.26*clamp(size,0,1);                                    // máx .96 → cola de unos 5 s
@@ -727,6 +728,10 @@ function applyFx(L,R,fx,beat,maxLen,tv){      // → {L,R}; la salida puede ser 
   if(dly){ const d=Math.max(1,Math.round(fx.delay.time*(tv&&!tv.tm.constant?tv.tm.slowBeat:beat)*SR)), fb=clamp(fx.delay.fb,0,.92); tail+=Math.min(8*SR,d*((fb>0?Math.ceil(Math.log(.001)/Math.log(fb)):0)+1)); }
   if(rev){ const fbk=revFbk(fx.reverb.size); tail+=Math.min(6*SR,Math.ceil((1400/44100)*SR*Math.log(.001)/Math.log(fbk)))+Math.round(clamp(fx.reverb.pre,0,200)*SR/1000); }
   const m=Math.min(maxLen==null?n+tail:maxLen,n+tail); let a=L,b=R;
+  const eqA=eqOn(fx.eq), cpA=compOn(fx.comp);
+  if(eqA||cpA){ a=Float32Array.from(a); b=Float32Array.from(b);                  // EQ → compresor → eco → reverb
+    if(eqA){ shelf(a,b,120,fx.eq.low,false); peakEq(a,b,fx.eq.midF,fx.eq.mid,fx.eq.midQ); shelf(a,b,7000,fx.eq.high,true); }
+    if(cpA) compFx(a,b,fx.comp); }
   if(dly) [a,b]=delayFx(a,b,m,fx.delay,beat,tv);
   if(rev) [a,b]=reverbFx(a,b,m,fx.reverb);
   return {L:a,R:b};
@@ -748,6 +753,23 @@ function shelf(L,R,f,dB,high){              // filtro shelving (biquad RBJ), en 
   else { b0=A*((A+1)+(A-1)*cs+t); b1=-2*A*((A-1)+(A+1)*cs); b2=A*((A+1)+(A-1)*cs-t); a0=(A+1)-(A-1)*cs+t; a1=2*((A-1)-(A+1)*cs); a2=(A+1)-(A-1)*cs-t; }
   b0/=a0; b1/=a0; b2/=a0; a1/=a0; a2/=a0;
   for(const X of [L,R]){ let x1=0,x2=0,y1=0,y2=0; for(let i=0;i<X.length;i++){ const x=X[i], y=b0*x+b1*x1+b2*x2-a1*y1-a2*y2; x2=x1; x1=x; y2=y1; y1=y; X[i]=y; } }
+}
+function peakEq(L,R,f,dB,Q){                // campana (biquad RBJ), en el sitio
+  if(!dB) return; const A=Math.pow(10,dB/40), w=2*Math.PI*clamp(f,40,SR*.45)/SR, cs=Math.cos(w), al=Math.sin(w)/(2*clamp(Q,.2,12));
+  let b0=1+al*A, b1=-2*cs, b2=1-al*A, a0=1+al/A, a1=-2*cs, a2=1-al/A; b0/=a0; b1/=a0; b2/=a0; a1/=a0; a2/=a0;
+  for(const X of [L,R]){ let x1=0,x2=0,y1=0,y2=0; for(let i=0;i<X.length;i++){ const x=X[i], y=b0*x+b1*x1+b2*x2-a1*y1-a2*y2; x2=x1; x1=x; y2=y1; y1=y; X[i]=y; } }
+}
+let lastGR=0;                                // reducción máxima (dB) del último compresor aplicado; la interfaz la muestra
+function compFx(L,R,p){                      // compresor con codo suave, detector de pico enlazado (no mueve el paneo), en el sitio
+  const thr=p.thr, ratio=Math.max(1,p.ratio), kn=Math.max(0,p.knee), mix=clamp(p.mix,0,1), mk=Math.pow(10,(p.makeup||0)/20);
+  const aC=Math.exp(-1/(Math.max(.1,p.atk)*1e-3*SR)), rC=Math.exp(-1/(Math.max(1,p.rel)*1e-3*SR)), inv=1/ratio-1; let gs=0, mx=0; const n=L.length;
+  for(let i=0;i<n;i++){
+    const x=Math.max(Math.abs(L[i]),Math.abs(R[i])), lv=x>1e-6?20*Math.log10(x):-120, ov=lv-thr; let gr;
+    if(2*ov<-kn) gr=0; else if(kn>0&&2*Math.abs(ov)<=kn){ const t=ov+kn/2; gr=-inv*t*t/(2*kn); } else gr=-inv*ov;
+    gs=gr>gs?aC*gs+(1-aC)*gr:rC*gs+(1-rC)*gr; if(gs>mx) mx=gs;
+    const g=mk*Math.pow(10,-gs/20), w=mix>=1?g:(1-mix)+mix*g; L[i]*=w; R[i]*=w;
+  }
+  if(mx>lastGR) lastGR=mx;
 }
 function masterFx(P,out){
   const m=masterOf(P); if(!m.low&&!m.high&&m.gain===1) return out;          // todo neutro: no se toca el sonido original
@@ -803,7 +825,7 @@ async function ensureStems(P,trs,onProg,from,to){
   }
   let fxN=0, N=Math.ceil(total*SR);
   for(const tr of trs){ const c=stemCache.get(tr.id); if(!c||c.err) continue; const fx=fxOf(tr), want=fxActive(fx)?hash2(JSON.stringify([fx,beat,tmx.key,c.key])):'';
-    if(c.fxKey!==want){ c.fxStems=want?fxStems(c.stems,fx,beat,N,tmx):null; c.fxKey=want; if(want){ fxN++; await tick(); } } }
+    if(c.fxKey!==want){ lastGR=0; c.fxStems=want?fxStems(c.stems,fx,beat,N,tmx):null; c.fxKey=want; c.gr=lastGR; if(want){ fxN++; await tick(); } } }
   return {errors,rendered:todo.length,fx:fxN,beat,total};
 }
 // ── automatización por pista (volumen, paneo, filtro): puntos {b,v} en pulsos, interpolación lineal; se aplica al mezclar,
@@ -1378,7 +1400,7 @@ async function doRender(){
     const out=await renderProject(P,prog);
     cache={L:out.L,R:out.R,dur:out.dur,buf:toAudioBuffer(out)}; dirty=(ver!==version);
     if(out.errors&&out.errors.length) toast('Error en «'+out.errors[0].track+'»: '+out.errors[0].msg,'err');
-    rendering=false; updateStat(); $('stat').textContent+=' · render '+((performance.now()-t0)/1000).toFixed(1)+' s ('+out.stats.rendered+' de '+out.stats.tracks+' pistas nuevas'+(out.stats.fx?', '+out.stats.fx+' con efectos recalculados':'')+')'; return true;
+    rendering=false; updateGR(); updateStat(); $('stat').textContent+=' · render '+((performance.now()-t0)/1000).toFixed(1)+' s ('+out.stats.rendered+' de '+out.stats.tracks+' pistas nuevas'+(out.stats.fx?', '+out.stats.fx+' con efectos recalculados':'')+')'; return true;
   }catch(e){ console.error(e); toast('Error al renderizar: '+e.message,'err'); rendering=false; updateStat(); return false; }
   finally{ prog(0); rendering=false; }
 }
@@ -1743,6 +1765,13 @@ function sliderRow(label,get,set,min,max,step,def,fmt){
 }
 function renderSelInfo(){ const sa=$('selAct'); if(sa) sa.hidden=!selNotes.size; const sl=$('sLyric'); if(sl) sl.hidden=!lyricInst(); const e=$('selInfo'); if(!e) return; const tr=P.tracks[sel]; e.textContent=tr?(tr.notes.length+' notas · '+selNotes.size+' seleccionadas'):''; const v=$('selVel'); if(v){ v.disabled=!selNotes.size; if(selNotes.size){ const x=[...selNotes][0].v; v.value=x==null?1:x; if(v.nextElementSibling) v.nextElementSibling.textContent=fmtNum(+v.value); } } }
 function setFx(tr,g,k,v){ tr.fx=tr.fx||{}; tr.fx[g]=Object.assign({},FX_DEF[g],tr.fx[g]); tr.fx[g][k]=v; touch(); }
+const FX_PRESETS={
+  'Voz':{eq:{low:-3,mid:2.5,midF:3000,midQ:1,high:2},comp:{thr:-20,ratio:3,atk:8,rel:120,knee:6,makeup:3,mix:1}},
+  'Bajo':{eq:{low:2,mid:-2,midF:300,midQ:1.2,high:-1},comp:{thr:-18,ratio:4,atk:20,rel:150,knee:6,makeup:3,mix:1}},
+  'Bombo':{eq:{low:3,mid:-3,midF:400,midQ:1.5,high:1.5},comp:{thr:-14,ratio:4,atk:25,rel:80,knee:4,makeup:2,mix:1}},
+  'Pegamento suave':{eq:null,comp:{thr:-14,ratio:2,atk:30,rel:200,knee:8,makeup:1.5,mix:1}},
+  'Brillo':{eq:{low:0,mid:1.5,midF:5000,midQ:1,high:4},comp:null}};
+function updateGR(){ const e=$('compGR'), tr=P.tracks[sel]; if(!e||!tr) return; const c=stemCache.get(tr.id), on=compOn(fxOf(tr).comp); e.textContent=!on?'':(c&&c.gr!=null&&c.fxKey)?('Reducción máxima: '+fmtNum(+c.gr.toFixed(1))+' dB'):'Reducción máxima: se muestra tras renderizar'; }
 function fxBlock(tr){
   const T=[['1/16',.25],['1/8',.5],['1/8 punteado',.75],['1/4',1],['1/4 punteado',1.5],['1/2',2]];
   const group=(g,title,...rows)=>el('div',{class:'fxg'},
@@ -1750,11 +1779,17 @@ function fxBlock(tr){
     ...(fxOf(tr)[g].on?rows:[]));
   const sl=(g,k,label,min,max,step,fmt)=>sliderRow(label,()=>fxOf(tr)[g][k],v=>setFx(tr,g,k,v),min,max,step,FX_DEF[g][k],fmt);
   const cur=fxOf(tr).delay.time, ts=el('select',{onchange:e=>{ setFx(tr,'delay','time',+e.target.value); previewTrack(); }},...T.map(([n,v])=>el('option',{value:v,text:n}))); ts.value=(T.find(x=>Math.abs(x[1]-cur)<1e-6)||T[2])[1];
-  return sec('Efectos de la pista',
-    el('p',{class:'desc',text:'Se aplican al audio de esta pista ya renderizado: cambiarlos no vuelve a renderizar el instrumento.'}),
+  const fmtDb=v=>(v>0?'+':'')+fmtNum(v)+' dB', fmtHz=v=>v>=1000?fmtNum(+(v/1000).toFixed(2))+' kHz':Math.round(v)+' Hz', fmtMs=v=>fmtNum(v)+' ms';
+  const ps=el('select',{onchange:e=>{ const p=FX_PRESETS[e.target.value]; if(!p) return; pushUndo(); tr.fx=tr.fx||{}; for(const g of ['eq','comp']){ if(p[g]) tr.fx[g]=Object.assign({},FX_DEF[g],p[g],{on:true}); else if(tr.fx[g]) tr.fx[g]=Object.assign({},tr.fx[g],{on:false}); } touch(); renderInspector(); previewTrack(); }},el('option',{value:'',text:'Elegir…'}),...Object.keys(FX_PRESETS).map(k=>el('option',{value:k,text:k})));
+  const box=sec('Mezcla y efectos de la pista',
+    el('p',{class:'desc',text:'Se aplican al audio de esta pista ya renderizado (EQ → compresor → delay → reverb): cambiarlos no vuelve a renderizar el instrumento. También salen en los stems.'}),
+    el('div',{class:'row'},el('label',{text:'Preajuste'}),ps),
+    group('eq','EQ',sl('eq','low','Graves (120 Hz)',-12,12,.5,fmtDb),sl('eq','mid','Medios',-12,12,.5,fmtDb),sl('eq','midF','Frec. medios',200,5000,10,fmtHz),sl('eq','midQ','Q de medios',.3,6,.05),sl('eq','high','Agudos (7 kHz)',-12,12,.5,fmtDb)),
+    group('comp','Compresor',sl('comp','thr','Umbral',-48,0,.5,fmtDb),sl('comp','ratio','Razón',1,20,.1,v=>fmtNum(v)+':1'),sl('comp','atk','Ataque',.5,100,.5,fmtMs),sl('comp','rel','Liberación',10,800,5,fmtMs),sl('comp','knee','Codo',0,24,.5,fmtDb),sl('comp','makeup','Compensación',0,24,.5,fmtDb),sl('comp','mix','Mezcla (paralelo)',0,1,.01),el('div',{class:'hint',id:'compGR'})),
     group('delay','Delay',el('div',{class:'row'},el('label',{text:'Tiempo'}),ts),sl('delay','fb','Repeticiones',0,.92,.01),sl('delay','tone','Tono (Hz)',500,12000,50),sl('delay','mix','Mezcla',0,1,.01),
       el('label',{class:'chk',style:'margin:4px 0'},el('input',{type:'checkbox',checked:fxOf(tr).delay.pp,onchange:e=>{ setFx(tr,'delay','pp',e.target.checked); previewTrack(); }}),' ping-pong (rebota entre izquierda y derecha)')),
     group('reverb','Reverb',sl('reverb','size','Tamaño',0,1,.01),sl('reverb','damp','Amortiguación',0,1,.01),sl('reverb','mix','Mezcla',0,1,.01),sl('reverb','pre','Pre-delay (ms)',0,80,1)));
+  setTimeout(updateGR,0); return box;
 }
 function setMaster(k,v){ P.master=Object.assign({},MASTER_DEF,P.master); P.master[k]=v; touch(); }
 function masterBlock(){
