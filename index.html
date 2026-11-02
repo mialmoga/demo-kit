@@ -257,7 +257,7 @@ kbd{display:inline-block;min-width:1.5em;text-align:center;padding:1px 6px;borde
         <label class="chk">BPM <input type="number" id="tBpm" min="20" max="400" step="1"></label>
         <label class="chk" title="Si está activo, el tempo cambia gradualmente desde el punto anterior y llega a este BPM en este pulso. Si no, salta de golpe."><input type="checkbox" id="tRamp"> rampa hasta aquí</label>
         <button id="tDel" class="sm danger">Quitar punto</button></span>
-      <span id="sCtl" hidden>Compás <select id="sSel" aria-label="Compás"></select> <span id="sInfo"></span><button id="sDel" class="sm danger">Quitar cambio</button></span>
+      <span id="sCtl" hidden>Compás <select id="sSel" aria-label="Compás"></select> <span id="sInfo"></span><button id="sDelSig" class="sm danger">Quitar cambio</button></span>
       <span id="tHint" class="hint">inicial = el BPM de arriba · clic = punto nuevo · arrastra = mover (horizontal: pulso, vertical: BPM) · doble clic o clic derecho = quitar</span>
       <span id="sHint" class="hint" hidden>inicial = el compás de arriba · clic en un compás = cambio nuevo (con el compás elegido) · arrastra = mover de compás · doble clic o clic derecho = quitar. Las notas no se mueven: cambia dónde caen las barras</span>
     </div>
@@ -1541,7 +1541,7 @@ function hit(tr,info,inst,px,py){
 }
 function setCursor(b){ cursorBeat=Math.max(0,b); invalidate(); }
 cv.addEventListener('pointerdown',e=>{
-  if(mode==='nav') return; const tr=P.tracks[sel]; const r=cv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
+  if(mode==='nav'){ if(e.pointerType==='mouse'){ pan={x:e.clientX,y:e.clientY,sx:wrap.scrollLeft,sy:wrap.scrollTop}; try{ cv.setPointerCapture(e.pointerId); }catch(_){} cv.style.cursor='grabbing'; } return; } const tr=P.tracks[sel]; const r=cv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
   if(py<RUL){ if(px>=KW) setCursor(snapB(pxToBeat(px))); return; }
   if(!tr) return; const info=trackInfo(tr), inst=INSTRUMENTS[tr.inst]||{kind:'melodic'}, bx=pxToBeat(px), m=pyToM(info,py);
   if(px<KW){ if(!info.perc&&m>=0&&m<=127) previewNote({b:0,l:.5,m,v:1}); else if(info.perc&&m>=0&&m<info.rows) previewNote({b:0,l:.5,m,v:1}); return; }
@@ -1565,8 +1565,8 @@ cv.addEventListener('pointerdown',e=>{
   selNotes=new Set([n,...extra]); previewNote(n); for(const x of extra) previewNote(x); drag={kind:'draw',n,extra,start:b,moved:false}; touch(); renderSelInfo();
 });
 cv.addEventListener('pointermove',e=>{
-  lastPX=e.clientX; lastPY=e.clientY; const tr=P.tracks[sel]; const r=cv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
-  if(!drag){ if(mode==='draw'&&tr&&px>=KW&&py>=RUL){ const info=trackInfo(tr),inst=INSTRUMENTS[tr.inst]||{}; const h=hit(tr,info,inst,px,py); cv.style.cursor=h?(h.edge?'ew-resize':'pointer'):'crosshair'; } else cv.style.cursor=mode==='erase'?'not-allowed':(mode==='select'?'crosshair':'default'); return; }
+  lastPX=e.clientX; lastPY=e.clientY; if(pan){ wrap.scrollLeft=pan.sx-(e.clientX-pan.x); wrap.scrollTop=pan.sy-(e.clientY-pan.y); return; } const tr=P.tracks[sel]; const r=cv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
+  if(!drag){ if(mode==='draw'&&tr&&px>=KW&&py>=RUL){ const info=trackInfo(tr),inst=INSTRUMENTS[tr.inst]||{}; const h=hit(tr,info,inst,px,py); cv.style.cursor=h?(h.edge?'ew-resize':'pointer'):'crosshair'; } else cv.style.cursor=mode==='erase'?'not-allowed':(mode==='select'?'crosshair':(mode==='nav'?'grab':'default')); return; }
   const info=trackInfo(tr), bx=pxToBeat(px), m=pyToM(info,py), minL=snap>0?snap:.0625;
   const undoOnce=()=>{ if(!drag.undone){ pushUndo(); drag.undone=true; } };
   if(drag.kind==='move'){
@@ -1583,13 +1583,13 @@ cv.addEventListener('pointermove',e=>{
     selNotes=new Set(tr.notes.filter(n=>n.b+visLen(inst,n)>=ba&&n.b<=bb&&Math.round(n.m)>=ma&&Math.round(n.m)<=mb)); invalidate();
   }
 });
-const endDrag=()=>{ clearTimeout(lyLP); if(!drag) return; const k=drag.kind; const ol=drag.openLyric&&!drag.undone?drag.openLyric:null; if(ol){ drag=null; renderSelInfo(); invalidate(); openLyric(ol); return; } if(k==='move'&&drag.tap&&!drag.undone) selNotes.delete(drag.tap); drag=null; if(k!=='rubber') fitBars(); renderSelInfo(); invalidate(); };
+const endDrag=()=>{ if(pan){ pan=null; cv.style.cursor=mode==='nav'?'grab':''; } clearTimeout(lyLP); if(!drag) return; const k=drag.kind; const ol=drag.openLyric&&!drag.undone?drag.openLyric:null; if(ol){ drag=null; renderSelInfo(); invalidate(); openLyric(ol); return; } if(k==='move'&&drag.tap&&!drag.undone) selNotes.delete(drag.tap); drag=null; if(k!=='rubber') fitBars(); renderSelInfo(); invalidate(); };
 cv.addEventListener('pointerup',endDrag); cv.addEventListener('pointercancel',endDrag);
-cv.addEventListener('contextmenu',e=>{ e.preventDefault(); const tr=P.tracks[sel]; if(!tr) return; if(lyPtr==='touch'&&lyricInst()) return;   // en pistas con letra, mantener pulsado abre la letra, no borra const r=cv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
+cv.addEventListener('contextmenu',e=>{ e.preventDefault(); const tr=P.tracks[sel]; if(!tr) return; if(lyPtr==='touch'&&lyricInst()) return; /* en pistas con letra, mantener pulsado abre la letra, no borra */ const r=cv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
   if(px<KW||py<RUL) return; const h=hit(tr,trackInfo(tr),INSTRUMENTS[tr.inst]||{},px,py); if(h){ pushUndo(); tr.notes.splice(tr.notes.indexOf(h.n),1); selNotes.delete(h.n); touch(); renderSelInfo(); } });
 
 // ===== Letra sobre las notas (instrumentos con inst.lyrics) =====
-let LE=null, lyTap=null, lyLP=0, lyPtr='', lastPX=0, lastPY=0;
+let pan=null, LE=null, lyTap=null, lyLP=0, lyPtr='', lastPX=0, lastPY=0;
 const lyricInst=()=>{ const tr=P.tracks[sel], i=tr&&INSTRUMENTS[tr.inst]; return i&&i.lyrics?i:null; };
 const lySorted=tr=>[...tr.notes].sort((a,b)=>a.b-b.b||b.m-a.m);
 const lyInp=document.createElement('input'); lyInp.id='lyInp'; lyInp.type='text'; lyInp.autocomplete='off'; lyInp.spellcheck=false; lyInp.setAttribute('autocorrect','off'); lyInp.setAttribute('autocapitalize','none'); lyInp.setAttribute('enterkeyhint','done'); lyInp.setAttribute('aria-label','Letra de la nota'); document.body.append(lyInp);
@@ -1982,7 +1982,7 @@ function sigMove(e){ if(!sDrag){ const h=sNear(e); tcv.style.cursor=h.p&&h.p!=='
   const r=tcv.getBoundingClientRect(), i=clamp(sBarAt(e.clientX-r.left),1,P.bars-1); if(i!==sDrag.p.bar&&!(P.sigs||[]).some(q=>q!==sDrag.p&&q.bar===i)){ sDrag.p.bar=i; touch(); invalidate(); refreshTempoUI(); } }
 function sDelete(p){ const L=P.sigs||[], i=L.indexOf(p); if(i<0) return; pushUndo(); L.splice(i,1); if(!L.length) delete P.sigs; if(sS===p) sS=null; touch(); layoutSpacer(); invalidate(); prewarm(); refreshTempoUI(); }
 $('sSel').onchange=e=>{ if(!sS) return; const [a,b]=e.target.value.split('/').map(Number); pushUndo(); if(sS==='init'){ P.sig=[a,b]; $('sig').value=a+'/'+b; } else sS.sig=[a,b]; touch(); layoutSpacer(); invalidate(); prewarm(); refreshTempoUI(); };
-$('sDel').onclick=()=>{ if(sS&&sS!=='init') sDelete(sS); };
+$('sDelSig').onclick=()=>{ if(sS&&sS!=='init') sDelete(sS); };
 $('tabBpm').onclick=()=>{ tMode='bpm'; refreshTempoUI(); invalidate(); }; $('tabSig').onclick=()=>{ tMode='sig'; refreshTempoUI(); invalidate(); };
 $('tempoOn').onclick=()=>{ tempoShow=!tempoShow; refreshTempoUI(); invalidate(); };
 $('tBpm').onchange=e=>{ if(!tSel) return; pushUndo(); const v=clamp(Math.round(+e.target.value)||120,tSel==='init'?40:20,tSel==='init'?260:400); if(tSel==='init'){ P.bpm=v; $('bpm').value=v; } else tSel.bpm=v; touch(); refreshTempoUI(); prewarm(); };
