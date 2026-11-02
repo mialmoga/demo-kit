@@ -35,32 +35,8 @@ button.pri{background:var(--a);color:#0b0d14;border-color:var(--a);font-weight:7
 button.on{background:#2a3350;border-color:var(--a)}
 button.sm{padding:2px 7px;font-size:12px}
 button.danger:hover{border-color:var(--err);color:var(--err)}
-
-#fullscreen-btn {
-    background: none;
-    border: 1px solid transparent;
-    color: #ffd166;
-    font-size: 14px;
-    cursor: pointer;
-    width: 34px;
-    height: 34px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all var(--transition-fast);
-    opacity: 0.6;
-    border-radius: 2px;
-}
-#fullscreen-btn:hover {
-    opacity: 1;
-    border-color: #14161c;
-    background: #14161c;
-}
-/* Fullscreen siempre visible — en iOS abre en modo PWA */
-/* @media (max-width: 767px) {
-    #fullscreen-btn { display: none; }
-} */
-
+#fullscreen-btn {border-color: #14161c;background: #14161c;}
+#fullscreen-btn:hover {opacity: 1;border-color: #14161c;background: #14161c;}
 input[type=number],input[type=text],select,textarea{background:#0f1117;border:1px solid var(--b);border-radius:6px;padding:4px 6px}
 input[type=number]{width:64px}
 input[type=range]{accent-color:var(--a);width:100%;min-width:0}
@@ -197,10 +173,9 @@ kbd{display:inline-block;min-width:1.5em;text-align:center;padding:1px 6px;borde
 </head>
 <body>
 <header>
-  <div class="brand"><img src="assets/icon.png" onerror="this.onerror=null;this.src='favicon.ico'" alt="dk" width="28" height="28" style="vertical-align:middle;border-radius:7px;margin-right:6px"> Demo Kit</div>
+  <div class="brand"><button id="fullscreen-btn" title="Pantalla completa"><img src="assets/icon.png" onerror="this.onerror=null;this.src='favicon.ico'" alt="dk" width="28" height="28" style="vertical-align:middle;border-radius:7px;margin-right:6px"></button> Demo Kit</div>
   <button id="hToggle" class="sm" aria-expanded="false" title="Mostrar u ocultar el resto de controles del proyecto">☰ Proyecto</button>
   <button id="bKeys" class="sm" title="Atajos y gestos (F1)">?</button>
-  <button id="fullscreen-btn" title="Pantalla completa" data-i18n-title="tooltips.fullscreen">⛶</button>
   <div class="grp">
     <button id="bPlay" class="pri">▶ Play</button>
     <label class="chk"><input type="checkbox" id="loop"> bucle</label>
@@ -2432,7 +2407,6 @@ const fsBtn = document.getElementById('fullscreen-btn');
 if (fsBtn) {
     const updateFsIcon = () => {
         const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement);
-        fsBtn.textContent = isFull ? '✕' : '⛶';
         fsBtn.title = isFull ? 'Salir de pantalla completa' : 'Pantalla completa';
     };
     fsBtn.addEventListener('click', () => {
