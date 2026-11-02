@@ -1605,6 +1605,10 @@ function dupSel(){ const tr=P.tracks[sel]; if(!tr||!selNotes.size) return; pushU
 function shiftSel(up){ const tr=P.tracks[sel]; if(!tr||!selNotes.size) return; const info=trackInfo(tr); pushUndo(); for(const n of selNotes) n.m=info.perc?clamp(n.m+(up?-1:1),0,info.rows-1):clamp(n.m+(up?1:-1),0,127); touch(); }
 $('sDup').onclick=dupSel; $('sDel').onclick=delSel; $('sUp').onclick=()=>shiftSel(true); $('sDn').onclick=()=>shiftSel(false);
 // la franja y la cabecera se pliegan; en pantallas chicas arrancan cerradas (el estado se recuerda en este navegador)
+function rememberKit(name,src){ try{ localStorage.setItem('demokit-kit',JSON.stringify({name,src})); return true; }catch(e){ try{ localStorage.removeItem('demokit-kit'); }catch(_){} return false; } }
+function restoreKit(){ let o=null; try{ o=JSON.parse(localStorage.getItem('demokit-kit')||'null'); }catch(e){ return; } if(!o||typeof o.src!=='string') return;
+  try{ const f=new Function(o.src+'\nreturn demoKit;')(), k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); Kit.make=f; bumpKit(); kitName=o.name||'propio'; cache=null; dirty=true; toast('Kit «'+kitName+'» restaurado (el que cargaste antes). Lo quitas en «Demos y plugins» → «Volver al kit incluido»','ok'); }
+  catch(e){ console.error(e); try{ localStorage.removeItem('demokit-kit'); }catch(_){} toast('El kit guardado no funcionó ('+e.message+'): volví al kit incluido','err'); } }
 const lsGet=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } }, lsSet=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} }, smallScr=()=>matchMedia('(max-width:700px)').matches;
 function setMore(open,save){ $('rmore').hidden=!open; $('rMoreBtn').classList.toggle('on',open); $('rMoreBtn').setAttribute('aria-expanded',String(open)); if(save) lsSet('demokit-rmore',open?'1':'0'); }
 $('rMoreBtn').onclick=()=>setMore($('rmore').hidden,true); { const v=lsGet('demokit-rmore'); setMore(v==null?!smallScr():v==='1'); }
@@ -1970,7 +1974,7 @@ ${chunks.join(',\n')}
 $('bDemoJs').onclick=exportDemoJs;
 
 const BUILTIN_KIT=Kit.make;
-$('kitReset').onclick=()=>{ Kit.make=BUILTIN_KIT; bumpKit(); kitName='incluido'; cache=null; dirty=true; renderLib(); updateStat(); toast('Kit incluido restaurado','ok'); };
+$('kitReset').onclick=()=>{ Kit.make=BUILTIN_KIT; bumpKit(); kitName='incluido'; try{ localStorage.removeItem('demokit-kit'); }catch(e){} cache=null; dirty=true; renderLib(); updateStat(); toast('Kit incluido restaurado','ok'); };
 // ───────────── seguridad: el código ajeno solo se ejecuta si lo confirmas ─────────────
 // Un plugin, un kit o un proyecto con plugins es JavaScript que corre con los mismos permisos que esta página.
 function trustCode(titulo,detalle){ return confirm('⚠ '+titulo+'\n\n'+detalle+'\n\nEl código se ejecuta en tu navegador con los mismos permisos que esta página. Continúa solo si confías en quien lo hizo.\n\n¿Ejecutarlo?'); }
@@ -1995,7 +1999,7 @@ async function ingest(file,opts){
   const txt=await file.text();
   try{
     if(/^\s*\{/.test(txt)){ const o=JSON.parse(txt); if(o.format==='demokit-studio'){ loadProject(projectFromFile(o,name)); populateAddInst(); toast('Proyecto «'+o.name+'» cargado','ok'); return; } }
-    if(/function\s+demoKit\s*\(/.test(txt)){ if(!trustCode('Kit «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código que reemplazará al kit incluido.')){ toast('Kit no cargado','err'); return; } const f=new Function(txt+'\nreturn demoKit;')(); const k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); Kit.make=f; bumpKit(); kitName=name; cache=null; dirty=true; renderLib(); updateStat(); toast('Kit «'+name+'» cargado: los instrumentos y plugins lo usan desde ahora','ok'); return; }
+    if(/function\s+demoKit\s*\(/.test(txt)){ if(!trustCode('Kit «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código que reemplazará al kit incluido.')){ toast('Kit no cargado','err'); return; } const f=new Function(txt+'\nreturn demoKit;')(); const k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); Kit.make=f; bumpKit(); kitName=name; cache=null; dirty=true; const kept=rememberKit(name,txt); renderLib(); updateStat(); toast('Kit «'+name+'» cargado: los instrumentos y plugins lo usan desde ahora'+(kept?' y se recordará en este navegador':' (no pude guardarlo en este navegador: pesa demasiado; durará solo esta sesión)'),kept?'ok':'err'); return; }
     if(/async\s+function\s+render\w*\s*\(/.test(txt)){ const fn=/async\s+function\s+(render\w*)/.exec(txt)[1]; const d={name:demoName(txt,name.replace(/\.js$/,'')),fn,src:txt,out:null,trusted:!!(opts&&opts.trusted)}; const i=demos.findIndex(x=>x.name===d.name); if(i>=0) demos[i]=d; else demos.push(d); renderLib(); openModal('libModal'); toast('Demo «'+d.name+'» lista: reprodúcela o conviértela','ok'); return; }
     if(/registerInstrument\s*\(/.test(txt)){ if(!trustCode('Plugin «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código. Empieza así:\n'+txt.slice(0,160).replace(/\s+/g,' ')+'…')){ toast('Plugin no instalado','err'); return; } const def=installPlugin(txt); populateAddInst(); renderLib(); toast('Plugin «'+def.name+'» registrado','ok'); return; }
     toast('No reconocí «'+name+'» (¿demo, plugin, kit o proyecto?)','err');
@@ -2088,7 +2092,7 @@ function renderLib(){
   for(const u of USER_PLUGINS) pl.append(el('div',{class:'item'},el('div',{class:'nm'},el('b',{text:u.name}),el('small',{text:u.id})),
     el('button',{class:'sm',text:'Editar',onclick:()=>openPlugin(u.code)}),el('button',{class:'sm',text:'＋ Pista',onclick:()=>{ addTrack(u.id); closeModal('libModal'); }}),
     el('button',{class:'sm danger',text:'Quitar',onclick:()=>{ removePlugin(u.id); delete INSTRUMENTS[u.id]; const i=INST_ORDER.indexOf(u.id); if(i>=0) INST_ORDER.splice(i,1); populateAddInst(); renderLib(); }})));
-  $('kitInfo').textContent='Kit en uso: '+kitName+'. Puedes soltar un demo_kit.js propio (con funciones nuevas) para reemplazarlo durante esta sesión: los plugins podrán usar sus funciones desde K. Al recargar la página vuelve el kit incluido. Cómo escribir uno: README → «Extender el kit».'; $('kitReset').hidden=kitName==='incluido';
+  $('kitInfo').textContent='Kit en uso: '+kitName+'. Puedes soltar un demo_kit.js propio (con funciones nuevas) para reemplazar el incluido: los plugins podrán usar sus funciones desde K. Se recuerda en este navegador hasta que pulses «Volver al kit incluido». Cómo escribir uno: README → «Extender el kit».'; $('kitReset').hidden=kitName==='incluido';
 }
 const openModal=id=>{ const was=$(id).classList.contains('show'); $(id).classList.add('show'); if(!was&&id==='libModal'&&typeof renderRepo==='function') renderRepo(false); }, closeModal=id=>$(id).classList.remove('show');
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>closeModal(b.dataset.close)));
@@ -2335,7 +2339,7 @@ window.addEventListener('drop',e=>{ if(e.dataTransfer&&e.dataTransfer.files.leng
 // ───────────── arranque ─────────────
 (function init(){
   try{ const raw=localStorage.getItem('demokit-studio-plugins'); if(raw){ for(const u of JSON.parse(raw)){ try{ const def=evalPlugin(u.code); registerInstrument(def,{user:true}); USER_PLUGINS.push({id:def.id,name:def.name,code:u.code}); }catch(e){ console.warn('plugin',u.id,e); } } } }catch(e){}
-  populateAddInst(); for(const [a,b] of SIGS){ $('sig').append(el('option',{value:a+'/'+b,text:a+'/'+b})); $('sSel').append(el('option',{value:a+'/'+b,text:a+'/'+b})); } $('sSel').value='3/4';
+  restoreKit(); populateAddInst(); for(const [a,b] of SIGS){ $('sig').append(el('option',{value:a+'/'+b,text:a+'/'+b})); $('sSel').append(el('option',{value:a+'/'+b,text:a+'/'+b})); } $('sSel').value='3/4';
   try{ const raw=localStorage.getItem('demokit-studio-autosave'); if(raw){ const o=JSON.parse(raw); if(o&&o.format==='demokit-studio'&&o.tracks&&o.tracks.length){ P=projectFromJSON(o); toast('Sesión anterior restaurada. «Nuevo» o «Cargar proyecto de ejemplo» en Demos y plugins para empezar de cero.'); } } }catch(e){ console.warn('autosave',e); }
   $('pname').value=P.name; $('bpm').value=P.bpm; $('bars').value=P.bars; $('sig').value=sigStr(); setMode('draw');
   renderTracks(); renderInspector(); renderLib(); layoutSpacer(); centerTrack(); updateStat(); invalidate(); histReset();
