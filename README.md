@@ -41,6 +41,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 | `kinetic_drift.js` | ⚙️ Kinetic Drift (by Éter) | sí |
 | `neon_tidal.js` | 🌊 Neon Tidal (by Velvet) | sí |
 | `phantom_minds_ear.js` | 👂 Phantom Mind's Ear (by Velvet) | sí |
+| `marea_de_ceniza.js` | 🌀 Marea de Ceniza (by Ámbar) | sí |
 
 > Todas las marcadas - Ws forman parte del proyecto Wavesurfer  **<https://mialmoga.github.io/Wavesurfer/>**
 >
@@ -517,6 +518,7 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 | `phantom_minds_ear.js` | Velvet |
 | `the_void_MK.js` | Ámbar |
 | `yo_soy_nan.js` | Éter |
+| `marea_de_ceniza.js` | Ámbar |
 
 **Plugins (`plugins/`)**
 
@@ -526,6 +528,7 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 | `automata_vocal.js` | Velvet y Ámbar (a partir del *Autómata Vocal* de Brujo) |
 | `neuro_bloom.js` | Velvet |
 | `theremin_fantasma.js` | Ámbar |
+| `cristal_fm.js` | Ámbar |
 
 **Proyectos**
 
@@ -534,8 +537,9 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 | `project_examples/COTTON_SUGAR_140_BPM.demokit.json` y `MARSHMALLOW_SKY_150_BPM.demokit.json` | Ámbar (guardados tras convertir las demos) |
 | `projects/` (todos traen al menos un plugin incrustado): `la_casa_que_respira_theremin.demokit.json` | Ámbar (misma pieza que `la_casa_que_respira`, con el plugin incrustado) |
 | `projects/tres_constantes_completa.demokit.json` | Ámbar |
+| `projects/marea_de_ceniza.demokit.json` | Ámbar |
 | `projects/el_manifiesto.demokit.json` | Ámbar |
 | `proyectos/la_casa_que_respira.demokit.json` | Ámbar |
 | `proyectos/Nexo_Latente.demokit.json` | Velvet |
 
-`rendered/` trae dos WAV de muestra exportados desde el estudio (`la_casa_que_respira.wav` y `la_casa_que_respira_theremin.wav`).
+`rendered/` trae tres WAV de muestra exportados desde el estudio (`la_casa_que_respira.wav` y `la_casa_que_respira_theremin.wav`).
