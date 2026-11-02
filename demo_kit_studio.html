@@ -123,6 +123,8 @@ aside{background:var(--p);overflow:auto;min-height:0}
 .toast{background:#202537;border:1px solid #38405a;border-radius:8px;padding:8px 12px;box-shadow:0 6px 24px #0008}
 .toast.err{border-color:var(--err);background:#2a1a1e}
 .toast.ok{border-color:var(--ok)}
+#lyInp{position:fixed;z-index:30;display:none;box-sizing:border-box;height:24px;min-width:96px;padding:0 6px;font:600 13px system-ui;color:#fff;background:#0b0d14;border:2px solid #ffd76a;border-radius:5px;outline:none}
+#lyInp.on{display:block}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:flex-start;justify-content:center;padding:4vh 12px;z-index:40;overflow:auto}
 .modal.show{display:flex}
 .card{background:var(--p);border:1px solid var(--b);border-radius:12px;padding:14px;width:min(820px,100%);max-height:92vh;overflow:auto}
@@ -222,6 +224,7 @@ kbd{display:inline-block;min-width:1.5em;text-align:center;padding:1px 6px;borde
         <span class="grp"><button id="zOut" class="sm" title="Alejar">−</button><button id="zIn" class="sm" title="Acercar">＋</button></span>
         <span class="grp" id="selAct" hidden>
           <button id="sDup" class="sm" title="Duplicar la selección justo después (Ctrl+D)">⧉<span class="lb"> Duplicar</span></button>
+          <button id="sLyric" class="sm" hidden title="Escribir la letra sobre las notas (doble toque, mantener pulsada la nota o Intro)">✎<span class="lb"> Letra</span></button>
           <button id="sUp" class="sm" title="Subir la selección un semitono (en percusión, un carril)">▲</button>
           <button id="sDn" class="sm" title="Bajar la selección un semitono (en percusión, un carril)">▼</button>
           <button id="sDel" class="sm danger" title="Borrar la selección (Supr)">🗑<span class="lb"> Borrar</span></button>
@@ -284,6 +287,14 @@ kbd{display:inline-block;min-width:1.5em;text-align:center;padding:1px 6px;borde
   <div class="sec fold" data-fold="plugins"><h4 class="ft">Instrumentos de usuario (plugins)</h4><div id="plgList"></div>
     <div class="btnrow"><button id="bNewPlg" class="pri">Escribir un plugin nuevo…</button></div></div>
   <div class="sec fold" data-fold="kit"><h4 class="ft">Kit de síntesis</h4><div id="kitInfo" class="desc"></div><div class="btnrow"><button id="kitReset" class="sm" hidden>Volver al kit incluido</button></div></div>
+</div></div>
+
+<div id="lyModal" class="modal"><div class="card">
+  <h3>Pegar letra <button class="x" data-close="lyModal">Cerrar</button></h3>
+  <div class="desc">Escribe o pega la letra: se parte en sílabas y se reparte una por nota, desde la primera nota seleccionada (o desde la primera de la pista), en orden de tiempo. Las palabras que ya tuvieran esas notas se reemplazan.</div>
+  <textarea id="lyText" rows="6" style="width:100%;box-sizing:border-box" placeholder="canción de cuna, duérmete ya…"></textarea>
+  <div class="btnrow"><label class="chk"><input type="checkbox" id="lySyl" checked> Partir en sílabas (si no, una palabra por nota)</label></div>
+  <div class="btnrow"><button id="lyApply" class="pri">Repartir en las notas</button><span id="lyInfo" class="hint"></span></div>
 </div></div>
 
 <div id="plgModal" class="modal"><div class="card">
@@ -858,11 +869,11 @@ function encodeWav(L,R,sr){
 function u8ToB64(u8){let s='';const C=0x8000;for(let i=0;i<u8.length;i+=C)s+=String.fromCharCode.apply(null,u8.subarray(i,i+C));return btoa(s);}
 function b64ToU8(b){const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u;}
 const KIT_FORMAT=1;      // sube cuando un cambio del kit/motor haga sonar distinto un proyecto ya guardado
-const NOTE_KEYS=new Set(['b','l','m','v','pan','o']);
+const NOTE_KEYS=new Set(['b','l','m','v','pan','o','w']);
 function compactNote(n){
   for(const k in n) if(!NOTE_KEYS.has(k)) return n;                        // con campos desconocidos se guarda tal cual
-  const q=x=>Math.round(x*1e5)/1e5, v=n.v==null?1:n.v, pan=n.pan||0, hasO=n.o&&Object.keys(n.o).length;
-  const a=[q(n.b),q(n.l==null?.25:n.l),n.m]; if(v!==1||pan||hasO) a.push(v); if(pan||hasO) a.push(pan); if(hasO) a.push(n.o); return a;
+  const q=x=>Math.round(x*1e5)/1e5, v=n.v==null?1:n.v, pan=n.pan||0, hasO=n.o&&Object.keys(n.o).length, w=n.w||'';
+  const a=[q(n.b),q(n.l==null?.25:n.l),n.m]; if(v!==1||pan||hasO||w) a.push(v); if(pan||hasO||w) a.push(pan); if(hasO||w) a.push(hasO?n.o:0); if(w) a.push(w); return a;   // [b,l,m,v,pan,o,w]
 }
 function compactTrack(t){
   const inst=INSTRUMENTS[t.inst], def=inst?defaultParams(inst):null, o={id:t.id,name:t.name,inst:t.inst};
@@ -870,7 +881,7 @@ function compactTrack(t){
   if(t.vol!=null&&t.vol!==1) o.vol=t.vol; if(t.pan) o.pan=t.pan; if(t.mute) o.mute=true; if(t.solo) o.solo=true; o.ducked=!!t.ducked; if(t.sc) o.sc=true;
   if(t.fx) o.fx=t.fx; if(t.auto) o.auto=t.auto; if(t.alv) o.alv=t.alv; if(t.bakeOf) o.bakeOf=t.bakeOf; o.n=t.notes.map(compactNote); return o;
 }
-function expandTrack(t){ if(!Array.isArray(t.n)) return t; t.notes=t.n.map(a=>{ if(!Array.isArray(a)) return a; const n={b:a[0],l:a[1],m:a[2],v:a[3]==null?1:a[3]}; if(a[4]) n.pan=a[4]; if(a[5]) n.o=a[5]; return n; }); delete t.n; return t; }
+function expandTrack(t){ if(!Array.isArray(t.n)) return t; t.notes=t.n.map(a=>{ if(!Array.isArray(a)) return a; const n={b:a[0],l:a[1],m:a[2],v:a[3]==null?1:a[3]}; if(a[4]) n.pan=a[4]; if(a[5]) n.o=a[5]; if(a[6]) n.w=a[6]; return n; }); delete t.n; return t; }
 function projectToJSON(P,opts){
   const compact=!!(opts&&opts.compact);
   const o={format:'demokit-studio',v:compact?2:1,kit:KIT_FORMAT,name:P.name,bpm:P.bpm,bars:P.bars,tempo:(P.tempo&&P.tempo.length)?P.tempo:undefined,sig:barBeats(P)===4&&(!P.sig||P.sig[1]===4)?undefined:P.sig,sigs:sigPts(P).length?sigPts(P):undefined,seed:P.seed,sc:{mode:P.sc.mode,depth:P.sc.depth,rel:P.sc.rel,rate:P.sc.rate},master:masterOf(P),key:P.key||undefined,tracks:compact?P.tracks.map(compactTrack):P.tracks,clips:{},plugins:[]};
@@ -934,13 +945,13 @@ function bakeTrackNotes(P,tr,notes){      // → {baked, shared, bytes, track}
     P.tracks.splice(P.tracks.indexOf(tr)+1,0,bt); }
   let baked=0, shared=0, bytes=0;
   for(const nt of notes){ const r=bakeNoteClip(P,tr,nt,lanes); tr.notes.splice(tr.notes.indexOf(nt),1);
-    const src={m:nt.m,l:nt.l,v:nt.v==null?1:nt.v}; if(nt.pan) src.pan=nt.pan; if(nt.o) src.o=nt.o;
+    const src={m:nt.m,l:nt.l,v:nt.v==null?1:nt.v}; if(nt.pan) src.pan=nt.pan; if(nt.o) src.o=nt.o; if(nt.w) src.w=nt.w;
     bt.notes.push({b:nt.b,l:nt.l||.25,m:0,v:1,o:{cid:r.cid,src}}); baked++; if(r.shared) shared++; bytes+=r.bytes; }
   return {baked,shared,bytes,track:bt};
 }
 function unbakeTrackNotes(P,bt,notes){     // devuelve las notas horneadas a su pista de origen
   const src=P.tracks.find(x=>x.id===bt.bakeOf); if(!src) throw new Error('la pista original ya no existe'); let n=0;
-  for(const nt of notes){ const s=nt.o&&nt.o.src; if(!s) continue; const o={b:nt.b,l:s.l,m:s.m,v:s.v}; if(s.pan) o.pan=s.pan; if(s.o) o.o=s.o; src.notes.push(o); bt.notes.splice(bt.notes.indexOf(nt),1); n++; }
+  for(const nt of notes){ const s=nt.o&&nt.o.src; if(!s) continue; const o={b:nt.b,l:s.l,m:s.m,v:s.v}; if(s.pan) o.pan=s.pan; if(s.o) o.o=s.o; if(s.w) o.w=s.w; src.notes.push(o); bt.notes.splice(bt.notes.indexOf(nt),1); n++; }
   if(!bt.notes.length) P.tracks.splice(P.tracks.indexOf(bt),1); pruneBakedClips(P); return n;
 }
 function pruneBakedClips(P){ const used=new Set(); for(const t of P.tracks) if(t.inst==='clip') for(const n of t.notes) if(n.o&&n.o.cid) used.add(n.o.cid); for(const k of Object.keys(P.clips)) if(k.slice(0,3)==='bk-'&&!used.has(k.replace(/~r$/,''))) delete P.clips[k]; }
@@ -1494,7 +1505,9 @@ function draw(ph){
     const v=n.v==null?1:n.v; g.fillStyle=trackColor(sel,clamp(.35+.65*v,.2,1)); g.fillRect(x,y+1,w-1,RH-2);
     if(selNotes.has(n)){ g.strokeStyle='#fff'; g.lineWidth=1.5; g.strokeRect(x+.5,y+1.5,w-2,RH-3); }
     if(n.o&&Object.keys(n.o).some(k=>k!=='cid')){ g.fillStyle='#ffffffaa'; g.fillRect(x+w-6,y+3,3,3); }
-    if(!info.perc&&w>30&&RH>=14){ g.fillStyle='#0b0d14'; g.font='10px system-ui'; g.fillText(midiName(n.m),x+3,y+RH-4); }
+    if(inst.lyrics&&n.w&&w>8){ g.save(); g.beginPath(); g.rect(Math.max(x,KW),y,w-1,RH); g.clip(); g.fillStyle='#0b0d14'; g.font='600 '+clamp(RH-5,9,13)+'px system-ui'; g.fillText(n.w,x+3,y+RH-Math.max(3,(RH-9)/2)); g.restore(); }
+    else if(!info.perc&&w>30&&RH>=14){ g.fillStyle='#0b0d14'; g.font='10px system-ui'; g.fillText(midiName(n.m),x+3,y+RH-4); }
+    if(LE&&LE.n===n){ g.strokeStyle='#ffd76a'; g.lineWidth=2; g.strokeRect(x+1,y+1,w-3,RH-2); }
   }
   if(drag&&drag.kind==='rubber'){ g.strokeStyle='#8fa8ff'; g.fillStyle='#8fa8ff22'; const x=Math.min(drag.x0,drag.x1),y=Math.min(drag.y0,drag.y1),w=Math.abs(drag.x1-drag.x0),h=Math.abs(drag.y1-drag.y0); g.fillRect(x,y,w,h); g.strokeRect(x+.5,y+.5,w,h); }
   // inicio de reproducción y cabezal
@@ -1536,6 +1549,11 @@ cv.addEventListener('pointerdown',e=>{
   if(h){
     let tap=null; if(mode==='select'){ if(!selNotes.has(h.n)) selNotes.add(h.n); else tap=h.n; } else if(e.shiftKey){ if(selNotes.has(h.n)) selNotes.delete(h.n); else selNotes.add(h.n); } else if(!selNotes.has(h.n)) selNotes=new Set([h.n]);
     drag={kind:h.edge?'resize':'move',tap,startBeat:bx,startM:m,undone:false,orig:[...selNotes].map(n=>({n,b:n.b,m:n.m,l:n.l||.25}))};
+    lyPtr=e.pointerType; clearTimeout(lyLP);
+    if(inst.lyrics&&!h.edge&&mode!=='select'){
+      const now=Date.now(); if(lyTap&&lyTap.n===h.n&&now-lyTap.t<380){ drag.openLyric=h.n; lyTap=null; } else lyTap={n:h.n,t:now};
+      const x0=e.clientX,y0=e.clientY; lyLP=setTimeout(()=>{ if(drag&&drag.kind==='move'&&!drag.undone&&Math.abs(lastPX-x0)<7&&Math.abs(lastPY-y0)<7){ const n=h.n; drag=null; lyTap=null; openLyric(n); } },480);
+    }
     if(!h.edge) previewNote(h.n); renderSelInfo(); invalidate(); return;
   }
   if(e.shiftKey||mode==='select'){ if(mode==='select'&&!e.shiftKey){ selNotes=new Set(); renderSelInfo(); invalidate(); } drag={kind:'rubber',x0:px,y0:py,x1:px,y1:py}; return; }
@@ -1546,7 +1564,7 @@ cv.addEventListener('pointerdown',e=>{
   selNotes=new Set([n,...extra]); previewNote(n); for(const x of extra) previewNote(x); drag={kind:'draw',n,extra,start:b,moved:false}; touch(); renderSelInfo();
 });
 cv.addEventListener('pointermove',e=>{
-  const tr=P.tracks[sel]; const r=cv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
+  lastPX=e.clientX; lastPY=e.clientY; const tr=P.tracks[sel]; const r=cv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
   if(!drag){ if(mode==='draw'&&tr&&px>=KW&&py>=RUL){ const info=trackInfo(tr),inst=INSTRUMENTS[tr.inst]||{}; const h=hit(tr,info,inst,px,py); cv.style.cursor=h?(h.edge?'ew-resize':'pointer'):'crosshair'; } else cv.style.cursor=mode==='erase'?'not-allowed':(mode==='select'?'crosshair':'default'); return; }
   const info=trackInfo(tr), bx=pxToBeat(px), m=pyToM(info,py), minL=snap>0?snap:.0625;
   const undoOnce=()=>{ if(!drag.undone){ pushUndo(); drag.undone=true; } };
@@ -1564,10 +1582,49 @@ cv.addEventListener('pointermove',e=>{
     selNotes=new Set(tr.notes.filter(n=>n.b+visLen(inst,n)>=ba&&n.b<=bb&&Math.round(n.m)>=ma&&Math.round(n.m)<=mb)); invalidate();
   }
 });
-const endDrag=()=>{ if(!drag) return; const k=drag.kind; if(k==='move'&&drag.tap&&!drag.undone) selNotes.delete(drag.tap); drag=null; if(k!=='rubber') fitBars(); renderSelInfo(); invalidate(); };
+const endDrag=()=>{ clearTimeout(lyLP); if(!drag) return; const k=drag.kind; const ol=drag.openLyric&&!drag.undone?drag.openLyric:null; if(ol){ drag=null; renderSelInfo(); invalidate(); openLyric(ol); return; } if(k==='move'&&drag.tap&&!drag.undone) selNotes.delete(drag.tap); drag=null; if(k!=='rubber') fitBars(); renderSelInfo(); invalidate(); };
 cv.addEventListener('pointerup',endDrag); cv.addEventListener('pointercancel',endDrag);
-cv.addEventListener('contextmenu',e=>{ e.preventDefault(); const tr=P.tracks[sel]; if(!tr) return; const r=cv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
+cv.addEventListener('contextmenu',e=>{ e.preventDefault(); const tr=P.tracks[sel]; if(!tr) return; if(lyPtr==='touch'&&lyricInst()) return;   // en pistas con letra, mantener pulsado abre la letra, no borra const r=cv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
   if(px<KW||py<RUL) return; const h=hit(tr,trackInfo(tr),INSTRUMENTS[tr.inst]||{},px,py); if(h){ pushUndo(); tr.notes.splice(tr.notes.indexOf(h.n),1); selNotes.delete(h.n); touch(); renderSelInfo(); } });
+
+// ===== Letra sobre las notas (instrumentos con inst.lyrics) =====
+let LE=null, lyTap=null, lyLP=0, lyPtr='', lastPX=0, lastPY=0;
+const lyricInst=()=>{ const tr=P.tracks[sel], i=tr&&INSTRUMENTS[tr.inst]; return i&&i.lyrics?i:null; };
+const lySorted=tr=>[...tr.notes].sort((a,b)=>a.b-b.b||b.m-a.m);
+const lyInp=document.createElement('input'); lyInp.id='lyInp'; lyInp.type='text'; lyInp.autocomplete='off'; lyInp.spellcheck=false; lyInp.setAttribute('autocorrect','off'); lyInp.setAttribute('autocapitalize','none'); lyInp.setAttribute('enterkeyhint','done'); lyInp.setAttribute('aria-label','Letra de la nota'); document.body.append(lyInp);
+function lyPlace(){ if(!LE) return; const tr=P.tracks[sel]; if(!tr){ closeLyric(false); return; } const info=trackInfo(tr), RH=info.RH, n=LE.n, r=cv.getBoundingClientRect(), sx=wrap.scrollLeft, sy=wrap.scrollTop;
+  const ri=info.perc?Math.round(n.m):(info.hi-n.m), x=KW+n.b*BW-sx, y=RUL+ri*RH-sy, w=Math.max(96,(n.l||.25)*BW);
+  lyInp.style.left=Math.max(r.left+KW,Math.min(r.left+x,r.right-w-4))+'px'; lyInp.style.top=Math.max(r.top+RUL,Math.min(r.top+y+(RH-24)/2,r.bottom-26))+'px'; lyInp.style.width=w+'px'; }
+function lyReveal(n){ const tr=P.tracks[sel], info=trackInfo(tr), RH=info.RH, W=wrap.clientWidth, H=wrap.clientHeight; const x=KW+n.b*BW-wrap.scrollLeft;
+  if(x<KW+4||x>W-110) wrap.scrollLeft=Math.max(0,n.b*BW-(W-KW)/3);
+  const ri=info.perc?Math.round(n.m):(info.hi-n.m), y=RUL+ri*RH-wrap.scrollTop; if(y<RUL||y>H-RH-4) wrap.scrollTop=Math.max(0,ri*RH-(H-RUL)/2); }
+function openLyric(n){ const tr=P.tracks[sel]; if(!tr||!n||!lyricInst()) return; if(LE&&LE.n!==n) lyCommit(false);
+  if(!LE) LE={undone:false}; LE.n=n; LE.old=n.w||''; selNotes=new Set([n]); lyReveal(n); lyInp.value=LE.old; lyInp.classList.add('on'); lyPlace(); lyInp.focus({preventScroll:true}); lyInp.select(); renderSelInfo(); invalidate(); }
+function lyCommit(preview){ if(!LE) return; const v=lyInp.value.replace(/[\s]+/g,' ').trim(), n=LE.n; if(v!==(n.w||'')){ if(!LE.undone){ pushUndo(); LE.undone=true; } if(v) n.w=v; else delete n.w; touch(); LE.changed=true; if(preview&&v) { try{ previewNote(n); }catch(_){} } } LE.old=n.w||''; }
+function closeLyric(commit){ if(!LE) return; if(commit!==false) lyCommit(true); LE=null; lyInp.classList.remove('on'); lyInp.blur(); renderSelInfo(); renderInspector(); invalidate(); }
+function lyMove(d,skipCommit){ const tr=P.tracks[sel]; if(!LE||!tr) return; if(!skipCommit) lyCommit(true); const arr=lySorted(tr), i=arr.indexOf(LE.n), j=i+d;
+  if(j<0) return; if(j>=arr.length){ closeLyric(false); return; } const n=arr[j]; LE.n=n; LE.old=n.w||''; selNotes=new Set([n]); lyReveal(n); lyInp.value=LE.old; lyPlace(); lyInp.select(); renderSelInfo(); invalidate(); }
+lyInp.addEventListener('input',()=>{ if(!LE) return; const v=lyInp.value; if(!/[\s-]/.test(v)) return;
+  // Espacio o guion (también el del teclado de Android): confirma lo escrito y salta a la siguiente nota. Un texto con varias palabras se reparte por las notas.
+  const parts=v.split(/[\s-]+/), trailing=parts[parts.length-1]===''; if(trailing) parts.pop(); const toks=parts.filter(Boolean);
+  if(!toks.length){ lyInp.value=LE.old; lyMove(1,true); return; }   // espacio solo: saltar sin tocar la palabra
+  for(let i=0;i<toks.length-1;i++){ lyInp.value=toks[i]; lyMove(1); if(!LE) return; }
+  if(trailing){ lyInp.value=toks[toks.length-1]; lyMove(1); } else { lyInp.value=toks[toks.length-1]; } });
+lyInp.addEventListener('keydown',e=>{ if(!LE) return; e.stopPropagation();
+  if(e.key==='Enter'){ e.preventDefault(); closeLyric(true); }
+  else if(e.key==='Escape'){ e.preventDefault(); closeLyric(false); }
+  else if(e.key==='Tab'){ e.preventDefault(); lyMove(e.shiftKey?-1:1); }
+  else if(e.key==='Backspace'&&lyInp.value===''&&!e.repeat){ e.preventDefault(); lyMove(-1); }
+  else if(e.code==='Space'&&lyInp.value===''&&LE.old){ /* se resuelve en input */ } });
+lyInp.addEventListener('blur',()=>{ setTimeout(()=>{ if(LE&&document.activeElement!==lyInp) closeLyric(true); },120); });
+wrap.addEventListener('scroll',()=>{ if(LE) lyPlace(); }); window.addEventListener('resize',()=>{ if(LE) lyPlace(); });
+$('sLyric').onclick=()=>{ const tr=P.tracks[sel]; if(!tr||!lyricInst()) return; const n=lySorted(tr).find(x=>selNotes.has(x))||lySorted(tr)[0]; if(!n){ toast('Dibuja alguna nota primero','err'); return; } openLyric(n); };
+function lyricPaste(){ const tr=P.tracks[sel], inst=lyricInst(); if(!tr||!inst) return; const txt=$('lyText').value, useSyl=$('lySyl').checked;
+  const toks=useSyl?inst.syllables(txt):(txt.match(/[^\s]+/g)||[]); if(!toks.length){ $('lyInfo').textContent='No hay texto'; return; }
+  const arr=lySorted(tr); if(!arr.length){ $('lyInfo').textContent='La pista no tiene notas'; return; }
+  const from=Math.max(0,arr.findIndex(n=>selNotes.has(n))); pushUndo(); let k=0; for(let i=from;i<arr.length&&k<toks.length;i++,k++) arr[i].w=toks[k];
+  touch(); invalidate(); renderSelInfo(); closeModal('lyModal'); toast(k+' sílabas repartidas'+(k<toks.length?' · sobraron '+(toks.length-k)+' (faltan notas)':''),k<toks.length?'err':'ok'); }
+$('lyApply').onclick=lyricPaste;
 wrap.addEventListener('scroll',invalidate);
 wrap.addEventListener('wheel',e=>{ if(e.ctrlKey||e.metaKey){ e.preventDefault(); zoom(e.deltaY<0?1.15:1/1.15); } },{passive:false});
 new ResizeObserver(()=>{ layoutSpacer(); invalidate(); }).observe(wrap);
@@ -1588,6 +1645,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Delete'||e.key==='Backspace'){ if(selNotes.size){ e.preventDefault(); delSel(); } }
   else if(ctrl&&e.key.toLowerCase()==='a'){ e.preventDefault(); selNotes=new Set(tr.notes); renderSelInfo(); invalidate(); }
   else if(ctrl&&e.key.toLowerCase()==='d'){ e.preventDefault(); dupSel(); }
+  else if(e.key==='Enter'&&lyricInst()&&selNotes.size){ e.preventDefault(); openLyric(lySorted(tr).find(n=>selNotes.has(n))); }
   else if(e.key==='Escape'){ selNotes.clear(); renderSelInfo(); invalidate(); }
   else if(e.key==='Home'){ setCursor(0); wrap.scrollLeft=0; }
   else if(e.key.startsWith('Arrow')&&selNotes.size){ e.preventDefault(); const info=trackInfo(tr); pushUndo();
@@ -1676,7 +1734,7 @@ function sliderRow(label,get,set,min,max,step,def,fmt){
   if(def!=null) inp.addEventListener('dblclick',()=>{ inp.value=def; set(def); show(); previewTrack(); });
   show(); return el('div',{class:'row'},el('label',{text:label,title:label}),inp,out);
 }
-function renderSelInfo(){ const sa=$('selAct'); if(sa) sa.hidden=!selNotes.size; const e=$('selInfo'); if(!e) return; const tr=P.tracks[sel]; e.textContent=tr?(tr.notes.length+' notas · '+selNotes.size+' seleccionadas'):''; const v=$('selVel'); if(v){ v.disabled=!selNotes.size; if(selNotes.size){ const x=[...selNotes][0].v; v.value=x==null?1:x; if(v.nextElementSibling) v.nextElementSibling.textContent=fmtNum(+v.value); } } }
+function renderSelInfo(){ const sa=$('selAct'); if(sa) sa.hidden=!selNotes.size; const sl=$('sLyric'); if(sl) sl.hidden=!lyricInst(); const e=$('selInfo'); if(!e) return; const tr=P.tracks[sel]; e.textContent=tr?(tr.notes.length+' notas · '+selNotes.size+' seleccionadas'):''; const v=$('selVel'); if(v){ v.disabled=!selNotes.size; if(selNotes.size){ const x=[...selNotes][0].v; v.value=x==null?1:x; if(v.nextElementSibling) v.nextElementSibling.textContent=fmtNum(+v.value); } } }
 function setFx(tr,g,k,v){ tr.fx=tr.fx||{}; tr.fx[g]=Object.assign({},FX_DEF[g],tr.fx[g]); tr.fx[g][k]=v; touch(); }
 function fxBlock(tr){
   const T=[['1/16',.25],['1/8',.5],['1/8 punteado',.75],['1/4',1],['1/4 punteado',1.5],['1/2',2]];
@@ -1725,7 +1783,8 @@ function renderInspector(){
     el('button',{class:'sm',text:'Duplicar pista',onclick:()=>{ const c=JSON.parse(JSON.stringify(tr)); c.id=uid(); c.name=tr.name+' copia'; P.tracks.splice(sel+1,0,c); sel++; renderTracks(); renderInspector(); touch(); }}),
     el('button',{class:'sm danger',text:'Borrar pista',onclick:()=>{ if(tr.notes.length&&!confirm('¿Borrar «'+tr.name+'» con '+tr.notes.length+' notas?')) return; P.tracks.splice(sel,1); sel=Math.max(0,Math.min(sel,P.tracks.length-1)); selNotes.clear(); renderTracks(); renderInspector(); centerTrack(); touch(); }})));
   box.append(sec('Pista «'+tr.name+'»',...kids));
-  const pk=[]; const noteOv=tr.notes.filter(n=>n.o&&Object.keys(n.o).some(k=>k!=='cid')).length;
+  const pk=[]; const npk=new Set(inst.noteParams||[]); const noteOv=tr.notes.filter(n=>n.o&&Object.keys(n.o).some(k=>k!=='cid'&&!npk.has(k))).length;
+  if(inst.presets){ const names=Object.keys(inst.presets), ps=el('select',{onchange:e=>{ const p=inst.presets[names[+e.target.value-1]]; if(!p){ return; } for(const k in p) tr.params[k]=p[k]; touch(); renderInspector(); previewTrack(); }},el('option',{value:0,text:'Elegir…'}),...names.map((o,i)=>el('option',{value:i+1,text:o}))); pk.push(el('div',{class:'row'},el('label',{text:'Preajuste'}),ps)); }
   for(const d of inst.params){
     if(d.type==='choice'){ const vals=d.vals||d.opts.map((_,i)=>i); const s=el('select',{onchange:e=>{ tr.params[d.k]=vals[+e.target.value]; touch(); previewTrack(); }},...d.opts.map((o,i)=>el('option',{value:i,text:o}))); s.value=Math.max(0,vals.indexOf(tr.params[d.k]));
       pk.push(el('div',{class:'row'},el('label',{text:d.label}),s)); }
@@ -1734,12 +1793,15 @@ function renderInspector(){
   }
   if(tr.params.lpSrc) pk.push(el('div',{class:'hint',text:'Esta pista usa un filtro con función propia: '+tr.params.lpSrc}));
   if(noteOv) pk.push(el('div',{class:'hint',text:noteOv+' notas tienen ajustes propios (punto blanco) y no siguen estos controles.'}),
-    el('div',{class:'btnrow'},el('button',{class:'sm',text:'Unificar: borrar ajustes por nota',onclick:()=>{ for(const n of tr.notes) if(n.o){ const c=n.o.cid; delete n.o; if(c) n.o={cid:c}; } touch(); renderInspector(); }})));
+    el('div',{class:'btnrow'},el('button',{class:'sm',text:'Unificar: borrar ajustes por nota',onclick:()=>{ for(const n of tr.notes) if(n.o){ const keep={}; for(const k in n.o) if(k==='cid'||npk.has(k)) keep[k]=n.o[k]; if(Object.keys(keep).length) n.o=keep; else delete n.o; } touch(); renderInspector(); }})));
   box.append(sec('Parámetros del instrumento',...pk)); box.append(fxBlock(tr));
   const cp=['from','n','to','times'].map((k,i)=>el('input',{type:'number',min:1,value:[1,4,5,1][i],title:['desde el compás','cuántos compases','pegar en el compás','repeticiones'][i]}));
   const velRow=sliderRow('Velocidad',()=>1,v=>{ for(const n of selNotes) n.v=v; touch(); },0,1.5,.01,1); velRow.querySelector('input').id='selVel';
   box.append(sec('Notas',el('div',{id:'selInfo',class:'hint'}),
-    velRow,notesTools(),
+    velRow,...(inst.noteParams?[el('div',{class:'hint',text:'Por nota (solo las seleccionadas; sin selección, todas):'}),...inst.noteParams.map(k=>{ const d=inst.params.find(p=>p.k===k); if(!d) return null; const get=()=>{ const n=[...selNotes][0]; return n&&n.o&&n.o[k]!=null?n.o[k]:tr.params[k]; };
+      return sliderRow(d.label+' (nota)',get,v=>{ const L=selNotes.size?[...selNotes]:tr.notes; for(const n of L){ (n.o||(n.o={}))[k]=v; } touch(); },d.min,d.max,d.step,d.def); }).filter(Boolean)]:[]),
+    ...(inst.lyrics?[el('div',{class:'btnrow'},el('button',{class:'sm',text:'✎ Pegar letra…',onclick:()=>{ $('lyText').value=''; $('lyInfo').textContent=''; openModal('lyModal'); }}),el('button',{class:'sm danger',text:'Borrar letra',onclick:()=>{ if(!tr.notes.some(n=>n.w)) return; pushUndo(); for(const n of tr.notes) delete n.w; touch(); invalidate(); }}))]:[]),
+    notesTools(),
     el('div',{class:'copyrow',style:'margin-top:8px'},'Copiar compás',cp[0],'×',cp[1],'→',cp[2],'repetir',cp[3],
       el('button',{class:'sm',text:'Copiar',onclick:()=>{ const [f,c,t,x]=cp.map(i=>Math.max(1,Math.round(+i.value)||1)); pushUndo(); const mmc=meter(P), b0=mmc.beatOfBar(f-1), len=mmc.beatOfBar(f-1+c)-b0; const src=tr.notes.filter(n=>n.b>=b0-1e-9&&n.b<b0+len-1e-9);
         for(let r=0;r<x;r++){ const off=mmc.beatOfBar(t-1)+r*len-b0; for(const n of src){ const k=JSON.parse(JSON.stringify(n)); k.b=r6(n.b+off); tr.notes.push(k); } }
