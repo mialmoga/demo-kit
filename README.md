@@ -31,8 +31,8 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 | Archivo | Demo | Editable |
 |---|---|---|
 | `electronic_rush.js` | ⚡ Electronic Rush - Ws | no |
-| `the_void_MK.js` | 🕳️ The Void - Ws | no |
-| `cotton_sugar_MK.js` | 🍬 Cotton Sugar - Ws | no |
+| `the_void_MK.js` | 🕳️ The Void - Ws | sí |
+| `cotton_sugar_MK.js` | 🍬 Cotton Sugar - Ws | sí |
 | `event_horizon.js` | 🌑 Event Horizon - Ws | sí |
 | `marshmallow_sky.js` | ☁️ Marshmallow Sky - Ws | sí |
 | `dark_matter.js` | 🌌 Dark Matter - Ws | sí |
