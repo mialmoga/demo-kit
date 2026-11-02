@@ -30,21 +30,21 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 | Archivo | Demo | Editable |
 |---|---|---|
-| `electronic_rush.js` | ⚡ Electronic Rush - Ws | no |
+| `electronic_rush.js` | ⚡ Electronic Rush - Ws | sí |
 | `the_void_MK.js` | 🕳️ The Void - Ws | sí |
 | `cotton_sugar_MK.js` | 🍬 Cotton Sugar - Ws | sí |
 | `event_horizon.js` | 🌑 Event Horizon - Ws | sí |
 | `marshmallow_sky.js` | ☁️ Marshmallow Sky - Ws | sí |
 | `dark_matter.js` | 🌌 Dark Matter - Ws | sí |
 | `yo_soy_nan.js` | ♾️ You Soy NaN (by Éter) | sí |
-| `kinetic_drift.js` | Kinetic Drift (by Éter) | sí |
-| `neon_tidal.js` | Neon Tidal (by Velvet) | sí |
-| `phantom_minds_ear.js` | Phantom Mind's Ear (by Velvet) | sí |
+| `la_casa_que_respira.js` | 👻 La casa que respira (by Ámbar) | sí |
+| `kinetic_drift.js` | ⚙️ Kinetic Drift (by Éter) | sí |
+| `neon_tidal.js` | 🌊 Neon Tidal (by Velvet) | sí |
+| `phantom_minds_ear.js` | 👂 Phantom Mind's Ear (by Velvet) | sí |
 
-> Las marcadas como no editables se pueden reproducir y exportar a .WAV, pero usan un kit diferente que viene incrustado.
 > Todas las marcadas - Ws forman parte del proyecto Wavesurfer  **<https://mialmoga.github.io/Wavesurfer/>**
 >
-> La carpeta `demos/` trae también `la_casa_que_respira`, `ejemplo_minimo` y `ejemplo_metrico`; la autoría de cada demo está en [Créditos](#créditos).
+> La carpeta `demos/` trae también `ejemplo_minimo` y `ejemplo_metrico`; la autoría de cada demo está en [Créditos](#créditos).
 
 **Aviso de seguridad al ejecutar demos:** la primera vez que reproduces o conviertes una demo `.js` que no viene del repositorio, el estudio te pregunta antes de ejecutarla (es código). Recuerda tu respuesta por contenido, así que no vuelve a preguntar por la misma demo.
 
