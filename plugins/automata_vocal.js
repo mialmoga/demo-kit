@@ -238,12 +238,12 @@ registerInstrument((() => {
   const N = PRESETS.Neutra;
   return {
     id: 'voz', name: 'Voz cantada (Autómata)', kind: 'melodic', lyrics: true, noteParams: ['energia', 'sorpresa', 'cansancio'], presets: PRESETS, syllables,
-    desc: 'Sintetizador de formantes en español. Escribe una sílaba o palabra sobre cada nota (doble toque, mantener pulsada o Intro; Espacio salta a la siguiente nota) y la voz la canta con el tono de la nota. Energía, Sorpresa y Cansancio se cambian nota por nota.',
+    desc: 'Sintetizador de formantes en español. Escribe una sílaba o palabra sobre cada nota (doble toque, mantener pulsada o Intro; Espacio salta a la siguiente nota) y la voz la canta con el tono de la nota. Energía, Sorpresa y Cansancio se cambian nota por nota. El legato une las notas pegadas deslizando el tono.',
     params: [
       { k: 'energia', label: 'Energía', min: 0, max: 100, step: 1, def: 50 }, { k: 'sorpresa', label: 'Sorpresa', min: 0, max: 100, step: 1, def: 0 }, { k: 'cansancio', label: 'Cansancio', min: 0, max: 100, step: 1, def: 0 },
       { k: 'gain', label: 'Ganancia', min: 0, max: 2, step: .01, def: 1 },
       { k: 'gen', label: 'Género (0 masc · 1 fem)', min: 0, max: 1, step: .01, def: N.gen }, { k: 'tono', label: 'Tono (st)', min: -12, max: 12, step: 1, def: N.tono },
-      { k: 'form', label: 'Formantes (st)', min: -6, max: 6, step: .5, def: N.form }, { k: 'vel', label: 'Velocidad de dicción', min: .6, max: 1.6, step: .05, def: N.vel },
+      { k: 'form', label: 'Formantes (st)', min: -6, max: 6, step: .5, def: N.form }, { k: 'vel', label: 'Velocidad de dicción', min: .6, max: 1.6, step: .05, def: N.vel }, { k: 'legato', label: 'Legato (enlace entre notas)', min: 0, max: 1, step: .05, def: .8 },
       { k: 'asp', label: 'Saturación', min: 0, max: 1, step: .01, def: N.asp }, { k: 'aire', label: 'Aire / respiración', min: 0, max: 1, step: .01, def: N.aire },
       { k: 'ruido', label: 'Ruido fonético', min: 0, max: 1, step: .01, def: N.ruido }, { k: 'vib', label: 'Vibrato', min: 0, max: 1, step: .01, def: N.vib },
       { k: 'micro', label: 'Microvariación', min: 0, max: 1, step: .01, def: N.micro }, { k: 'timbre', label: 'Timbre / carácter del ADN', min: 0, max: 1, step: .01, def: N.timbre },
@@ -257,9 +257,13 @@ registerInstrument((() => {
       const vp = { gen: p.gen, tono: p.tono, form: p.form, vel: p.vel, asp: p.asp, aire: p.aire, ruido: p.ruido, vib: p.vib, micro: p.micro, timbre: p.timbre, sib: p.sib, agua: p.agua, coro: p.coro, coro2: p.coro2, coro3: p.coro3, coro4: p.coro4, dnaName: name, dnaSeed: hashDNA(name) };
       const mood = { energy: clamp(p.energia / 100, 0, 1), surprise: clamp(p.sorpresa / 100, 0, 1), fatigue: clamp(p.cansancio / 100, 0, 1) };
       const f0 = n.hz * Math.pow(2, vp.tono / 12), plan = notePlan(text, vp, n.len, f0, mood); if (!plan) return;
+      // legato: si la nota vecina está pegada (hueco ≤ 120 ms) el tono se desliza desde la anterior y la vocal se alarga un poco para fundirse con la siguiente
+      const lk = n.link, lg = clamp(p.legato == null ? .8 : p.legato, 0, 1), jp = !!(lk && lg > 0 && lk.prevGap != null && lk.prevGap <= .12), jn = !!(lk && lg > 0 && lk.nextGap != null && lk.nextGap <= .12);
+      if (jn) { let last = null; for (const f of plan.frames) if (!last || f.t + f.d > last.t + last.d) last = f; if (last) last.d += .012 + .05 * lg; }
+      const dm = jp ? n.midi - lk.prevMidi : 0, gt = Math.max(.02, Math.min(.03 + .13 * lg, .45 * n.len));
       const dp = dnaProfile(vp.dnaSeed), nv = clamp(Math.round(vp.coro), 1, 4), t0 = n.t - plan.pre, shift = t0 < 0 ? -t0 : 0, tailW = vp.agua > .001 ? Math.min(3.5, (.12 + vp.agua * .24) * 7 + .4) : 0;
       const sur = mood.surprise, fat = mood.fatigue, sm = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x), pre = plan.pre, len = n.len;
-      const contour = t => { const tn = t - pre, u = clamp(tn / len, 0, 1); return -fat * .5 * u + (tn >= 0 ? -sur * 1.8 * Math.exp(-tn / .09) : 0) + sur * 2.4 * sm((u - .55) / .45); };
+      const contour = t => { const tn = t - pre, u = clamp(tn / len, 0, 1); return -fat * .5 * u + (tn >= 0 && !jp ? -sur * 1.8 * Math.exp(-tn / .09) : 0) + (jn ? 0 : sur * 2.4 * sm((u - .55) / .45)) - (jp ? dm * (1 - sm(tn / gt)) : 0); };
       const voices = []; for (let v = 0; v < nv; v++) voices.push(makeVoice(plan.frames, vp, dp, mood, v, contour, sr, plan));
       const L = plan.end + .5 + tailW + .1; let tt = 0;
       K.add(n.buf, Math.max(0, t0), L, t => { const tl = t + shift; let s = 0; for (let v = 0; v < voices.length; v++) s += voices[v](tl); return s; }, n.a * p.gain * 1.4, n.pan);

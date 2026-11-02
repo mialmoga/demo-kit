@@ -668,11 +668,14 @@ function tmap(P){
   tmCache.set(P,{key,tm}); return tm;
 }
 // ───────────────────────── render ─────────────────────────
-function noteArgs(K,P,tr,nt,beat,t0){
+function noteArgs(K,P,tr,nt,beat,t0,nb){
   const p=nt.o?Object.assign({},tr.params,nt.o):tr.params, tm=t0!=null?null:tmap(P), vb=!!tm&&!tm.constant, bpmN=vb?tm.bpmAt(nt.b):P.bpm, bt=vb?60/bpmN:beat;
   return {t:t0!=null?t0:(vb?tm.sec(nt.b):nt.b*beat),len:Math.max(.01,vb?tm.span(nt.b,nt.l||.25):(nt.l||.25)*beat),midi:nt.m,hz:K.hz(nt.m),lane:nt.m,a:(nt.v==null?1:nt.v)*(tr.vol==null?1:tr.vol),
-    pan:clamp((tr.pan||0)+(nt.pan||0),-1,1),p,buf:tr.ducked?K.mu:K.dr,sr:SR,bpm:bpmN,beat:bt,bar:bt*meter(P).lenAt(nt.b),note:nt,clips:P.clips};
+    pan:clamp((tr.pan||0)+(nt.pan||0),-1,1),p,buf:tr.ducked?K.mu:K.dr,sr:SR,bpm:bpmN,beat:bt,bar:bt*meter(P).lenAt(nt.b),note:nt,clips:P.clips,link:nb&&!(t0!=null)?linkOf(P,nt,nb):null};
 }
+// vecinas de una nota (para instrumentos que enlazan notas, como la voz): holgura en segundos hasta el final de la anterior / el inicio de la siguiente (≤0 = se tocan o se pisan) y su nota MIDI
+function linkOf(P,nt,nb){ const tm=tmap(P), beat=60/P.bpm, sec=b=>tm.constant?b*beat:tm.sec(b), r={prevGap:null,prevMidi:null,nextGap:null,nextMidi:null}, s0=sec(nt.b), e0=sec(nt.b+(nt.l||.25));
+  if(nb.prev){ r.prevGap=s0-sec(nb.prev.b+(nb.prev.l||.25)); r.prevMidi=nb.prev.m; } if(nb.next){ r.nextGap=sec(nb.next.b)-e0; r.nextMidi=nb.next.m; } return r; }
 function makeDuck(P,beat){
   const sc=P.sc||{}, tm=tmap(P), vb=!tm.constant;
   if(sc.mode==='table'&&sc.table){ const T=sc.table,R=sc.rate||800; return t=>{ const x=t*R,i=Math.floor(x); if(i>=T.length-1) return T[T.length-1]; if(i<0) return T[0]; const f=x-i; return T[i]+(T[i+1]-T[i])*f; }; }
@@ -785,7 +788,9 @@ function extractStems(K){
 async function renderTrackStem(P,tr,beat,total){
   const inst=INSTRUMENTS[tr.inst]; if(!inst) throw new Error('instrumento no disponible ('+tr.inst+')');
   const K=Kit.make(SR,total,trackSeed(P,tr)); K.sr=SR; const t=Object.assign({},tr,{vol:1}), lanes=paramLanes(tr,inst), LV=tr.alv===16?16:8; let last=performance.now(),i=0;
-  for(const nt of tr.notes.slice().sort((a,b)=>a.b-b.b)){ inst.play(K,noteArgs(K,P,t,laneNote(lanes,LV,nt),beat)); if(++i%25===0&&performance.now()-last>14){ await tick(); last=performance.now(); } }
+  const SN=tr.notes.slice().sort((a,b)=>a.b-b.b);
+  for(let j=0;j<SN.length;j++){ const nt=SN[j]; let pv=null,nx=null; for(let q=j-1;q>=0;q--) if(SN[q].b<nt.b-1e-6){ pv=SN[q]; break; } for(let q=j+1;q<SN.length;q++) if(SN[q].b>nt.b+1e-6){ nx=SN[q]; break; }
+    inst.play(K,noteArgs(K,P,t,laneNote(lanes,LV,nt),beat,null,{prev:pv,next:nx})); if(++i%25===0&&performance.now()-last>14){ await tick(); last=performance.now(); } }
   return extractStems(K);
 }
 async function ensureStems(P,trs,onProg,from,to){
