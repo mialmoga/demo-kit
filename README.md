@@ -558,4 +558,4 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 | `proyectos/la_casa_que_respira.demokit.json` | Ámbar |
 | `proyectos/Nexo_Latente.demokit.json` | Velvet |
 
-`rendered/` trae tres WAV de muestra exportados desde el estudio (`la_casa_que_respira.wav` y `la_casa_que_respira_theremin.wav`).
+`rendered/` trae tres WAV de muestra exportados desde el estudio (`la_casa_que_respira.wav`, `la_casa_que_respira_theremin.wav` y `marea_de_ceniza.wav`).
