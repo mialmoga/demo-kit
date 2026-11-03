@@ -23,7 +23,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 ## Uso rápido
 
-1. Abre la versión en línea: **<https://mialmoga.github.io/demo-kit/>**. O descarga `demo_kit_studio.html` y ábrelo con doble clic (no necesita servidor; el favicon y las imágenes vienen de `favicon.ico` y `assets/`, así que sin ellos el HTML funciona igual pero sin iconos).
+1. Abre la versión en línea: **<https://mialmoga.github.io/demo-kit/>**. O descarga `demo_kit_studio.html` y ábrelo con doble clic (no necesita servidor, y lleva sus iconos incrustados; la versión en línea `index.html` los toma de `favicon.ico` y `assets/`, y sin ellos funciona igual pero sin iconos).
 2. «Demos y plugins» → «Cargar proyecto de ejemplo», y dale **Play**.
 3. O arrastra algún demo de la carpeta demos/ a la ventana y pulsa **«✎ Convertir en editable»**. También puedes abrir lo que hay en las carpetas del repositorio desde la sección **En el repositorio** (ver más abajo).
 4. Pulsa **?** (o `F1`) para ver la hoja de atajos y gestos.
@@ -49,7 +49,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 **Aviso de seguridad al ejecutar demos:** la primera vez que reproduces o conviertes una demo `.js` que no viene del repositorio, el estudio te pregunta antes de ejecutarla (es código). Recuerda tu respuesta por contenido, así que no vuelve a preguntar por la misma demo.
 
-> El audio solo se genera cuando pulsas Play o WAV: Demo Kit renderiza el proyecto completo y luego lo reproduce. Si cambias algo, el indicador de arriba a la derecha muestra «cambios sin renderizar» y el siguiente Play vuelve a renderizar.
+> El audio solo se genera cuando pulsas Play o WAV: Demo Kit renderiza el proyecto completo y luego lo reproduce. Si cambias algo, el indicador de la cabecera muestra «sin renderizar» y el siguiente Play vuelve a renderizar.
 
 ## Funciones
 
@@ -82,13 +82,21 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 - **Sidechain:** las pistas «ducked» (la música) bajan de volumen cada vez que suena una pista marcada como disparador (normalmente el bombo). Profundidad y relajación ajustables.
 
-- **Efectos por pista:** *delay* (tiempo en negras/corcheas, repeticiones, tono, mezcla, ping-pong) y *reverb* (tamaño, amortiguación, mezcla, pre-delay). Se aplican sobre el audio ya renderizado de la pista, así que moverlos **no vuelve a renderizar el instrumento**. También suenan al tocar en vivo y en la vista previa.
+- **Efectos por pista** («Mezcla y efectos de la pista», en el inspector). Se aplican en este orden sobre el audio ya renderizado de la pista, así que moverlos **no vuelve a renderizar el instrumento**. También suenan al tocar en vivo y en la vista previa:
+  - **EQ de 3 bandas:** graves (shelf en 120 Hz), medios (campana con frecuencia y Q ajustables) y agudos (shelf en 7 kHz), de ±12 dB.
+  - **Compresor:** umbral, razón, ataque, liberación, codo, compensación de ganancia y mezcla en paralelo. Un indicador muestra cuánto está comprimiendo (reducción máxima) la última vez que se renderizó.
+  - **Delay** (tiempo en negras/corcheas, repeticiones, tono, mezcla, ping-pong) y **reverb** (tamaño, amortiguación, mezcla, pre-delay).
+  - **Preajustes** de EQ y compresor: Voz, Bajo, Bombo, Pegamento suave y Brillo.
 
 - **Automatización por pista:** botón «📈 Automatización» bajo el piano roll. Curvas de **volumen**, **paneo** y **filtro** (pasa-bajos de 80 Hz a 18 kHz) con puntos en pulsos: clic = punto, arrastrar = mover (respeta la rejilla), doble clic o clic derecho = quitar, `Ctrl+Z` deshace. Se aplican al mezclar, después de los efectos, así que editarlas no vuelve a renderizar el instrumento. Se oyen al dar Play, en el WAV y en los stems; no al tocar en vivo.
 
 - **Parámetros del instrumento automatizables:** en el mismo selector del carril aparecen también los parámetros del instrumento de la pista (cutoff, índice FM, lo que tenga).
   - Estas curvas **escalonan**: el valor se toma al inicio de cada nota y se reparte en **8 niveles** (o **16**, con el selector «niveles»). El sonido por nota queda un poco «artificial» a propósito, como una característica.
   - Un parámetro fijado a mano en una nota (punto blanco) tiene prioridad sobre la curva. Cambiarlas vuelve a renderizar solo esa pista.
+
+- **Efectos automatizables:** en el mismo selector, el grupo **«Efectos de la pista»** trae nueve curvas: EQ (graves, medios, frecuencia de medios, agudos), compresor (umbral, compensación, mezcla), mezcla del delay y mezcla de la reverb.
+  - A diferencia de las del instrumento, estas curvas son **continuas** (interpolación lineal que sigue el mapa de tempo) y no vuelven a renderizar el instrumento: solo se recalculan los efectos.
+  - Una curva **solo actúa si su efecto está encendido**; si no, el carril avisa. Sin curvas de efectos el audio es idéntico al de siempre. Se guardan en el proyecto, el compacto, la demo `.js` y la librería, pero no suenan al tocar en vivo.
 
 - **Hornear barrido** (solo con parámetros automatizados): si quieres que el parámetro se mueva de forma **continua dentro de cada nota**, el botón «Hornear barrido» renderiza la nota seleccionada (o toda la pista) varias veces con el valor en distintos puntos y las funde.
   - Es caro, así que solo ocurre al pulsarlo. Las notas horneadas pasan a una pista «<nombre> · bake» (con audio estéreo guardado en el proyecto, que pesa), y las notas idénticas comparten el mismo clip.
@@ -121,6 +129,8 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 - **Exportación a WAV** (estéreo, 16 bits, 44.1 kHz) y **a stems**: un ZIP con un WAV por pista (incluidas las silenciadas), con los efectos de cada pista pero sin el master, para seguir mezclando en otro DAW.
 
 - **MIDI:** «⬇ MIDI» descarga un `.mid` con una pista por pista, más tempo, compás (con sus cambios), volumen y paneo (las pistas silenciadas salen con volumen 0; la automatización no se exporta). **Cargar archivos** acepta `.mid`/`.midi` y lo abre como **proyecto nuevo** (con los cambios de tempo y de compás que traiga; si un cambio de compás no cae en límite de compás, se ajusta y se avisa). Es para llevar las notas a otro programa y de vuelta: el sonido de Demo Kit no viaja en el MIDI.
+
+- **Pantalla completa:** toca el logo «dk» de la cabecera. El fondo (aurora y partículas) se queda quieto cuando no hay actividad y despierta con un toque, una tecla o Play.
 
 - **Metrónomo:** casilla «metrónomo» en la cabecera; sigue el compás y el mapa de tempo, y suena también al grabar.
 
@@ -210,7 +220,7 @@ Resultado actual con las demos incluidas:
 | Yo soy NaN | 11 | 322 | 0 |
 | Ejemplo mínimo | 5 | 72 | 0 |
 
-Electronic Rush y cualquier demo que traiga su propio kit no se convierten (suenan y exportan a WAV, pero no son editables).
+Electronic Rush (reescrita sobre `demoKit.metric`) ya se convierte; una demo que traiga su propio kit integrado no se convierte (suena y exporta a WAV, pero no es editable).
 
 Límites a tener en cuenta:
 
@@ -374,7 +384,7 @@ El plugin [`plugins/automata_vocal.js`](plugins/automata_vocal.js) («Voz cantad
 - **Saltar a la siguiente nota mientras escribes:** `Espacio`, guion `-` o `Tab` confirman la palabra y pasan a la siguiente nota (en el teclado de Android también funciona el `Espacio`). `Shift+Tab` o `Retroceso` con el cuadro vacío vuelven a la anterior; `Intro` cierra; `Esc` cancela. Un `Espacio` sin escribir nada salta la nota sin cambiarla. Si pegas varias palabras de golpe, se reparten una por nota. Una sesión de escritura es un solo paso de deshacer.
 - **Pegar letra…** (en el inspector): partes un texto en sílabas y se reparte una por nota, en orden de tiempo, desde la nota seleccionada. **Borrar letra** quita todas las palabras de la pista.
 - **Por nota: Energía, Sorpresa y Cansancio** (sliders en «Notas», para las notas seleccionadas o todas si no hay selección): energía = brillo y volumen, sorpresa = inflexión de tono al entrar y al terminar, cansancio = caída de tono, más aire y menos vibrato. Los demás controles (género, tono, formantes, aspereza, aire, vibrato, timbre, agua, coro de 1 a 4 voces, ADN…) son de la pista, con **preajustes** Robot, Neutra, Grave, Aguda y Hueca.
-- **Límites:** cada nota es una voz independiente (no hay portamento entre notas); no hay modo hablado aparte (para una voz plana, deja Sorpresa y Cansancio en 0 y el vibrato bajo, con notas largas del mismo tono), y las voces guardadas en el `localStorage` del Autómata original no se importan.
+- **Límites:** cada nota es una voz independiente (el slider **Legato** de la pista une cada nota con la anterior y la siguiente si están casi pegadas; en 0, cada nota es independiente); no hay modo hablado aparte (para una voz plana, deja Sorpresa y Cansancio en 0 y el vibrato bajo, con notas largas del mismo tono), y las voces guardadas en el `localStorage` del Autómata original no se importan.
 
 ## Extender el kit
 
@@ -403,7 +413,7 @@ function demoKit(sr, seconds, seed0) {
 
 ## Usar la música en otros proyectos (librería) lib/
 
-`demokit.min.js` (≈39 KB, ≈16 KB con gzip; `demokit.js` es la versión legible, v1.4) es el kit, el motor y un reproductor, **sin interfaz**. Carga canciones `.demokit.json` (las del estudio) **o** demos `.js` escritas a mano, las sintetiza en el momento y las reproduce con Web Audio. No hay muestras: la canción es solo código o datos.
+`demokit.min.js` (≈44 KB, ≈17 KB con gzip; `demokit.js` es la versión legible, v1.4) es el kit, el motor y un reproductor, **sin interfaz**. Carga canciones `.demokit.json` (las del estudio) **o** demos `.js` escritas a mano, las sintetiza en el momento y las reproduce con Web Audio. No hay muestras: la canción es solo código o datos.
 
 ```html
 <script src="demokit.min.js"></script>
@@ -454,8 +464,14 @@ function demoKit(sr, seconds, seed0) {
     "params": { "gain": 0.45, "decay": 0.9 },
     "notes": [{ "b": 0, "l": 3.6, "m": 36, "v": 1, "pan": 0, "o": {}, "w": "la" }],
     "auto": { "vol": [{"b": 0, "v": 1}], "p:cutoff": [{"b": 4, "v": 800}] },   // opcional: curvas; «p:<parámetro>» = parámetro del instrumento
-    "alv": 16                                    // opcional: niveles de las curvas de parámetro (8 por defecto)
+    "alv": 16,                                   // opcional: niveles de las curvas de parámetro (8 por defecto)
+    "fx": { "eq": {"on": true, "low": 2, "mid": 0, "midF": 1000, "midQ": 1, "high": 0},      // opcional: efectos de la pista
+            "comp": {"on": true, "thr": -18, "ratio": 3, "atk": 10, "rel": 120, "knee": 6, "makeup": 0, "mix": 1},
+            "delay": {"on": false}, "reverb": {"on": false} }
+    // las curvas de efectos van en "auto" con claves «fx:<grupo>.<parámetro>»: "fx:eq.low", "fx:eq.mid", "fx:eq.midF", "fx:eq.high",
+    //   "fx:comp.thr", "fx:comp.makeup", "fx:comp.mix", "fx:delay.mix", "fx:reverb.mix"
   }],
+  "master": { "low": 0, "high": 0, "gain": 1, "limit": true, "ceil": 0.97 },   // opcional
   "clips": { "c1": "<base64 int16>" },
   "plugins": [{ "id": "...", "name": "...", "code": "..." }]
 }
@@ -486,10 +502,10 @@ El render es determinista (misma semilla → mismo audio) y se hace por bloques 
 - Un stem exportado pasa por el mismo sidechain y saturación suave del master, solo con esa pista. La suma de todos los stems no es bit a bit idéntica al WAV de la mezcla completa, porque la saturación y el limitador no son lineales.
 - El autoguardado en el navegador no se activa en proyectos con clips horneados (serían demasiado grandes): guarda con «Guardar».
 - En iOS/Safari, el audio solo arranca tras un gesto del usuario (el botón Play ya lo es).
-- Los parámetros de los **efectos** (delay, reverb) no se automatizan; los del instrumento sí, pero escalonados por nota (8/16 niveles) salvo que hornees el barrido. El paneo automatizado actúa como balance sobre el paneo fijo de la pista.
+- Los parámetros del **instrumento** se automatizan escalonados por nota (8/16 niveles) salvo que hornees el barrido; los de los **efectos** (EQ, compresor, mezcla de delay y reverb) sí son continuos, pero no todos: el resto (razón, ataque, tiempo del delay, tamaño de la reverb…) no se automatizan. El paneo automatizado actúa como balance sobre el paneo fijo de la pista.
 - Los clips horneados (barridos y conversiones) pesan: se guardan como audio dentro del proyecto. «⬇ Compacto» avisa cuánto.
 - La demo exportada no es legible como código de síntesis (es el motor más los datos del proyecto); si quieres una demo escrita a mano, usa la guía de arriba.
-- El MIDI exportado lleva las notas, no el sonido ni la automatización. Los efectos son solo delay y reverb por pista; no hay compresor ni EQ por pista.
+- El MIDI exportado lleva las notas, no el sonido ni la automatización. Los efectos por pista (EQ, compresor, delay y reverb) tampoco viajan en el MIDI.
 - La reverb tiene cola de ~0.8 s (tamaño .2) a ~5 s (tamaño 1) y su nivel está calibrado de forma aproximada, afínalo de oído. Los efectos añaden a la caché (unos 230 MB en The Void con 5 pistas con efectos; tope 320 MB).
 - La grabación compensa la latencia de salida que reporta el navegador (ver «Latencia» arriba), pero con Bluetooth conviene calibrarla.
 
