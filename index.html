@@ -169,6 +169,8 @@ kbd{display:inline-block;min-width:1.5em;text-align:center;padding:1px 6px;borde
   #roll{min-height:auto}
   #insp{border-left:0}
 }
+</style>
+<style id="skinGlass">
 /* ═══════════ PIEL DE CRISTAL · Demo Kit ═══════════
    Paleta NaN (violeta + cian sobre noche profunda) y paneles glassmorphism.
    Solo estilos: no toca la lógica del estudio. */
@@ -290,6 +292,8 @@ kbd{background:rgba(255,255,255,.08);border-color:var(--glass-b)}
   #roll{margin-bottom:8px}
 }
 @media(max-width:700px){header{padding:6px 10px}}
+</style>
+<style>
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 
 /* ═══════════ FONDO VIVO (aurora + constelación que se aquieta) ═══════════ */
@@ -338,7 +342,36 @@ header .hl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;flex:1 1 
 @media(min-width:1001px) and (max-width:1500px){.rbar{column-gap:8px}.rbar .nm{max-width:150px}}
 @media(min-width:1001px) and (max-width:1320px){.rbar .lb{display:none}.rbar button.sm{padding:4px 9px;font-size:14px}}
 @media(min-width:1001px) and (max-width:1199px){.rbar .nm{max-width:100px}}
+
+/* ═══════════ APARIENCIA Y RENDIMIENTO (panel ⚙) ═══════════
+   data-skin="classic" apaga la piel de cristal (hoja #skinGlass); los demás atributos quitan efectos caros */
+html[data-skin="classic"] #bgfx,html[data-fx="off"] #bgfx{display:none}
+html[data-blur="off"]{--glass:rgba(15,23,42,.88)}
+html[data-blur="off"] *,html[data-blur="off"] *::before,html[data-blur="off"] *::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+#aprModal .card{width:min(460px,100%)}
+.aprrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.aprrow small{display:block;color:var(--m);font-size:12px;margin-top:2px}
+.aprrow input[type=checkbox]{width:18px;height:18px;flex:none}
+.aprhint{color:var(--m);font-size:12px;margin:10px 0 0}
+.toast .tact{margin-left:10px}
+#aprModal .row{display:flex;gap:8px}#aprModal .row button{flex:1}
 </style>
+<script>
+/* Preferencias de apariencia: se aplican antes de pintar para que no parpadee */
+(function(){
+  var D={skin:'glass',blur:true,fx:true,anim:true,warn:true}, A=D;
+  try{ var s=JSON.parse(localStorage.getItem('dk-apr')||'null'); if(s&&typeof s==='object') A=Object.assign({},D,s); }catch(e){}
+  function apply(){
+    var r=document.documentElement, g=document.getElementById('skinGlass');
+    r.dataset.skin=A.skin==='classic'?'classic':'glass'; r.dataset.blur=A.blur?'on':'off'; r.dataset.fx=A.fx?'on':'off'; r.dataset.anim=A.anim?'on':'off';
+    if(g) g.disabled=A.skin==='classic';
+    if(window.__bgfx) window.__bgfx.enable(A.fx&&A.skin!=='classic');
+  }
+  window.dkApr={get:function(){return Object.assign({},A);},set:function(k,v){A[k]=v; try{localStorage.setItem('dk-apr',JSON.stringify(A));}catch(e){} apply();},reset:function(){A=Object.assign({},D); try{localStorage.removeItem('dk-apr');}catch(e){} apply();},apply:apply};
+  apply();
+})();
+</script>
 <script>
 /* Visualizadores reactivos: un analizador "escucha" la salida (sin alterar el sonido) y alimenta
    el osciloscopio del header y el espectro del piano roll. Sin sonido todo cae a quietud y el bucle se detiene. */
@@ -441,6 +474,7 @@ header .hl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;flex:1 1 
   <div class="brand"><button id="fullscreen-btn" title="Pantalla completa"><img src="assets/icon.png" onerror="this.onerror=null;this.src='favicon.ico'" alt="dk" width="36" height="36" style="vertical-align:middle;border-radius:9px;margin-right:6px"></button> Demo Kit</div>
   <button id="hToggle" class="sm" aria-expanded="false" title="Mostrar u ocultar el resto de controles del proyecto">☰ Proyecto</button>
   <button id="bKeys" class="sm" title="Atajos y gestos (F1)">?</button>
+  <button id="bApr" class="sm" title="Apariencia y rendimiento" aria-label="Apariencia y rendimiento">⚙</button>
   <div class="grp">
     <button id="bPlay" class="pri">▶ Play</button>
     <label class="chk"><input type="checkbox" id="loop"> bucle</label>
@@ -582,6 +616,17 @@ header .hl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;flex:1 1 
   <details><summary>Referencia rápida del kit</summary><pre id="plgDoc"></pre></details>
 </div></div>
 
+<div id="aprModal" class="modal"><div class="card">
+  <h3>Apariencia y rendimiento <button class="x" data-close="aprModal">Cerrar</button></h3>
+  <div class="aprrow"><div>Tema<small>Cristal: paneles translúcidos y colores de la marca. Clásico: oscuro y plano, el de antes.</small></div>
+    <select id="aprSkin"><option value="glass">Cristal</option><option value="classic">Clásico</option></select></div>
+  <div class="aprrow"><div>Desenfoque de cristal<small>Es lo que más pesa en un teléfono modesto.</small></div><input type="checkbox" id="aprBlur"></div>
+  <div class="aprrow"><div>Fondo animado<small>Aurora y partículas; se quedan quietas cuando no hay actividad.</small></div><input type="checkbox" id="aprFx"></div>
+  <div class="aprrow"><div>Transiciones y animaciones<small>Los pequeños movimientos de botones, paneles y barras.</small></div><input type="checkbox" id="aprAnim"></div>
+  <div class="aprrow"><div>Avisarme si va lento<small>Si el movimiento se entrecorta, te propone apagar el desenfoque y el fondo animado.</small></div><input type="checkbox" id="aprWarn"></div>
+  <p class="aprhint">Solo cambian cómo se ve; el audio y los proyectos no se tocan. Se recuerda en este navegador.</p>
+  <div class="row" style="margin-top:10px"><button id="aprLite">Modo ligero (apagar todo)</button><button id="aprReset">Restablecer</button></div>
+</div></div>
 <div id="keysModal" class="modal"><div class="card">
   <h3>Atajos y gestos <button class="x" data-close="keysModal">Cerrar</button></h3>
   <div class="kgrp"><h4>General</h4><div class="kt">
@@ -2010,6 +2055,16 @@ function startMetro(){
 }
 { const v=lsGet('demokit-metro'); $('metro').checked=v==='1'; $('metro').onchange=()=>{ lsSet('demokit-metro',$('metro').checked?'1':'0'); if($('metro').checked) startMetro(); else stopMetro(); }; }
 $('bKeys').onclick=()=>openModal('keysModal');
+// ── Apariencia y rendimiento ──
+function aprSync(){ const A=dkApr.get(); $('aprSkin').value=A.skin==='classic'?'classic':'glass'; $('aprBlur').checked=!!A.blur; $('aprFx').checked=!!A.fx; $('aprAnim').checked=!!A.anim; $('aprWarn').checked=!!A.warn; $('aprBlur').disabled=$('aprFx').disabled=A.skin==='classic'; }
+$('bApr').onclick=()=>{ aprSync(); openModal('aprModal'); };
+$('aprSkin').onchange=e=>{ dkApr.set('skin',e.target.value); aprSync(); };
+for(const [id,k] of [['aprBlur','blur'],['aprFx','fx'],['aprAnim','anim'],['aprWarn','warn']]) $(id).onchange=e=>{ dkApr.set(k,e.target.checked); };
+$('aprLite').onclick=()=>{ dkApr.set('blur',false); dkApr.set('fx',false); dkApr.set('anim',false); aprSync(); };
+$('aprReset').onclick=()=>{ dkApr.reset(); aprSync(); };
+let perfAsked=false;
+window.__perfSlow=()=>{ const A=dkApr.get(); if(!A.warn||perfAsked||(!A.blur&&!A.fx)) return; perfAsked=true;
+  const d=el('div',{class:'toast',text:'El movimiento va entrecortado. ¿Apago el desenfoque y el fondo animado?'}); const b=el('button',{class:'sm tact',text:'Apagar'}); b.onclick=()=>{ dkApr.set('blur',false); dkApr.set('fx',false); d.remove(); toast('Listo. Puedes volver a encenderlos en ⚙.','ok'); }; const n=el('button',{class:'sm tact',text:'No'}); n.onclick=()=>d.remove(); d.append(b,n); $('toasts').append(d); setTimeout(()=>d.remove(),15000); };
 document.addEventListener('keydown',e=>{ if(e.key==='F1'){ e.preventDefault(); openModal('keysModal'); } });
 
 // ───────────── pistas ─────────────
@@ -2835,7 +2890,8 @@ if (fsBtn) {
       g.globalCompositeOperation='source-over';
     }
     function frame(now){
-      raf=0;
+      raf=0; if(dis) return;
+      var raw=now-last; if(prevT&&!document.hidden&&raw<1000){ if(raw>45) slow++; else if(slow>0) slow-=.5; if(slow>=40&&window.__perfSlow){ slow=0; try{window.__perfSlow();}catch(e){} } } prevT=now;
       var dt=Math.min((now-last)/1000,.1); last=now;
       var vl=(window.__viz&&window.__viz.level)||0;var target=playing?Math.min(1,.4+vl*2.2):((now-lastAct<HOLD)?Math.min(1,.5+vl*2):0);
       var k=1-Math.exp(-dt*1000/(target>E?380:TAU));
@@ -2845,13 +2901,16 @@ if (fsBtn) {
       if(!playing&&target===0&&E<REST){E=0;render();return;} /* quietud: se detiene el bucle */
       raf=requestAnimationFrame(frame);
     }
+    var dis=false, slow=0, prevT=0;
     function wake(){
-      if(reduce) return;
+      if(reduce||dis) return;
       lastAct=performance.now();
       if(!raf){last=performance.now();raf=requestAnimationFrame(frame);}
     }
     size();render();
-    if(!reduce){last=performance.now();raf=requestAnimationFrame(frame);}
+    dis=document.documentElement.dataset.fx==='off'||document.documentElement.dataset.skin==='classic';
+    window.__bgfx={enable:function(on){ dis=!on; if(dis){ if(raf){cancelAnimationFrame(raf);raf=0;} prevT=0; } else { size(); render(); wake(); } }};
+    if(!reduce&&!dis){last=performance.now();raf=requestAnimationFrame(frame);}
     addEventListener('resize',function(){size();render();});
     ['pointerdown','keydown','wheel','touchstart'].forEach(function(ev){addEventListener(ev,wake,{passive:true,capture:true});});
     document.addEventListener('visibilitychange',function(){if(!document.hidden)wake();});
