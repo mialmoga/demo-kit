@@ -557,12 +557,14 @@ html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *:
     </div>
     <div id="osk" hidden></div>
     <div id="tbar" class="abar" hidden>
-      <span class="tabs"><button id="tabBpm" class="sm on" title="Cambios de tempo y rampas">♩ BPM</button><button id="tabSig" class="sm" title="Cambios de compás (solo en límites de compás)">𝄞 Compás</button></span>
+      <span class="tabs"><button id="tabBpm" class="sm on" title="Cambios de tempo y rampas">♩ BPM</button><button id="tabSig" class="sm" title="Cambios de compás (solo en límites de compás)">𝄞 Compás</button><button id="tabMark" class="sm" title="Secciones de la canción: Intro, Verso, Coro…">🏷 Sección</button></span>
       <span id="tCtl" hidden><span id="tInfo"></span>
         <label class="chk">BPM <input type="number" id="tBpm" min="20" max="400" step="1"></label>
         <label class="chk" title="Si está activo, el tempo cambia gradualmente desde el punto anterior y llega a este BPM en este pulso. Si no, salta de golpe."><input type="checkbox" id="tRamp"> rampa hasta aquí</label>
         <button id="tDel" class="sm danger">Quitar punto</button></span>
       <span id="sCtl" hidden>Compás <select id="sSel" aria-label="Compás"></select> <span id="sInfo"></span><button id="sDelSig" class="sm danger">Quitar cambio</button></span>
+      <span id="mCtl" hidden>Nombre <input id="mName" type="text" maxlength="40" value="Verso" size="12" aria-label="Nombre de la sección"> <span id="mQuick"></span> <span id="mInfo"></span><button id="mDelBtn" class="sm danger">Quitar marca</button></span>
+      <span id="mHint" class="hint" hidden>clic en un compás = marca nueva con ese nombre · elige una marca y cambia el nombre o toca un atajo para renombrarla · arrastra = mover de compás · doble clic o clic derecho = quitar. Solo organiza: no cambia el sonido</span>
       <span id="tHint" class="hint">inicial = el BPM de arriba · clic = punto nuevo · arrastra = mover (horizontal: pulso, vertical: BPM) · doble clic o clic derecho = quitar</span>
       <span id="sHint" class="hint" hidden>inicial = el compás de arriba · clic en un compás = cambio nuevo (con el compás elegido) · arrastra = mover de compás · doble clic o clic derecho = quitar. Las notas no se mueven: cambia dónde caen las barras</span>
     </div>
@@ -768,10 +770,18 @@ const satf=x=>x/(1+Math.abs(x));
 // ───────────────────────── registro de instrumentos ─────────────────────────
 const INSTRUMENTS={}, INST_ORDER=[];
 let USER_PLUGINS=[];                                            // [{id,name,code}]
+// Categorías de instrumento (solo para organizar y colorear; no cambian el sonido). Un plugin puede declarar cat:'perc'|'mel'|'acomp'|'fx'.
+const CATS={perc:{name:'Percusión',color:'#ff7a8a',dot:'🔴'},mel:{name:'Melódico',color:'#7aa8ff',dot:'🔵'},acomp:{name:'Acompañamiento',color:'#6fe0a8',dot:'🟢'},fx:{name:'Efectos',color:'#c58bff',dot:'🟣'}};
+const CAT_ORDER=['perc','mel','acomp','fx'];
+const CAT_OF={kick:'perc',snare:'perc',clap:'perc',snap:'perc',hat:'perc',crash:'perc',rim:'perc',clip:'perc',
+  sinte:'mel',pluck:'mel',bell:'mel',bellmk:'mel',chop:'mel',
+  pad:'acomp',supersaw:'acomp',arp:'acomp',sub:'acomp',subfall:'acomp',reese:'acomp',reesemk:'acomp',growl:'acomp',
+  riser:'fx',sweep:'fx',wash:'fx',impact:'fx'};
+const catOf=d=>CATS[d&&d.cat]?d.cat:((d&&CAT_OF[d.id])||(d&&d.kind==='perc'?'perc':'mel'));
 const slug=s=>String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'inst';
 function registerInstrument(def,opts){
   if(!def||typeof def.play!=='function') throw new Error('El instrumento necesita una función play(K, n)');
-  def.name=def.name||'Sin nombre'; def.id=def.id||slug(def.name); def.kind=def.kind==='perc'?'perc':'melodic';
+  def.name=def.name||'Sin nombre'; def.id=def.id||slug(def.name); def.kind=def.kind==='perc'?'perc':'melodic'; def.cat=catOf(def);
   def.params=(def.params||[]).map(p=>Object.assign({type:'num',min:0,max:1,step:.01,def:0,label:p.k},p));
   if(def.kind==='perc'&&!def.lanes) def.lanes=[{name:def.name}];
   def.user=!!(opts&&opts.user); def.rev=++_rev;
@@ -917,6 +927,10 @@ const barBeats=P=>{ const s=P&&P.sig; return s&&s[0]>0&&s[1]>0?s[0]*4/s[1]:4; };
 // ── mapa de compases: P.sig = compás inicial; P.sigs = [{bar, sig:[n,d]}] cambios a partir del compás `bar` (0 = primero; solo en límites de compás).
 // Sin cambios el mapa es constante (bar·barBeats) y todo sale exactamente como antes. Las notas y el tempo están en pulsos: no se mueven; lo que cambia es dónde caen las barras.
 const mmCache=new WeakMap();
+// ── secciones de la canción: P.marks = [{bar,name,c?}]  (bar = compás 0-based donde empieza; dura hasta la siguiente marca). Solo organizan: no afectan al audio.
+const MARK_PAL=['#d9b38c','#9ec5a0','#8fb3d9','#c9a0d6','#d6a0a0','#b8c98f','#8fcfc9','#c7b8e0'];
+function markPts(P){ const m=new Map(); for(const x of (P&&P.marks)||[]){ if(!x||!(x.bar>=0)) continue; const bar=Math.floor(x.bar), o={bar,name:String(x.name==null?'':x.name).trim().slice(0,40)||'Sección'}; if(x.c>=0&&x.c<MARK_PAL.length) o.c=x.c|0; m.set(bar,o); } return [...m.values()].sort((a,b)=>a.bar-b.bar); }
+function markColor(mk){ if(mk.c!=null&&MARK_PAL[mk.c]) return MARK_PAL[mk.c]; const s=String(mk.name).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[\s\d]+$/,''); let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return MARK_PAL[h%MARK_PAL.length]; }
 function sigPts(P){ const m=new Map(); for(const x of (P&&P.sigs)||[]) if(x&&x.bar>0&&x.sig&&x.sig[0]>0&&x.sig[1]>0) m.set(Math.floor(x.bar),[+x.sig[0],+x.sig[1]]); return [...m].sort((a,b)=>a[0]-b[0]).map(([bar,sig])=>({bar,sig})); }
 function meter(P){
   const pts=sigPts(P), key=(P.sig||'')+'|'+(pts.length?JSON.stringify(pts):''), c=mmCache.get(P); if(c&&c.key===key) return c.mm;
@@ -1250,7 +1264,7 @@ function compactTrack(t){
 function expandTrack(t){ if(!Array.isArray(t.n)) return t; t.notes=t.n.map(a=>{ if(!Array.isArray(a)) return a; const n={b:a[0],l:a[1],m:a[2],v:a[3]==null?1:a[3]}; if(a[4]) n.pan=a[4]; if(a[5]) n.o=a[5]; if(a[6]) n.w=a[6]; return n; }); delete t.n; return t; }
 function projectToJSON(P,opts){
   const compact=!!(opts&&opts.compact);
-  const o={format:'demokit-studio',v:compact?2:1,kit:KIT_FORMAT,name:P.name,bpm:P.bpm,bars:P.bars,tempo:(P.tempo&&P.tempo.length)?P.tempo:undefined,sig:barBeats(P)===4&&(!P.sig||P.sig[1]===4)?undefined:P.sig,sigs:sigPts(P).length?sigPts(P):undefined,seed:P.seed,sc:{mode:P.sc.mode,depth:P.sc.depth,rel:P.sc.rel,rate:P.sc.rate},master:masterOf(P),key:P.key||undefined,tracks:compact?P.tracks.map(compactTrack):P.tracks,clips:{},plugins:[]};
+  const o={format:'demokit-studio',v:compact?2:1,kit:KIT_FORMAT,name:P.name,bpm:P.bpm,bars:P.bars,tempo:(P.tempo&&P.tempo.length)?P.tempo:undefined,sig:barBeats(P)===4&&(!P.sig||P.sig[1]===4)?undefined:P.sig,sigs:sigPts(P).length?sigPts(P):undefined,marks:markPts(P).length?markPts(P):undefined,seed:P.seed,sc:{mode:P.sc.mode,depth:P.sc.depth,rel:P.sc.rel,rate:P.sc.rate},master:masterOf(P),key:P.key||undefined,tracks:compact?P.tracks.map(compactTrack):P.tracks,clips:{},plugins:[]};
   if(P.sc.table){ const T=P.sc.table,u=new Uint8Array(T.length); for(let i=0;i<T.length;i++) u[i]=Math.round(clamp(T[i],0,1)*255); o.sc.table=u8ToB64(u); }
   if(typeof pruneBakedClips==='function') pruneBakedClips(P);
   for(const cid in P.clips){ const d=P.clips[cid],q=new Int16Array(d.length); for(let i=0;i<d.length;i++) q[i]=clamp(Math.round(d[i]*16384),-32768,32767); o.clips[cid]=u8ToB64(new Uint8Array(q.buffer)); }
@@ -1265,7 +1279,7 @@ function projectReport(P){
 // opts.allowPlugins===false: no se ejecuta el código de los plugins incluidos (por defecto sí, para compatibilidad; el estudio pregunta antes)
 function projectFromJSON(o,opts){
   const errs=[], skipped=[]; for(const u of o.plugins||[]){ if(opts&&opts.allowPlugins===false){ skipped.push(u.name||u.id); continue; } try{ installPlugin(u.code); }catch(e){ errs.push(u.id+': '+e.message); } }
-  const P=newProject(o.name,o.bpm,o.bars); if(Array.isArray(o.tempo)) P.tempo=tempoPts({bpm:o.bpm,tempo:o.tempo}); if(Array.isArray(o.sig)&&o.sig[0]>0&&o.sig[1]>0) P.sig=[+o.sig[0],+o.sig[1]]; if(Array.isArray(o.sigs)&&o.sigs.length) P.sigs=o.sigs.map(x=>({bar:x.bar,sig:[+x.sig[0],+x.sig[1]]})); P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key);
+  const P=newProject(o.name,o.bpm,o.bars); if(Array.isArray(o.tempo)) P.tempo=tempoPts({bpm:o.bpm,tempo:o.tempo}); if(Array.isArray(o.sig)&&o.sig[0]>0&&o.sig[1]>0) P.sig=[+o.sig[0],+o.sig[1]]; if(Array.isArray(o.sigs)&&o.sigs.length) P.sigs=o.sigs.map(x=>({bar:x.bar,sig:[+x.sig[0],+x.sig[1]]})); if(Array.isArray(o.marks)&&o.marks.length) P.marks=markPts({marks:o.marks}); P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key);
   if(o.sc&&o.sc.table){ const u=b64ToU8(o.sc.table),T=new Float32Array(u.length); for(let i=0;i<u.length;i++) T[i]=u[i]/255; P.sc.table=T; }
   for(const cid in o.clips||{}){ const u=b64ToU8(o.clips[cid]),q=new Int16Array(u.buffer,u.byteOffset,u.length>>1),d=new Float32Array(q.length); for(let i=0;i<q.length;i++) d[i]=q[i]/16384; P.clips[cid]=d; }
   P.tracks=(o.tracks||[]).map(t=>fixTrack(expandTrack(t))); P.loadErrors=errs; P.loadWarnings=[]; if(skipped.length) P.loadWarnings.push('Plugins sin ejecutar: '+skipped.join(', ')+'. Las pistas que los usan quedan sin instrumento.'); if(o.kit!=null&&o.kit!==KIT_FORMAT) P.loadWarnings.push('Este proyecto se guardó con la versión '+o.kit+' del kit y esta es la '+KIT_FORMAT+(o.kit>KIT_FORMAT?': puede sonar distinto o faltar instrumentos. Actualiza la librería.':': puede sonar un poco distinto.')); return P;
@@ -1895,6 +1909,8 @@ function drawRuler(g,W,sx,b0,b1){
   const mm=meter(P), BB=mm.bb, step=Math.max(1,Math.ceil(40/(BW*BB))), chg=new Set(sigPts(P).map(p=>p.bar)); chg.add(0);
   for(let bi=mm.barAt(b0).i;bi<=mm.barAt(b1).i+1;bi++){ const x=KW+mm.beatOfBar(bi)*BW-sx; if(bi%step&&!(bi>0&&chg.has(bi))) continue; g.fillStyle='#aab3c9'; g.fillRect(Math.round(x),RUL-8,1,8); g.fillText(String(bi+1),x+4,RUL-8);
     if(bi>0&&chg.has(bi)){ const sg=mm.sigAtBar(bi); g.fillStyle='#7ad7ff'; g.fillText(sg[0]+'/'+sg[1],x+4+g.measureText(String(bi+1)).width+5,RUL-8); g.fillStyle='#aab3c9'; } }
+  { const L=markPts(P); if(L.length){ g.font='600 8px system-ui'; const end=mm.total(P.bars); for(let i=0;i<L.length;i++){ const m=L[i]; if(m.bar>=P.bars) break; const x0=KW+mm.beatOfBar(m.bar)*BW-sx, x1=KW+(i+1<L.length&&L[i+1].bar<P.bars?mm.beatOfBar(L[i+1].bar):end)*BW-sx; if(x1<KW||x0>W) continue;
+      g.fillStyle=markColor(m); g.fillRect(Math.round(x0),0,Math.max(1,Math.round(x1-x0)-1),8); if(x1-x0>g.measureText(m.name).width+8){ g.fillStyle='#0d0f14'; g.fillText(m.name,Math.max(x0,KW)+3,7); } } } }
   const cx=KW+cursorBeat*BW-sx; g.fillStyle='#8fa8ff'; g.beginPath(); g.moveTo(cx-5,RUL-10); g.lineTo(cx+5,RUL-10); g.lineTo(cx,RUL-2); g.fill();
   g.restore(); g.fillStyle='#aab3c9'; g.font='10px system-ui'; g.fillText('compás',8,15);
 }
@@ -2078,7 +2094,7 @@ function renderTracks(){
   const box=$('tlist'); box.innerHTML='';
   P.tracks.forEach((tr,i)=>{
     const inst=INSTRUMENTS[tr.inst];
-    const row=el('div',{class:'trk'+(i===sel?' sel':''),onclick:e=>{ if(!e.target.closest('input,button')) selectTrack(i); }},
+    const row=el('div',{class:'trk'+(i===sel?' sel':''),style:inst?'border-left:3px solid '+CATS[catOf(inst)].color:'',title:inst?CATS[catOf(inst)].name:'',onclick:e=>{ if(!e.target.closest('input,button')) selectTrack(i); }},
       el('span',{class:'dot',style:'background:'+trackColor(i)}),
       (()=>{ const nm=el('span',{class:'tname',text:tr.name,title:tr.name}); return el('span',{class:'tn'},nm,el('button',{class:'sm ed',text:'✎',title:'Cambiar el nombre',onclick:e=>{ e.stopPropagation(); selectTrack(i); renameTrack(i,nm); }})); })(),
       el('span',{class:'btns'},
@@ -2095,9 +2111,9 @@ function addTrack(instId){
   P.tracks.push(t); sel=P.tracks.length-1; selNotes.clear(); renderTracks(); renderInspector(); centerTrack(); touch();
 }
 function populateAddInst(){
-  const s=$('addInst'), cur=s.value; s.innerHTML=''; const groups={'Sintetizadores y bajos':[],'Percusión y efectos':[],'Plugins de usuario':[]};
-  for(const id of INST_ORDER){ const d=INSTRUMENTS[id]; if(d.hidden) continue; (d.user?groups['Plugins de usuario']:(d.kind==='perc'?groups['Percusión y efectos']:groups['Sintetizadores y bajos'])).push(d); }
-  for(const g in groups){ if(!groups[g].length) continue; const og=el('optgroup',{label:g}); for(const d of groups[g]) og.append(el('option',{value:d.id,text:d.name})); s.append(og); }
+  const s=$('addInst'), cur=s.value; s.innerHTML=''; const groups={}; for(const c of CAT_ORDER) groups[c]=[]; groups.user=[];
+  for(const id of INST_ORDER){ const d=INSTRUMENTS[id]; if(d.hidden) continue; (d.user?groups.user:groups[catOf(d)]).push(d); }
+  for(const g in groups){ if(!groups[g].length) continue; const og=el('optgroup',{label:g==='user'?'Plugins de usuario':CATS[g].name}); for(const d of groups[g]) og.append(el('option',{value:d.id,text:CATS[catOf(d)].dot+' '+d.name})); s.append(og); }
   if(cur&&INSTRUMENTS[cur]) s.value=cur;
 }
 
@@ -2315,15 +2331,17 @@ $('autoK').onchange=e=>{ autoKey=e.target.value; refreshAutoUI(); invalidate(); 
 $('autoClr').onclick=()=>{ const tr=P.tracks[sel]; if(autoKey==='vel'){ if(!tr||!tr.notes.length) return; pushUndo(); for(const n of tr.notes) n.v=1; touch(); renderSelInfo(); return; } if(!tr||!autoList(false)) return; pushUndo(); delete tr.auto[autoKey]; if(!Object.keys(tr.auto).length) delete tr.auto; touch(); refreshAutoUI(); };
 
 // ───────────── pista de tempo (cambios de tempo y rampas) ─────────────
-let tempoShow=false, tSel=null, tDrag=null, tMode='bpm', sS=null; const tcv=$('tcv'), TH=84, TP=10;
+let tempoShow=false, tSel=null, tDrag=null, tMode='bpm', sS=null, mS=null, mDrag=null; const tcv=$('tcv'), TH=84, TP=10;
+const MARK_QUICK=['Intro','Verso','Pre-coro','Coro','Puente','Drop','Break','Outro'];
 const tList=create=>{ if(!P.tempo){ if(!create) return []; P.tempo=[]; } return P.tempo; };
 const tRange=()=>{ const v=[P.bpm,...tList(false).map(p=>p.bpm)], mn=Math.min(...v), mx=Math.max(...v); return {lo:Math.max(20,Math.min(60,Math.floor(mn/10)*10-10)),hi:Math.min(400,Math.max(180,Math.ceil(mx/10)*10+10))}; };
 const tY=(bpm,R)=>TP+(1-(bpm-R.lo)/(R.hi-R.lo))*(TH-2*TP);
 const tBpmAt=(y,R)=>Math.round(clamp(R.lo+(1-(y-TP)/(TH-2*TP))*(R.hi-R.lo),20,400));
-function refreshTempoUI(){ $('tbar').hidden=!tempoShow; $('twrap').hidden=!tempoShow; $('tempoOn').classList.toggle('on',tempoShow||tList(false).length>0||sigPts(P).length>0);
-  const L=tList(false); if(tSel&&tSel!=='init'&&!L.includes(tSel)) tSel=null; if(sS&&sS!=='init'&&!(P.sigs||[]).includes(sS)) sS=null;
-  $('tabBpm').classList.toggle('on',tMode==='bpm'); $('tabSig').classList.toggle('on',tMode==='sig'); $('tHint').hidden=tMode!=='bpm'; $('sHint').hidden=tMode!=='sig'; $('sCtl').hidden=tMode!=='sig';
-  if(tMode==='sig'){ if(sS){ const sg=sS==='init'?P.sig:sS.sig; $('sSel').value=sg[0]+'/'+sg[1]; } $('sInfo').textContent=sS?(sS==='init'?'inicial · ':'desde el compás '+(sS.bar+1)+' · '):'elige un compás y haz clic en la pista para ponerlo · '; $('sDel').disabled=!sS||sS==='init'; }
+function refreshTempoUI(){ $('tbar').hidden=!tempoShow; $('twrap').hidden=!tempoShow; $('tempoOn').classList.toggle('on',tempoShow||tList(false).length>0||sigPts(P).length>0||(P.marks||[]).length>0);
+  const L=tList(false); if(tSel&&tSel!=='init'&&!L.includes(tSel)) tSel=null; if(sS&&sS!=='init'&&!(P.sigs||[]).includes(sS)) sS=null; if(mS&&!(P.marks||[]).includes(mS)) mS=null;
+  $('tabBpm').classList.toggle('on',tMode==='bpm'); $('tabSig').classList.toggle('on',tMode==='sig'); $('tabMark').classList.toggle('on',tMode==='mark'); $('tHint').hidden=tMode!=='bpm'; $('sHint').hidden=tMode!=='sig'; $('sCtl').hidden=tMode!=='sig'; $('mHint').hidden=tMode!=='mark'; $('mCtl').hidden=tMode!=='mark';
+  if(tMode==='mark'){ if(mS&&document.activeElement!==$('mName')) $('mName').value=mS.name; $('mInfo').textContent=mS?'desde el compás '+(mS.bar+1)+' · ':'elige una marca o haz clic en la pista para poner una · '; $('mDelBtn').disabled=!mS; }
+  if(tMode==='sig'){ if(sS){ const sg=sS==='init'?P.sig:sS.sig; $('sSel').value=sg[0]+'/'+sg[1]; } $('sInfo').textContent=sS?(sS==='init'?'inicial · ':'desde el compás '+(sS.bar+1)+' · '):'elige un compás y haz clic en la pista para ponerlo · '; $('sDelSig').disabled=!sS||sS==='init'; }
   $('tCtl').hidden=!tSel||tMode!=='bpm';
   if(tSel){ const init=tSel==='init', b=init?0:tSel.b; $('tInfo').textContent=(init?'inicial':'pulso '+fmtNum(b)+' (compás '+(meter(P).barAt(b).i+1)+')')+' · '; $('tBpm').value=init?P.bpm:tSel.bpm; $('tRamp').checked=!init&&!!tSel.ramp; $('tRamp').disabled=init; $('tDel').disabled=init; } }
 function drawTempo(ph){
@@ -2334,7 +2352,8 @@ function drawTempo(ph){
   for(let i=Math.floor(b0/sub);i<=Math.ceil(b1/sub);i++){ const bt=i*sub,x=Math.round(KW+bt*BW-sx)+.5; if(x<KW) continue; const bar=Math.abs(bt-meter(P).barAt(bt).start)<1e-9, beat=Math.abs(bt-Math.round(bt))<1e-9; g.fillStyle=bar?'#4a5378':beat?'#2c3246':'#1f2433'; g.fillRect(x,0,1,H); }
   const endX=KW+meter(P).total(P.bars)*BW-sx; if(endX<W){ g.fillStyle='#00000066'; g.fillRect(Math.max(KW,endX),0,W,H); }
   for(let v=Math.ceil(R.lo/20)*20;v<=R.hi;v+=20){ const y=Math.round(tY(v,R))+.5; g.fillStyle='#1c202c'; g.fillRect(KW,y,W-KW,1); }
-  g.fillStyle='#12141b'; g.fillRect(0,0,KW,H); g.fillStyle='#aab3c9'; g.font='10px system-ui'; if(tMode==='bpm'){ g.fillText('Tempo',6,14); g.fillText(R.hi+' BPM',6,TP+10); g.fillText(R.lo+' BPM',6,H-TP+10); } else g.fillText('Compás',6,14);
+  g.fillStyle='#12141b'; g.fillRect(0,0,KW,H); g.fillStyle='#aab3c9'; g.font='10px system-ui'; if(tMode==='bpm'){ g.fillText('Tempo',6,14); g.fillText(R.hi+' BPM',6,TP+10); g.fillText(R.lo+' BPM',6,H-TP+10); } else g.fillText(tMode==='sig'?'Compás':'Sección',6,14);
+  drawMarkLane(g,W,H,sx);
   g.save(); g.beginPath(); g.rect(KW,0,W-KW,H); g.clip(); g.globalAlpha=tMode==='bpm'?1:.22;
   g.strokeStyle='#ffb86b'; g.lineWidth=2; g.beginPath(); for(let x=KW;x<=W;x++){ const y=tY(tm.bpmAt((x-KW+sx)/BW),R); if(x===KW) g.moveTo(x,y); else g.lineTo(x,y); } g.stroke(); g.lineWidth=1;
   const pts=[{init:true,b:0,bpm:P.bpm},...tList(false)];
@@ -2349,19 +2368,30 @@ function drawTempo(ph){
   const cx=KW+cursorBeat*BW-sx; if(cx>=KW){ g.strokeStyle='#8fa8ff'; g.setLineDash([4,4]); g.beginPath(); g.moveTo(cx+.5,0); g.lineTo(cx+.5,H); g.stroke(); g.setLineDash([]); }
   if(ph!=null){ const x=KW+ph*BW-sx; if(x>=KW){ g.fillStyle='#ff7ab8'; g.fillRect(x-1,0,2,H); } }
 }
+// secciones en la pista de tempo: franjas translúcidas con etiqueta abajo (a todo color solo en la pestaña Sección)
+function drawMarkLane(g,W,H,sx){
+  const L=markPts(P); if(!L.length) return; const mm=meter(P), act=tMode==='mark', end=mm.total(P.bars);
+  g.save(); g.beginPath(); g.rect(KW,0,W-KW,H); g.clip(); g.font='600 10px system-ui';
+  for(let i=0;i<L.length;i++){ const m=L[i]; if(m.bar>=P.bars) break; const b0=mm.beatOfBar(m.bar), b1=i+1<L.length&&L[i+1].bar<P.bars?mm.beatOfBar(L[i+1].bar):end, x0=KW+b0*BW-sx, x1=KW+b1*BW-sx; if(x1<KW||x0>W) continue;
+    const col=markColor(m), sel=m===mS;
+    g.globalAlpha=act?.2:.09; g.fillStyle=col; g.fillRect(x0,0,Math.max(1,x1-x0),H);
+    g.globalAlpha=act?1:.45; g.fillStyle=sel?'#fff':col; g.fillRect(Math.round(x0),0,2,H);
+    const tw=Math.min(g.measureText(m.name).width+10,Math.max(0,x1-x0-4)); if(tw>14){ g.fillRect(Math.round(x0)+2,H-19,tw,15); g.fillStyle='#0d0f14'; g.save(); g.beginPath(); g.rect(x0+2,H-19,tw,15); g.clip(); g.fillText(m.name,x0+7,H-8); g.restore(); } }
+  g.restore();
+}
 function tNear(e){ const r=tcv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top, R=tDrag?tDrag.R:tRange(); let best=null,bd=1e9;
   for(const p of [{init:true,b:0,bpm:P.bpm},...tList(false)]){ const dd=Math.hypot(KW+p.b*BW-wrap.scrollLeft-px,tY(p.bpm,R)-py); if(dd<11&&dd<bd){ best=p; bd=dd; } } return {p:best,px,py,R}; }
-tcv.addEventListener('pointerdown',e=>{ if(e.button!==0) return; if(tMode==='sig') return sigDown(e); const h=tNear(e); if(h.px<KW) return; try{ tcv.setPointerCapture(e.pointerId); }catch(_){}
+tcv.addEventListener('pointerdown',e=>{ if(e.button!==0) return; if(tMode==='sig') return sigDown(e); if(tMode==='mark') return markDown(e); const h=tNear(e); if(h.px<KW) return; try{ tcv.setPointerCapture(e.pointerId); }catch(_){}
   pushUndo(); let p=h.p;
   if(!p){ const b=Math.max(0,snapB(pxToBeat(h.px))); if(b<=1e-9){ tcv.releasePointerCapture&&0; return; } p={b:r6(b),bpm:tBpmAt(h.py,h.R),ramp:false}; tList(true).push(p); }
   tSel=p.init?'init':p; tDrag={p,R:h.R}; touch(); refreshTempoUI(); });
-tcv.addEventListener('pointermove',e=>{ if(tMode==='sig') return sigMove(e); const h=tNear(e); if(!tDrag){ tcv.style.cursor=h.p?'grab':'crosshair'; return; }
+tcv.addEventListener('pointermove',e=>{ if(tMode==='sig') return sigMove(e); if(tMode==='mark') return markMove(e); const h=tNear(e); if(!tDrag){ tcv.style.cursor=h.p?'grab':'crosshair'; return; }
   const d=tDrag.p, bpm=tBpmAt(h.py,tDrag.R); if(d.init){ P.bpm=clamp(bpm,40,260); $('bpm').value=P.bpm; } else { d.bpm=bpm; d.b=Math.max(.25,r6(snapB(pxToBeat(h.px)))); }
   touch(); refreshTempoUI(); });
-const tEnd=()=>{ if(sDrag){ sDrag=null; layoutSpacer(); invalidate(); prewarm(); return; } if(!tDrag) return; tDrag=null; if(P.tempo) P.tempo.sort((a,b)=>a.b-b.b); invalidate(); prewarm(); };
+const tEnd=()=>{ if(mDrag){ mDrag=null; if(P.marks) P.marks.sort((a,b)=>a.bar-b.bar); invalidate(); return; } if(sDrag){ sDrag=null; layoutSpacer(); invalidate(); prewarm(); return; } if(!tDrag) return; tDrag=null; if(P.tempo) P.tempo.sort((a,b)=>a.b-b.b); invalidate(); prewarm(); };
 tcv.addEventListener('pointerup',tEnd); tcv.addEventListener('pointercancel',tEnd);
 function tDelete(p){ const L=tList(false), i=L.indexOf(p); if(i<0) return; pushUndo(); L.splice(i,1); if(!L.length) delete P.tempo; if(tSel===p) tSel=null; touch(); refreshTempoUI(); }
-const tDel2=e=>{ e.preventDefault(); if(tMode==='sig'){ const h=sNear(e); if(h.p&&h.p!=='init') sDelete(h.p); return; } const h=tNear(e); if(h.p&&!h.p.init) tDelete(h.p); }; tcv.addEventListener('dblclick',tDel2); tcv.addEventListener('contextmenu',tDel2);
+const tDel2=e=>{ e.preventDefault(); if(tMode==='mark'){ const h=mNear(e); if(h.p) mDelete(h.p); return; } if(tMode==='sig'){ const h=sNear(e); if(h.p&&h.p!=='init') sDelete(h.p); return; } const h=tNear(e); if(h.p&&!h.p.init) tDelete(h.p); }; tcv.addEventListener('dblclick',tDel2); tcv.addEventListener('contextmenu',tDel2);
 // ── pestaña Compás: cambios de compás (solo en límites de compás) ──
 let sDrag=null;
 function sNear(e){ const r=tcv.getBoundingClientRect(), px=e.clientX-r.left, mm=meter(P); let best=null,bd=1e9; for(const p of ['init',...(P.sigs||[])]){ const bar=p==='init'?0:p.bar; const dd=Math.abs(KW+mm.beatOfBar(bar)*BW-wrap.scrollLeft-px); if(dd<12&&dd<bd){ best=p; bd=dd; } } return {p:best,px}; }
@@ -2375,7 +2405,21 @@ function sigMove(e){ if(!sDrag){ const h=sNear(e); tcv.style.cursor=h.p&&h.p!=='
 function sDelete(p){ const L=P.sigs||[], i=L.indexOf(p); if(i<0) return; pushUndo(); L.splice(i,1); if(!L.length) delete P.sigs; if(sS===p) sS=null; touch(); layoutSpacer(); invalidate(); prewarm(); refreshTempoUI(); }
 $('sSel').onchange=e=>{ if(!sS) return; const [a,b]=e.target.value.split('/').map(Number); pushUndo(); if(sS==='init'){ P.sig=[a,b]; $('sig').value=a+'/'+b; } else sS.sig=[a,b]; touch(); layoutSpacer(); invalidate(); prewarm(); refreshTempoUI(); };
 $('sDelSig').onclick=()=>{ if(sS&&sS!=='init') sDelete(sS); };
-$('tabBpm').onclick=()=>{ tMode='bpm'; refreshTempoUI(); invalidate(); }; $('tabSig').onclick=()=>{ tMode='sig'; refreshTempoUI(); invalidate(); };
+// ── pestaña Sección: marcas con nombre en límites de compás (solo organizan, no cambian el audio) ──
+function mNear(e){ const r=tcv.getBoundingClientRect(), px=e.clientX-r.left, mm=meter(P); let best=null,bd=1e9; for(const p of P.marks||[]){ if(p.bar>=P.bars) continue; const dd=Math.abs(KW+mm.beatOfBar(p.bar)*BW-wrap.scrollLeft-px); if(dd<12&&dd<bd){ best=p; bd=dd; } } return {p:best,px}; }
+function markDown(e){ const h=mNear(e); if(h.px<KW) return; try{ tcv.setPointerCapture(e.pointerId); }catch(_){}
+  let p=h.p; pushUndo();
+  if(!p){ const i=sBarAt(h.px); if(i<0||i>=P.bars) return; p=(P.marks||[]).find(q=>q.bar===i); if(!p){ p={bar:i,name:$('mName').value.trim().slice(0,40)||'Sección'}; if(!P.marks) P.marks=[]; P.marks.push(p); } }
+  mS=p; mDrag={p}; $('mName').value=p.name; touch(); invalidate(); refreshTempoUI(); }
+function markMove(e){ if(!mDrag){ const h=mNear(e); tcv.style.cursor=h.p?'ew-resize':'crosshair'; return; }
+  const r=tcv.getBoundingClientRect(), i=clamp(sBarAt(e.clientX-r.left),0,P.bars-1); if(i!==mDrag.p.bar&&!(P.marks||[]).some(q=>q!==mDrag.p&&q.bar===i)){ mDrag.p.bar=i; touch(); invalidate(); refreshTempoUI(); } }
+function mDelete(p){ const L=P.marks||[], i=L.indexOf(p); if(i<0) return; pushUndo(); L.splice(i,1); if(!L.length) delete P.marks; if(mS===p) mS=null; touch(); invalidate(); refreshTempoUI(); }
+function mRename(v){ v=String(v).trim().slice(0,40); if(!v) return; if(mS){ if(mS.name===v) return; pushUndo(); mS.name=v; touch(); invalidate(); refreshTempoUI(); } }
+$('mName').onchange=e=>{ if(mS) mRename(e.target.value); else if(!e.target.value.trim()) e.target.value='Sección'; };
+$('mName').onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); e.target.blur(); } e.stopPropagation(); };
+for(const q of MARK_QUICK) $('mQuick').append(el('button',{class:'sm',text:q,onclick:()=>{ $('mName').value=q; if(mS) mRename(q); }}));
+$('mDelBtn').onclick=()=>{ if(mS) mDelete(mS); };
+$('tabBpm').onclick=()=>{ tMode='bpm'; refreshTempoUI(); invalidate(); }; $('tabSig').onclick=()=>{ tMode='sig'; refreshTempoUI(); invalidate(); }; $('tabMark').onclick=()=>{ tMode='mark'; refreshTempoUI(); invalidate(); };
 $('tempoOn').onclick=()=>{ tempoShow=!tempoShow; refreshTempoUI(); invalidate(); };
 $('tBpm').onchange=e=>{ if(!tSel) return; pushUndo(); const v=clamp(Math.round(+e.target.value)||120,tSel==='init'?40:20,tSel==='init'?260:400); if(tSel==='init'){ P.bpm=v; $('bpm').value=v; } else tSel.bpm=v; touch(); refreshTempoUI(); prewarm(); };
 $('tRamp').onchange=e=>{ if(!tSel||tSel==='init') return; pushUndo(); tSel.ramp=e.target.checked; touch(); refreshTempoUI(); };
