@@ -174,7 +174,7 @@ kbd{display:inline-block;min-width:1.5em;text-align:center;padding:1px 6px;borde
    Solo estilos: no toca la lógica del estudio. */
 :root{
   --bg:#070913;--p:rgba(15,23,42,.78);--p2:rgba(255,255,255,.06);--b:rgba(255,255,255,.12);
-  --t:#e9ecf8;--m:#93a0c0;--a:#22d3ee;--a2:#a855f7;
+  --t:#e9ecf8;--m:#b3bedb;--a:#22d3ee;--a2:#a855f7;
   --glass:rgba(15,23,42,.78);--glass-b:rgba(255,255,255,.12);--glass-hi:rgba(255,255,255,.07);
   --nan-cyan:#22d3ee;--nan-violet:#a855f7;
   --shadow:0 18px 50px -22px rgba(0,0,0,.75),inset 0 1px 0 var(--glass-hi);
@@ -438,7 +438,7 @@ header .hl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;flex:1 1 
 <canvas id="bgfx" aria-hidden="true"></canvas>
 <header>
 <div class="hl">
-  <div class="brand"><button id="fullscreen-btn" title="Pantalla completa"><img src="assets/icon.png" onerror="this.onerror=null;this.src='favicon.ico'" alt="dk" width="28" height="28" style="vertical-align:middle;border-radius:7px;margin-right:6px"></button> Demo Kit</div>
+  <div class="brand"><button id="fullscreen-btn" title="Pantalla completa"><img src="assets/icon.png" onerror="this.onerror=null;this.src='favicon.ico'" alt="dk" width="36" height="36" style="vertical-align:middle;border-radius:9px;margin-right:6px"></button> Demo Kit</div>
   <button id="hToggle" class="sm" aria-expanded="false" title="Mostrar u ocultar el resto de controles del proyecto">☰ Proyecto</button>
   <button id="bKeys" class="sm" title="Atajos y gestos (F1)">?</button>
   <div class="grp">
@@ -1804,17 +1804,17 @@ function draw(ph){
   g.setTransform(dpr,0,0,dpr,0,0); g.fillStyle='#0d0f14'; g.fillRect(0,0,W,H);
   const sx=wrap.scrollLeft, sy=wrap.scrollTop, tr=P.tracks[sel];
   const b0=Math.floor(sx/BW), b1=Math.ceil((sx+W-KW)/BW);
-  if(!tr){ g.fillStyle='#8b92a3'; g.font='14px system-ui'; g.fillText('Agrega una pista con ＋ para empezar',KW+20,RUL+40); drawRuler(g,W,sx,b0,b1); return; }
+  if(!tr){ g.fillStyle='#aab3c9'; g.font='14px system-ui'; g.fillText('Agrega una pista con ＋ para empezar',KW+20,RUL+40); drawRuler(g,W,sx,b0,b1); return; }
   const info=trackInfo(tr), inst=INSTRUMENTS[tr.inst]||{kind:'melodic'}, RH=info.RH;
   const r0=Math.max(0,Math.floor(sy/RH)), r1=Math.min(info.rows-1,Math.ceil((sy+H-RUL)/RH));
   for(let r=r0;r<=r1;r++){ const y=RUL+r*RH-sy;
     g.fillStyle=info.perc?(r%2?'#10131a':'#0d0f14'):rowBg(info.hi-r); g.fillRect(KW,y,W-KW,RH);
-    g.fillStyle=(!info.perc&&((info.hi-r)%12===0))?'#2a3040':'#181b25'; g.fillRect(KW,y+RH-1,W-KW,1); }
+    g.fillStyle=(!info.perc&&((info.hi-r)%12===0))?'#3a4258':'#212637'; g.fillRect(KW,y+RH-1,W-KW,1); }
   // rejilla vertical
   let sub=snap>0?snap:.25; while(sub*BW<7) sub*=2; const k0=Math.floor(b0/sub),k1=Math.ceil(b1/sub);
   for(let k=k0;k<=k1;k++){ const bt=k*sub, x=Math.round(KW+bt*BW-sx)+.5; if(x<KW) continue;
     const bar=Math.abs(bt-meter(P).barAt(bt).start)<1e-9, beat=Math.abs(bt-Math.round(bt))<1e-9;
-    g.fillStyle=bar?'#323850':beat?'#222735':'#171a24'; g.fillRect(x,RUL,1,H-RUL); }
+    g.fillStyle=bar?'#4a5378':beat?'#2c3246':'#1f2433'; g.fillRect(x,RUL,1,H-RUL); }
   const endX=KW+meter(P).total(P.bars)*BW-sx; if(endX<W){ g.fillStyle='#00000066'; g.fillRect(Math.max(KW,endX),RUL,W,H); }
   // notas fantasma de otras pistas melódicas
   if(!info.perc){ P.tracks.forEach((o,i)=>{ if(i===sel||o.mute) return; const oi=INSTRUMENTS[o.inst]; if(!oi||oi.kind==='perc') return;
@@ -1846,12 +1846,12 @@ function draw(ph){
 }
 function drawRuler(g,W,sx,b0,b1){
   g.fillStyle='#14161c'; g.fillRect(0,0,W,RUL); g.fillStyle='#272b36'; g.fillRect(0,RUL-1,W,1);
-  g.save(); g.beginPath(); g.rect(KW,0,W-KW,RUL); g.clip(); g.fillStyle='#8b92a3'; g.font='11px system-ui';
+  g.save(); g.beginPath(); g.rect(KW,0,W-KW,RUL); g.clip(); g.fillStyle='#aab3c9'; g.font='11px system-ui';
   const mm=meter(P), BB=mm.bb, step=Math.max(1,Math.ceil(40/(BW*BB))), chg=new Set(sigPts(P).map(p=>p.bar)); chg.add(0);
-  for(let bi=mm.barAt(b0).i;bi<=mm.barAt(b1).i+1;bi++){ const x=KW+mm.beatOfBar(bi)*BW-sx; if(bi%step&&!(bi>0&&chg.has(bi))) continue; g.fillStyle='#8b92a3'; g.fillRect(Math.round(x),RUL-8,1,8); g.fillText(String(bi+1),x+4,RUL-8);
-    if(bi>0&&chg.has(bi)){ const sg=mm.sigAtBar(bi); g.fillStyle='#7ad7ff'; g.fillText(sg[0]+'/'+sg[1],x+4+g.measureText(String(bi+1)).width+5,RUL-8); g.fillStyle='#8b92a3'; } }
+  for(let bi=mm.barAt(b0).i;bi<=mm.barAt(b1).i+1;bi++){ const x=KW+mm.beatOfBar(bi)*BW-sx; if(bi%step&&!(bi>0&&chg.has(bi))) continue; g.fillStyle='#aab3c9'; g.fillRect(Math.round(x),RUL-8,1,8); g.fillText(String(bi+1),x+4,RUL-8);
+    if(bi>0&&chg.has(bi)){ const sg=mm.sigAtBar(bi); g.fillStyle='#7ad7ff'; g.fillText(sg[0]+'/'+sg[1],x+4+g.measureText(String(bi+1)).width+5,RUL-8); g.fillStyle='#aab3c9'; } }
   const cx=KW+cursorBeat*BW-sx; g.fillStyle='#8fa8ff'; g.beginPath(); g.moveTo(cx-5,RUL-10); g.lineTo(cx+5,RUL-10); g.lineTo(cx,RUL-2); g.fill();
-  g.restore(); g.fillStyle='#8b92a3'; g.font='10px system-ui'; g.fillText('compás',8,15);
+  g.restore(); g.fillStyle='#aab3c9'; g.font='10px system-ui'; g.fillText('compás',8,15);
 }
 function hit(tr,info,inst,px,py){
   const bx=pxToBeat(px), m=pyToM(info,py);
@@ -2211,10 +2211,10 @@ function drawAuto(ph){
   if(acv.width!==Math.round(W*dpr)||acv.height!==Math.round(H*dpr)){ acv.width=Math.round(W*dpr); acv.height=Math.round(H*dpr); acv.style.width=W+'px'; }
   const g=acv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.fillStyle='#0d0f14'; g.fillRect(0,0,W,H); const sx=wrap.scrollLeft, k=autoKey, d=adef(k), tr=P.tracks[sel];
   let sub=snap>0?snap:.25; while(sub*BW<7) sub*=2; const b0=Math.floor(sx/BW), b1=Math.ceil((sx+W-KW)/BW);
-  for(let i=Math.floor(b0/sub);i<=Math.ceil(b1/sub);i++){ const bt=i*sub,x=Math.round(KW+bt*BW-sx)+.5; if(x<KW) continue; const bar=Math.abs(bt-meter(P).barAt(bt).start)<1e-9, beat=Math.abs(bt-Math.round(bt))<1e-9; g.fillStyle=bar?'#323850':beat?'#222735':'#171a24'; g.fillRect(x,0,1,H); }
+  for(let i=Math.floor(b0/sub);i<=Math.ceil(b1/sub);i++){ const bt=i*sub,x=Math.round(KW+bt*BW-sx)+.5; if(x<KW) continue; const bar=Math.abs(bt-meter(P).barAt(bt).start)<1e-9, beat=Math.abs(bt-Math.round(bt))<1e-9; g.fillStyle=bar?'#4a5378':beat?'#2c3246':'#1f2433'; g.fillRect(x,0,1,H); }
   const endX=KW+meter(P).total(P.bars)*BW-sx; if(endX<W){ g.fillStyle='#00000066'; g.fillRect(Math.max(KW,endX),0,W,H); }
   const yd=Math.round(autoY(k,d.def,H))+.5; g.strokeStyle='#2f3548'; g.setLineDash([3,4]); g.beginPath(); g.moveTo(KW,yd); g.lineTo(W,yd); g.stroke(); g.setLineDash([]);
-  g.fillStyle='#12141b'; g.fillRect(0,0,KW,H); g.fillStyle='#8b92a3'; g.font='10px system-ui'; g.fillText(d.label,6,14); g.fillText(autoFmt(k,d.max),6,AP+10); g.fillText(autoFmt(k,d.min),6,H-AP+10);
+  g.fillStyle='#12141b'; g.fillRect(0,0,KW,H); g.fillStyle='#aab3c9'; g.font='10px system-ui'; g.fillText(d.label,6,14); g.fillText(autoFmt(k,d.max),6,AP+10); g.fillText(autoFmt(k,d.min),6,H-AP+10);
   const pts=k==='vel'?[]:(tr&&tr.auto&&tr.auto[k]?tr.auto[k].slice().sort((a,b)=>a.b-b.b):[]);
   g.save(); g.beginPath(); g.rect(KW,0,W-KW,H); g.clip();
   if(k==='vel'){ const col=trackColor(sel,1), y0=autoY(k,0,H); for(const n of (tr?tr.notes:[])){ const x=KW+n.b*BW-sx; if(x<KW-6||x>W) continue; const v=n.v==null?1:n.v, y=autoY(k,v,H); g.fillStyle=selNotes.has(n)?'#fff':col; g.fillRect(x-2,y,5,y0-y); g.beginPath(); g.arc(x+.5,y,4,0,7); g.fill(); }
@@ -2276,10 +2276,10 @@ function drawTempo(ph){
   if(tcv.width!==Math.round(W*dpr)||tcv.height!==Math.round(H*dpr)){ tcv.width=Math.round(W*dpr); tcv.height=Math.round(H*dpr); tcv.style.width=W+'px'; }
   const g=tcv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.fillStyle='#0d0f14'; g.fillRect(0,0,W,H); const sx=wrap.scrollLeft, R=tDrag?tDrag.R:tRange(), tm=tmap(P);
   let sub=snap>0?snap:.25; while(sub*BW<7) sub*=2; const b0=Math.floor(sx/BW), b1=Math.ceil((sx+W-KW)/BW);
-  for(let i=Math.floor(b0/sub);i<=Math.ceil(b1/sub);i++){ const bt=i*sub,x=Math.round(KW+bt*BW-sx)+.5; if(x<KW) continue; const bar=Math.abs(bt-meter(P).barAt(bt).start)<1e-9, beat=Math.abs(bt-Math.round(bt))<1e-9; g.fillStyle=bar?'#323850':beat?'#222735':'#171a24'; g.fillRect(x,0,1,H); }
+  for(let i=Math.floor(b0/sub);i<=Math.ceil(b1/sub);i++){ const bt=i*sub,x=Math.round(KW+bt*BW-sx)+.5; if(x<KW) continue; const bar=Math.abs(bt-meter(P).barAt(bt).start)<1e-9, beat=Math.abs(bt-Math.round(bt))<1e-9; g.fillStyle=bar?'#4a5378':beat?'#2c3246':'#1f2433'; g.fillRect(x,0,1,H); }
   const endX=KW+meter(P).total(P.bars)*BW-sx; if(endX<W){ g.fillStyle='#00000066'; g.fillRect(Math.max(KW,endX),0,W,H); }
   for(let v=Math.ceil(R.lo/20)*20;v<=R.hi;v+=20){ const y=Math.round(tY(v,R))+.5; g.fillStyle='#1c202c'; g.fillRect(KW,y,W-KW,1); }
-  g.fillStyle='#12141b'; g.fillRect(0,0,KW,H); g.fillStyle='#8b92a3'; g.font='10px system-ui'; if(tMode==='bpm'){ g.fillText('Tempo',6,14); g.fillText(R.hi+' BPM',6,TP+10); g.fillText(R.lo+' BPM',6,H-TP+10); } else g.fillText('Compás',6,14);
+  g.fillStyle='#12141b'; g.fillRect(0,0,KW,H); g.fillStyle='#aab3c9'; g.font='10px system-ui'; if(tMode==='bpm'){ g.fillText('Tempo',6,14); g.fillText(R.hi+' BPM',6,TP+10); g.fillText(R.lo+' BPM',6,H-TP+10); } else g.fillText('Compás',6,14);
   g.save(); g.beginPath(); g.rect(KW,0,W-KW,H); g.clip(); g.globalAlpha=tMode==='bpm'?1:.22;
   g.strokeStyle='#ffb86b'; g.lineWidth=2; g.beginPath(); for(let x=KW;x<=W;x++){ const y=tY(tm.bpmAt((x-KW+sx)/BW),R); if(x===KW) g.moveTo(x,y); else g.lineTo(x,y); } g.stroke(); g.lineWidth=1;
   const pts=[{init:true,b:0,bpm:P.bpm},...tList(false)];
