@@ -328,6 +328,16 @@ header .hl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;flex:1 1 
   #tracks.tcol #tlist .trk.sel .mini{display:none}
   #tracks.tcol:not(:has(.trk.sel)) .ph{display:flex}
 }
+
+/* ═══════════ «MÁS» → FLECHITA (cabe en la misma línea de herramientas) ═══════════ */
+#rMoreBtn{font-size:0;width:30px;height:28px;padding:0;margin-left:auto;display:inline-flex;align-items:center;justify-content:center;line-height:1}
+#rMoreBtn::before{content:'▾';font-size:14px;color:#cffafe}
+#rMoreBtn[aria-expanded="true"]::before{content:'▴'}
+@media(max-width:700px){#rMoreBtn{width:34px;height:34px}}
+@media(max-width:430px){.rbar button.sm{padding:6px 8px}}
+@media(min-width:1001px) and (max-width:1500px){.rbar{column-gap:8px}.rbar .nm{max-width:150px}}
+@media(min-width:1001px) and (max-width:1320px){.rbar .lb{display:none}.rbar button.sm{padding:4px 9px;font-size:14px}}
+@media(min-width:1001px) and (max-width:1199px){.rbar .nm{max-width:100px}}
 </style>
 <script>
 /* Visualizadores reactivos: un analizador "escucha" la salida (sin alterar el sonido) y alimenta
