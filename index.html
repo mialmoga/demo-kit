@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" href="assets/icon.png">
 <link rel="manifest" href="./site.webmanifest">
 <script>if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)) addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
-<meta name="theme-color" content="#0d0e12">
+<meta name="theme-color" content="#070913">
 <meta property="og:type" content="website">
 <meta property="og:title" content="dk — demo kit">
 <meta property="og:description" content="A tiny procedural synth studio. Runs in your browser.">
@@ -169,10 +169,265 @@ kbd{display:inline-block;min-width:1.5em;text-align:center;padding:1px 6px;borde
   #roll{min-height:auto}
   #insp{border-left:0}
 }
+/* ═══════════ PIEL DE CRISTAL · Demo Kit ═══════════
+   Paleta NaN (violeta + cian sobre noche profunda) y paneles glassmorphism.
+   Solo estilos: no toca la lógica del estudio. */
+:root{
+  --bg:#070913;--p:rgba(15,23,42,.78);--p2:rgba(255,255,255,.06);--b:rgba(255,255,255,.12);
+  --t:#e9ecf8;--m:#93a0c0;--a:#22d3ee;--a2:#a855f7;
+  --glass:rgba(15,23,42,.78);--glass-b:rgba(255,255,255,.12);--glass-hi:rgba(255,255,255,.07);
+  --nan-cyan:#22d3ee;--nan-violet:#a855f7;
+  --shadow:0 18px 50px -22px rgba(0,0,0,.75),inset 0 1px 0 var(--glass-hi);
+  color-scheme:dark;
+}
+@supports((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){:root{--glass:rgba(15,23,42,.52)}}
+html{background:#070913}
+body{
+  background:
+    radial-gradient(1100px 680px at 10% -8%,rgba(168,85,247,.30),transparent 62%),
+    radial-gradient(900px 620px at 96% 6%,rgba(34,211,238,.20),transparent 62%),
+    radial-gradient(1000px 720px at 50% 125%,rgba(99,102,241,.24),transparent 60%),
+    #070913;
+  background-attachment:fixed;
+}
+::selection{background:rgba(168,85,247,.55);color:#fff}
+
+/* scrollbars */
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(34,211,238,.45);background-clip:padding-box}
+::-webkit-scrollbar-thumb:active{background:var(--a);background-clip:padding-box}
+@supports(-moz-appearance:none){*{scrollbar-color:rgba(255,255,255,.18) transparent}}
+
+/* superficies de cristal */
+header,aside,.rtool,.abar,#osk,.card,.toast{
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%);
+  border-color:var(--glass-b);
+}
+header{margin:10px 10px 0;border:1px solid var(--glass-b);border-radius:18px;box-shadow:var(--shadow);padding:8px 14px;z-index:5}
+header .brand{letter-spacing:.4px;background:linear-gradient(90deg,#fff,#a5f3fc 55%,#d8b4fe);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+header .brand span{-webkit-text-fill-color:var(--m)}
+header .brand button{-webkit-text-fill-color:initial}
+#fullscreen-btn,#fullscreen-btn:hover{background:transparent;border-color:transparent;opacity:1}
+#prog{height:2px;border-radius:2px;background:linear-gradient(90deg,var(--nan-cyan),var(--nan-violet));box-shadow:0 0 10px rgba(34,211,238,.7)}
+#repo:hover{color:var(--nan-cyan)}
+
+/* disposición flotante en escritorio */
+main{gap:10px;padding:10px}
+aside{border:1px solid var(--glass-b);border-radius:18px;box-shadow:var(--shadow)}
+#tracks,#insp{border-left:1px solid var(--glass-b);border-right:1px solid var(--glass-b)}
+#roll{border:1px solid var(--glass-b);border-radius:18px;box-shadow:var(--shadow);overflow:clip;background:rgba(7,9,19,.55)}
+.ph{background:rgba(15,23,42,.72);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom-color:var(--glass-b)}
+.rtool{border-bottom:1px solid var(--glass-b)}
+.abar{border-top-color:var(--glass-b)}
+#wrap,#awrap,#twrap{border-color:var(--glass-b)}
+
+/* botones */
+button{background:rgba(255,255,255,.06);border:1px solid var(--glass-b);border-radius:10px;transition:background .18s,border-color .18s,box-shadow .18s,transform .12s}
+button:hover{background:rgba(255,255,255,.12);border-color:rgba(34,211,238,.45)}
+button:active{transform:translateY(1px) scale(.98)}
+button.pri{background:linear-gradient(135deg,#22d3ee,#a855f7);border-color:transparent;color:#070913;font-weight:700;box-shadow:0 6px 20px -8px rgba(168,85,247,.8)}
+button.pri:hover{filter:brightness(1.12);border-color:transparent;box-shadow:0 8px 26px -8px rgba(34,211,238,.85)}
+button.on,#mSel.on,#mDraw.on,#mNav.on,#mErase.on,#rMoreBtn.on,.tabs .sm.on{background:rgba(34,211,238,.16);border-color:rgba(34,211,238,.6);color:#cffafe;box-shadow:0 0 14px -4px rgba(34,211,238,.6)}
+button.danger:hover{background:rgba(255,107,107,.14);border-color:var(--err);color:#ffb4b4}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid rgba(34,211,238,.7);outline-offset:1px}
+#bRec.armed{background:rgba(143,43,52,.75)}
+
+/* campos */
+input[type=number],input[type=text],select,textarea{background:rgba(7,9,19,.55);border:1px solid var(--glass-b);border-radius:9px;transition:border-color .18s,box-shadow .18s}
+input[type=number]:focus,input[type=text]:focus,select:focus,textarea:focus{border-color:rgba(34,211,238,.6);box-shadow:0 0 0 3px rgba(34,211,238,.14);outline:none}
+input[type=checkbox]{accent-color:var(--nan-violet)}
+input[type=range]{accent-color:var(--nan-cyan)}
+@media(hover:hover){
+  input[type=range]{-webkit-appearance:none;appearance:none;height:5px;background:rgba(255,255,255,.14);border-radius:3px;outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,#22d3ee,#a855f7);border:2px solid #0b1020;box-shadow:0 0 10px rgba(34,211,238,.6);cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:linear-gradient(135deg,#22d3ee,#a855f7);border:2px solid #0b1020;box-shadow:0 0 10px rgba(34,211,238,.6);cursor:pointer}
+  input[type=range]::-moz-range-track{height:5px;background:rgba(255,255,255,.14);border-radius:3px}
+}
+
+/* pistas */
+.trk{border-bottom:1px solid rgba(255,255,255,.07);transition:background .2s}
+.trk:hover{background:rgba(255,255,255,.04)}
+.trk.sel{background:linear-gradient(90deg,rgba(168,85,247,.24),rgba(34,211,238,.07));box-shadow:inset 2px 0 0 var(--nan-cyan)}
+.trk .dot{box-shadow:0 0 9px 1px rgba(255,255,255,.35)}
+.trk .tname:focus{background:rgba(7,9,19,.55)}
+.trk .sw.act{background:linear-gradient(135deg,#22d3ee,#a855f7);border-color:transparent}
+
+/* inspector */
+.sec{border-bottom:1px solid rgba(255,255,255,.07)}
+.sec h4,.kgrp h4{background:linear-gradient(90deg,#a5f3fc,#d8b4fe);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.fxg{border-color:var(--glass-b);border-radius:12px;background:rgba(255,255,255,.03)}
+.row label{color:#c3cbe3}
+#oct{color:var(--nan-cyan)}
+.rtool .live,.keyg{border-left-color:var(--glass-b)}
+#rmore{border-top-color:var(--glass-b)}
+details pre{background:rgba(7,9,19,.6);border-color:var(--glass-b)}
+details summary{color:var(--nan-cyan)}
+kbd{background:rgba(255,255,255,.08);border-color:var(--glass-b)}
+
+/* teclado en pantalla */
+#osk .pad{background:rgba(255,255,255,.06);border-color:var(--glass-b);border-radius:10px}
+#osk .wk.on,#osk .bk.on,#osk .pad.on{background:var(--nan-cyan)}
+#osk .bk i.on{background:var(--nan-violet)}
+
+/* modales y avisos */
+.modal{background:rgba(4,6,15,.58);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.card{border:1px solid var(--glass-b);border-radius:22px;box-shadow:0 30px 80px -20px rgba(0,0,0,.85),inset 0 1px 0 var(--glass-hi);background:rgba(15,23,42,.72)}
+.drop{border:2px dashed rgba(255,255,255,.2);border-radius:14px;background:rgba(255,255,255,.03)}
+.drop.over{border-color:var(--nan-cyan);background:rgba(34,211,238,.08)}
+.item{border-bottom-color:rgba(255,255,255,.07)}
+.toast{border:1px solid rgba(168,85,247,.4);border-radius:14px;box-shadow:0 14px 40px -12px rgba(0,0,0,.8)}
+.toast.err{border-color:var(--err);background:rgba(60,20,28,.7)}
+.toast.ok{border-color:var(--ok)}
+#lyInp{border-radius:8px;border-color:#fcd34d;box-shadow:0 0 18px -2px rgba(252,211,77,.55)}
+
+/* móvil y tableta */
+@media(max-width:1000px){
+  header{margin:8px 8px 0;border-radius:16px}
+  main{padding:8px;gap:8px}
+  aside,#roll{border-radius:16px}
+  #tracks{border-bottom:1px solid var(--glass-b);margin-bottom:8px}
+  #roll{margin-bottom:8px}
+}
+@media(max-width:700px){header{padding:6px 10px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ═══════════ FONDO VIVO (aurora + constelación que se aquieta) ═══════════ */
+#bgfx{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block}
+body>header,body>main{position:relative;z-index:1}
+
+/* ═══════════ OSCILOSCOPIO DEL HEADER ═══════════ */
+#scope{order:100;flex:1 1 190px;min-width:160px;max-width:440px;height:52px;margin-left:auto;display:block;cursor:pointer;
+  border-radius:12px;border:1px solid var(--glass-b);background:rgba(7,9,19,.5);box-shadow:inset 0 0 18px rgba(34,211,238,.06)}
+#scope:hover{border-color:rgba(34,211,238,.45)}
+@media(max-width:700px){#scope{flex:1 1 100%;max-width:none;height:44px}}
+
+/* el header en dos columnas: controles (izq.) + osciloscopio (der.) */
+header{flex-wrap:nowrap;align-items:stretch;gap:14px}
+header .hl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;flex:1 1 0;min-width:0}
+#scope{order:0;flex:0 0 clamp(220px,24vw,340px);max-width:none;min-width:0;height:auto;min-height:64px;margin-left:0;align-self:stretch}
+@media(max-width:1000px){header{flex-wrap:wrap}header .hl{flex:1 1 100%}#scope{flex:1 1 100%;height:48px;min-height:48px}}
+@media(max-width:700px){#scope{height:44px;min-height:44px}}
+
+/* ═══════════ ESPECTRO DEL PIANO ROLL ═══════════ */
+#roll{position:relative}
+#rspec{position:absolute;z-index:1;pointer-events:none;mix-blend-mode:screen;opacity:.6;display:block}
+
+/* ═══════════ PANEL DE PISTAS COLAPSABLE (móvil / tableta) ═══════════ */
+#tTogWrap{display:none}
+@media(max-width:1000px){
+  #tTogWrap{display:block;position:sticky;top:0;height:0;z-index:4}
+  #tToggle{position:absolute;left:8px;top:9px;width:30px;height:30px;padding:0;border-radius:50%;line-height:1;font-size:15px;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.08);border:1px solid var(--glass-b);color:#cffafe}
+  #tToggle:hover{border-color:rgba(34,211,238,.6)}
+  #tracks .ph{padding-left:46px}
+  #tracks.tcol{max-height:none;overflow:visible}
+  #tracks.tcol .ph{display:none}
+  #tracks.tcol #tlist .trk:not(.sel){display:none}
+  #tracks.tcol #tlist .trk.sel{padding:8px 8px 8px 46px;min-height:48px;border-bottom:0;box-shadow:none;background:linear-gradient(90deg,rgba(168,85,247,.24),rgba(34,211,238,.07))}
+  #tracks.tcol #tlist .trk.sel .mini{display:none}
+  #tracks.tcol:not(:has(.trk.sel)) .ph{display:flex}
+}
 </style>
+<script>
+/* Visualizadores reactivos: un analizador "escucha" la salida (sin alterar el sonido) y alimenta
+   el osciloscopio del header y el espectro del piano roll. Sin sonido todo cae a quietud y el bucle se detiene. */
+(function(){
+  var V=window.__viz={level:0,drawers:[],onWake:null,active:false};
+  var AN=new WeakMap(),cur=null,tb=null,fb=null,raf=0,quietSince=0,lv=0;
+  var oc=AudioNode.prototype.connect;
+  AudioNode.prototype.connect=function(d){
+    var r=oc.apply(this,arguments);
+    try{
+      if(typeof AudioDestinationNode!=='undefined'&&d instanceof AudioDestinationNode){
+        var c=d.context;
+        if(!(typeof OfflineAudioContext!=='undefined'&&c instanceof OfflineAudioContext)){
+          var a=AN.get(c);
+          if(!a){a=c.createAnalyser();a.fftSize=2048;a.smoothingTimeConstant=.72;a.minDecibels=-92;a.maxDecibels=-18;AN.set(c,a);}
+          oc.call(this,a);
+          if(cur!==a){cur=a;tb=new Uint8Array(a.fftSize);fb=new Uint8Array(a.frequencyBinCount);V.sr=c.sampleRate;}
+          V.wake();
+        }
+      }
+    }catch(e){}
+    return r;
+  };
+  V.time=function(){return tb};V.freq=function(){return fb};
+  /* bandas logarítmicas suavizadas (ataque rápido, caída lenta) */
+  V.makeBands=function(n,lo,hi){
+    var out=new Float32Array(n);
+    return function(){
+      if(!fb){out.fill(0);return out;}
+      var sr=V.sr||44100,bh=sr/2/fb.length,top=Math.min(hi||16000,sr/2-1),bot=lo||40;
+      for(var i=0;i<n;i++){
+        var f0=bot*Math.pow(top/bot,i/n),f1=bot*Math.pow(top/bot,(i+1)/n);
+        var b0=Math.max(1,Math.floor(f0/bh)),b1=Math.max(b0,Math.ceil(f1/bh)),m=0;
+        for(var b=b0;b<=b1&&b<fb.length;b++) if(fb[b]>m)m=fb[b];
+        var v=m/255; v=v*(1+.9*i/n); if(v>1)v=1;
+        out[i]=v>out[i]?out[i]+(v-out[i])*.65:out[i]*.9;
+      }
+      return out;
+    };
+  };
+  function poll(){
+    if(!cur){lv*=.9;V.level=lv;return;}
+    cur.getByteTimeDomainData(tb);cur.getByteFrequencyData(fb);
+    var s=0;for(var i=0;i<tb.length;i+=2){var x=(tb[i]-128)/128;s+=x*x;}
+    var rms=Math.sqrt(s/(tb.length/2));
+    lv=rms>lv?lv+(rms-lv)*.5:lv*.93;V.level=lv;
+  }
+  function loop(now){
+    raf=0;poll();
+    if(lv>.003)quietSince=now;
+    for(var i=0;i<V.drawers.length;i++){try{V.drawers[i](now,V);}catch(e){}}
+    V.active=(now-quietSince<2200);
+    if(V.active)raf=requestAnimationFrame(loop);
+  }
+  V.wake=function(){quietSince=performance.now();if(!raf)raf=requestAnimationFrame(loop);if(V.onWake)V.onWake();};
+  V.redraw=function(){var now=performance.now();for(var i=0;i<V.drawers.length;i++){try{V.drawers[i](now,V);}catch(e){}}};
+
+  /* ───── osciloscopio del header (Onda ⇄ Espectro con un toque) ───── */
+  function initScope(){
+    var cv=document.getElementById('scope');if(!cv)return;
+    var g=cv.getContext('2d'),W=0,H=0,dpr=1,mode='wave',bands=V.makeBands(44,45,14000),pk=new Float32Array(44),parts=[];
+    try{mode=localStorage.getItem('dkScope')||'wave';}catch(e){}
+    function size(){dpr=Math.min(window.devicePixelRatio||1,2);W=cv.clientWidth;H=cv.clientHeight;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);g.setTransform(dpr,0,0,dpr,0,0);V.redraw();}
+    if(window.ResizeObserver)new ResizeObserver(size).observe(cv);else addEventListener('resize',size);
+    cv.addEventListener('click',function(){mode=mode==='wave'?'spec':'wave';try{localStorage.setItem('dkScope',mode);}catch(e){}V.wake();V.redraw();});
+    function grad(){var gr=g.createLinearGradient(0,0,W,0);gr.addColorStop(0,'#22d3ee');gr.addColorStop(.55,'#a855f7');gr.addColorStop(1,'#ec4899');return gr;}
+    V.drawers.push(function(now,V){
+      if(!W||!H)return;
+      g.clearRect(0,0,W,H);
+      var lvl=V.level,tb=V.time(),mid=H/2,gr=grad();
+      if(mode==='wave'){
+        g.save();g.lineWidth=2;g.lineJoin='round';g.strokeStyle=gr;g.shadowColor='rgba(168,85,247,.8)';g.shadowBlur=lvl>.003?10:0;g.globalAlpha=lvl>.003?1:.45;
+        g.beginPath();
+        if(tb&&lvl>.003){var n=Math.min(Math.floor(W/2),tb.length);for(var i=0;i<n;i++){var x=i/(n-1)*W,y=mid+((tb[Math.floor(i/n*tb.length)]-128)/128)*mid*1.5*.9;i?g.lineTo(x,y):g.moveTo(x,y);}}
+        else{g.moveTo(0,mid);g.lineTo(W,mid);}
+        g.stroke();g.restore();
+        if(lvl>.1&&parts.length<14&&Math.random()<lvl*.9)parts.push({x:Math.random()*W,y:mid+(Math.random()-.5)*H*.7,vx:(Math.random()-.5)*.6,vy:-.2-Math.random()*.5,l:1,r:1+Math.random()*2,c:Math.random()<.5});
+        for(var p=parts.length-1;p>=0;p--){var q=parts[p];q.x+=q.vx;q.y+=q.vy;q.l-=.025;if(q.l<=0){parts.splice(p,1);continue;}
+          g.fillStyle=q.c?'rgba(34,211,238,'+(q.l*.8).toFixed(2)+')':'rgba(216,180,254,'+(q.l*.8).toFixed(2)+')';g.beginPath();g.arc(q.x,q.y,q.r,0,6.2832);g.fill();}
+      }else{
+        var b=bands(),n2=b.length,bw=W/n2;g.fillStyle=gr;
+        for(var k=0;k<n2;k++){var h=Math.max(1.5,b[k]*(H-6));pk[k]=Math.max(pk[k]*.97-.002,b[k]);
+          g.globalAlpha=lvl>.003?.9:.35;g.beginPath();g.roundRect?g.roundRect(k*bw+1,H-h-2,Math.max(1,bw-2),h,2):g.rect(k*bw+1,H-h-2,Math.max(1,bw-2),h);g.fill();
+          if(pk[k]>.04){g.globalAlpha=.7;g.fillRect(k*bw+1,H-pk[k]*(H-6)-3,Math.max(1,bw-2),1.5);}}
+        g.globalAlpha=1;
+      }
+      g.font='9px ui-monospace,Menlo,monospace';g.fillStyle='rgba(165,180,252,.45)';g.textBaseline='top';g.fillText(mode==='wave'?'ONDA':'ESPECTRO',7,5);
+    });
+    size();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initScope);else initScope();
+})();
+</script>
+
 </head>
 <body>
+<canvas id="bgfx" aria-hidden="true"></canvas>
 <header>
+<div class="hl">
   <div class="brand"><button id="fullscreen-btn" title="Pantalla completa"><img src="assets/icon.png" onerror="this.onerror=null;this.src='favicon.ico'" alt="dk" width="28" height="28" style="vertical-align:middle;border-radius:7px;margin-right:6px"></button> Demo Kit</div>
   <button id="hToggle" class="sm" aria-expanded="false" title="Mostrar u ocultar el resto de controles del proyecto">☰ Proyecto</button>
   <button id="bKeys" class="sm" title="Atajos y gestos (F1)">?</button>
@@ -207,10 +462,13 @@ kbd{display:inline-block;min-width:1.5em;text-align:center;padding:1px 6px;borde
   </div>
   <a id="repo" class="hx" href="https://github.com/mialmoga/demo-kit" target="_blank" rel="noopener" title="Código en GitHub">GitHub ↗</a>
   <div id="stat"></div>
+  </div>
+  <canvas id="scope" title="Toca para cambiar entre onda y espectro" aria-label="Osciloscopio"></canvas>
   <div id="prog"></div>
 </header>
 <main>
   <aside id="tracks">
+    <div id="tTogWrap"><button id="tToggle" type="button" aria-controls="tlist" aria-expanded="true" title="Colapsar: solo la pista activa">▴</button></div>
     <div class="ph"><select id="addInst" aria-label="Instrumento"></select><button id="bAdd" class="pri" title="Agregar pista">＋</button></div>
     <div id="tlist"></div>
   </aside>
@@ -2474,5 +2732,157 @@ if (fsBtn) {
 })();
 
 </script>
+<script>
+/* Fondo vivo del estudio: aurora violeta/cian + constelación de partículas.
+   Idle tranquilo: arranca con vida, la energía decae y llega a la quietud (el bucle se detiene).
+   Despierta con un toque, tecla, rueda o Play; mientras suena se mantiene en un vaivén suave. */
+(function(){
+  try{
+    var cv=document.getElementById('bgfx'); if(!cv) return;
+    var g=cv.getContext('2d'); if(!g) return;
+    var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var DPR=Math.min(window.devicePixelRatio||1,1.5), W=0,H=0;
+    var small=Math.min(innerWidth,innerHeight)<700;
+    var N=small?34:70, LINK=small?110:140;
+    function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+    var R=rng(24061986), P=[];
+    for(var i=0;i<N;i++){
+      var a=R()*6.2832, sp=.004+R()*.012;
+      P.push({x:R(),y:R(),vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,r:.7+R()*1.6,ph:R()*6.28,tw:.5+R()*1.2,c:R()<.5?0:1});
+    }
+    var BL=[ /* manchas de aurora: x,y base, amplitud, fase, velocidad, radio, color */
+      {x:.15,y:.10,ax:.10,ay:.07,ph:0,  sp:.11,r:.62,c:'168,85,247',al:.30},
+      {x:.88,y:.18,ax:.08,ay:.10,ph:2.1,sp:.09,r:.55,c:'34,211,238',al:.22},
+      {x:.50,y:.98,ax:.14,ay:.05,ph:4.2,sp:.07,r:.70,c:'99,102,241',al:.26}
+    ];
+    var E=reduce?0:1, T=0, last=0, lastAct=performance.now(), playing=false, raf=0;
+    var HOLD=1600, TAU=2200, REST=.012;
+
+    function size(){
+      W=innerWidth;H=innerHeight;
+      cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);
+      g.setTransform(DPR,0,0,DPR,0,0);
+    }
+    function render(){
+      g.clearRect(0,0,W,H);
+      g.globalCompositeOperation='lighter';
+      var m=Math.max(W,H);
+      for(var i=0;i<BL.length;i++){
+        var b=BL[i], cx=(b.x+Math.sin(T*b.sp+b.ph)*b.ax)*W, cy=(b.y+Math.cos(T*b.sp*.83+b.ph)*b.ay)*H, r=b.r*m;
+        var gr=g.createRadialGradient(cx,cy,0,cx,cy,r);
+        gr.addColorStop(0,'rgba('+b.c+','+b.al+')');gr.addColorStop(1,'rgba('+b.c+',0)');
+        g.fillStyle=gr;g.fillRect(0,0,W,H);
+      }
+      var pts=[],j,k,p;
+      for(j=0;j<N;j++){
+        p=P[j];
+        var px=((p.x+p.vx*T)%1+1)%1*W, py=((p.y+p.vy*T)%1+1)%1*H;
+        pts.push(px,py);
+      }
+      g.lineWidth=1;
+      for(j=0;j<N;j++){
+        for(k=j+1;k<N;k++){
+          var dx=pts[j*2]-pts[k*2], dy=pts[j*2+1]-pts[k*2+1], d=dx*dx+dy*dy;
+          if(d<LINK*LINK){
+            var al=(1-Math.sqrt(d)/LINK)*.20;
+            g.strokeStyle='rgba(165,180,252,'+al.toFixed(3)+')';
+            g.beginPath();g.moveTo(pts[j*2],pts[j*2+1]);g.lineTo(pts[k*2],pts[k*2+1]);g.stroke();
+          }
+        }
+      }
+      for(j=0;j<N;j++){
+        p=P[j];
+        var tw=.55+.45*Math.sin(T*p.tw+p.ph);
+        g.fillStyle=p.c?'rgba(34,211,238,'+(.75*tw).toFixed(3)+')':'rgba(216,180,254,'+(.75*tw).toFixed(3)+')';
+        g.beginPath();g.arc(pts[j*2],pts[j*2+1],p.r,0,6.2832);g.fill();
+      }
+      g.globalCompositeOperation='source-over';
+    }
+    function frame(now){
+      raf=0;
+      var dt=Math.min((now-last)/1000,.1); last=now;
+      var vl=(window.__viz&&window.__viz.level)||0;var target=playing?Math.min(1,.4+vl*2.2):((now-lastAct<HOLD)?Math.min(1,.5+vl*2):0);
+      var k=1-Math.exp(-dt*1000/(target>E?380:TAU));
+      E+=(target-E)*k;
+      T+=dt*E*(reduce?0:1);
+      render();
+      if(!playing&&target===0&&E<REST){E=0;render();return;} /* quietud: se detiene el bucle */
+      raf=requestAnimationFrame(frame);
+    }
+    function wake(){
+      if(reduce) return;
+      lastAct=performance.now();
+      if(!raf){last=performance.now();raf=requestAnimationFrame(frame);}
+    }
+    size();render();
+    if(!reduce){last=performance.now();raf=requestAnimationFrame(frame);}
+    addEventListener('resize',function(){size();render();});
+    ['pointerdown','keydown','wheel','touchstart'].forEach(function(ev){addEventListener(ev,wake,{passive:true,capture:true});});
+    document.addEventListener('visibilitychange',function(){if(!document.hidden)wake();});
+
+    if(window.__viz)window.__viz.onWake=wake;
+    var bp=document.getElementById('bPlay');
+    if(bp){
+      var chk=function(){var was=playing;playing=!/▶/.test(bp.textContent);if(playing&&!was)wake();else if(!playing&&was)lastAct=performance.now();};
+      new MutationObserver(chk).observe(bp,{childList:true,characterData:true,subtree:true});
+      chk();
+    }
+  }catch(e){console.warn('bgfx',e);}
+})();
+</script>
+
+<script>
+/* Espectro general detrás/sobre el piano roll: silueta suave que respira con el sonido (sin alinearse a las filas).
+   Capa con mezcla «screen», sin capturar toques. Sin sonido se disuelve y el bucle se detiene. */
+(function(){
+  var V=window.__viz;if(!V)return;
+  var roll=document.getElementById('roll'),wrap=document.getElementById('wrap');if(!roll||!wrap)return;
+  var cv=document.createElement('canvas');cv.id='rspec';cv.setAttribute('aria-hidden','true');roll.appendChild(cv);
+  var g=cv.getContext('2d'),W=0,H=0,N=72,bands=V.makeBands(N,40,15000),cleared=false;
+  var X0=(typeof KW==='number'?KW:62);
+  function place(){
+    var dpr=Math.min(window.devicePixelRatio||1,1.5);
+    W=wrap.clientWidth;H=wrap.clientHeight;
+    cv.style.left=wrap.offsetLeft+'px';cv.style.top=wrap.offsetTop+'px';cv.style.width=W+'px';cv.style.height=H+'px';
+    cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);g.setTransform(dpr,0,0,dpr,0,0);cleared=false;V.redraw();
+  }
+  if(window.ResizeObserver){var ro=new ResizeObserver(place);ro.observe(wrap);ro.observe(roll);}else addEventListener('resize',place);
+  V.drawers.push(function(now,V){
+    if(!W||!H)return;
+    var b=bands(),i,mx=0;for(i=0;i<N;i++)if(b[i]>mx)mx=b[i];
+    if(mx<.012&&V.level<.003){if(!cleared){g.clearRect(0,0,W,H);cleared=true;}return;}
+    cleared=false;g.clearRect(0,0,W,H);
+    var x0=Math.min(X0,W*.3),span=W-x0,top=H*.62;
+    var gr=g.createLinearGradient(0,H,0,H-top);
+    gr.addColorStop(0,'rgba(168,85,247,.55)');gr.addColorStop(.55,'rgba(99,102,241,.22)');gr.addColorStop(1,'rgba(34,211,238,0)');
+    g.beginPath();g.moveTo(x0,H);
+    var px=x0,py=H-b[0]*top;g.lineTo(px,py);
+    for(i=1;i<N;i++){var x=x0+i/(N-1)*span,y=H-b[i]*top,mx2=(px+x)/2,my=(py+y)/2;g.quadraticCurveTo(px,py,mx2,my);px=x;py=y;}
+    g.lineTo(px,py);g.lineTo(W,H);g.closePath();g.fillStyle=gr;g.fill();
+    /* línea de cresta */
+    var lg=g.createLinearGradient(x0,0,W,0);lg.addColorStop(0,'rgba(34,211,238,.75)');lg.addColorStop(.55,'rgba(168,85,247,.75)');lg.addColorStop(1,'rgba(236,72,153,.7)');
+    g.beginPath();px=x0;py=H-b[0]*top;g.moveTo(px,py);
+    for(i=1;i<N;i++){var x1=x0+i/(N-1)*span,y1=H-b[i]*top,mx3=(px+x1)/2,my3=(py+y1)/2;g.quadraticCurveTo(px,py,mx3,my3);px=x1;py=y1;}
+    g.lineTo(px,py);g.strokeStyle=lg;g.lineWidth=1.5;g.shadowColor='rgba(168,85,247,.7)';g.shadowBlur=8;g.stroke();g.shadowBlur=0;
+  });
+  place();
+})();
+</script>
+
+<script>
+/* Panel de pistas colapsable en móvil: una flechita deja solo la pista activa (un renglón); se recuerda el estado. */
+(function(){
+  var a=document.getElementById('tracks'),b=document.getElementById('tToggle');if(!a||!b)return;
+  function set(c,save){
+    a.classList.toggle('tcol',c);b.setAttribute('aria-expanded',String(!c));
+    b.textContent=c?'▾':'▴';b.title=c?'Mostrar todas las pistas':'Colapsar: solo la pista activa';
+    if(save){try{localStorage.setItem('demokit-tcol',c?'1':'0');}catch(e){}}
+  }
+  b.addEventListener('click',function(){set(!a.classList.contains('tcol'),true);});
+  var v=null;try{v=localStorage.getItem('demokit-tcol');}catch(e){}
+  set(v==='1',false);
+})();
+</script>
+
 </body>
 </html>
