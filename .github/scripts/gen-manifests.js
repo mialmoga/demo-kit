@@ -10,6 +10,7 @@ const root = path.resolve(__dirname, '..', '..');
 const GROUPS = [
   { dir: 'demos', ext: /\.js$/i },
   { dir: 'plugins', ext: /\.js$/i },
+  { dir: 'kits/bootleg', ext: /\.js$/i },
   { dir: 'genres', ext: /\.json$/i },
   { dir: 'proyectos', ext: /\.json$/i },
   { dir: 'projects', ext: /\.json$/i },
