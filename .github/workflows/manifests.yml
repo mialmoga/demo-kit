@@ -9,6 +9,7 @@ on:
     paths:
       - 'demos/**'
       - 'plugins/**'
+      - 'genres/**'
       - 'proyectos/**'
       - 'projects/**'
       - 'project_examples/**'

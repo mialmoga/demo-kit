@@ -1,0 +1,23 @@
+{
+  "format": "demokit-genres",
+  "genres": [
+    {
+      "id": "reggae",
+      "name": "Reggae",
+      "desc": "Pulso relajado con el golpe en el contratiempo: bajo redondo, rim seco y mucho espacio.",
+      "bpm": [60, 90, 75],
+      "sig": [4, 4],
+      "keys": ["Mayor", "Menor natural", "Pentatónica menor", "Mixolidia"],
+      "inst": {
+        "perc": ["kick", "snare", "hat", "rim"],
+        "mel": ["pluck", "bell"],
+        "acomp": ["sub", "pad"],
+        "fx": ["wash"]
+      },
+      "structures": [
+        { "name": "Corta", "sections": [["Intro", 4], ["Verso", 8], ["Coro", 8], ["Verso", 8], ["Coro", 8], ["Outro", 4]] },
+        { "name": "Con puente", "sections": [["Intro", 8], ["Verso", 16], ["Coro", 8], ["Verso", 16], ["Coro", 8], ["Puente", 8], ["Coro", 8], ["Outro", 8]] }
+      ]
+    }
+  ]
+}

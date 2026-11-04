@@ -95,7 +95,7 @@ aside{background:var(--p);overflow:auto;min-height:0}
 #awrap{height:124px;flex:none;position:relative;background:#0d0f14;border-top:1px solid var(--b)}
 #acv{display:block;width:100%;height:100%;touch-action:none}
 .abar[hidden]{display:none}
-.abar [hidden]{display:none!important}.tabs{display:inline-flex;gap:4px}.tabs .sm.on{background:#26304f;border-color:var(--a)}
+.abar [hidden]{display:none!important}.tabs{display:inline-flex;gap:4px}.gchips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}.gstr{display:block;padding:6px 8px;margin:0 0 4px;border:1px solid var(--b);border-radius:8px;cursor:pointer}.gstr.on{border-color:var(--a);background:#26304f55}.gstr small{display:block;color:var(--m);font-size:11px;margin-top:2px}.gset{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}.gset label{display:inline-flex;align-items:center;gap:5px;color:var(--m)}.gcat{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin:0 0 4px;font-size:12px}.gcat b{font-weight:600}.tabs .sm.on{background:#26304f;border-color:var(--a)}
 #twrap{height:84px;flex:none;position:relative;background:#0d0f14;border-bottom:1px solid var(--b)}
 #tcv{display:block;width:100%;height:100%;touch-action:none}
 .abar input[type=number]{width:62px}
@@ -495,10 +495,11 @@ html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *:
   </div>
   <div class="grp hx">
     <button id="bNew" title="Proyecto vacío">Nuevo</button>
+    <button id="bGen" title="Proyecto nuevo desde un género: tempo, compás, escala y secciones ya puestos, con los instrumentos afines marcados">✨ Género</button>
     <button id="bSave" title="Descarga el proyecto (.json)">Guardar</button>
     <button id="bOpen" title="Abre proyectos, demos (.js), plugins y kits">Cargar archivos…</button>
     <button id="bWav">⬇ WAV</button>
-    <button id="bMidiOut" title="Descarga las notas como archivo MIDI (.mid): una pista por pista, tempo, compás, volumen y pan">⬇ MIDI</button>
+    <button id="bMidiOut" title="Descarga las notas como archivo MIDI (.mid): una pista por pista, tempo, compás, secciones (como marcadores), volumen y pan">⬇ MIDI</button>
     <button id="bCompact" title="Descarga el proyecto en formato compacto (.demokit.json) para usarlo con la librería, con un reporte de peso">⬇ Compacto</button>
     <button id="bDemoJs" title="Descarga el proyecto como una demo .js autónoma (con el proyecto editable dentro)">⬇ Demo .js</button>
     <button id="bStems" title="Un WAV por pista dentro de un .zip (para mezclar en otro DAW)">⬇ Stems</button>
@@ -595,6 +596,12 @@ html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *:
   <div class="sec fold" data-fold="plugins"><h4 class="ft">Instrumentos de usuario (plugins)</h4><div id="plgList"></div>
     <div class="btnrow"><button id="bNewPlg" class="pri">Escribir un plugin nuevo…</button></div></div>
   <div class="sec fold" data-fold="kit"><h4 class="ft">Kit de síntesis</h4><div id="kitInfo" class="desc"></div><div class="btnrow"><button id="kitReset" class="sm" hidden>Volver al kit incluido</button></div></div>
+</div></div>
+
+<div id="genModal" class="modal"><div class="card">
+  <h3>Nuevo desde género <button class="x" data-close="genModal">Cerrar</button></h3>
+  <div class="desc" style="color:var(--m);margin:0 0 8px">Pone el andamio (tempo, compás, escala y secciones en la regla) y marca con ● lo que le va bien al género. No compone nada: las notas son tuyas.</div>
+  <div id="genBody"></div>
 </div></div>
 
 <div id="lyModal" class="modal"><div class="card">
@@ -771,7 +778,7 @@ const satf=x=>x/(1+Math.abs(x));
 const INSTRUMENTS={}, INST_ORDER=[];
 let USER_PLUGINS=[];                                            // [{id,name,code}]
 // Categorías de instrumento (solo para organizar y colorear; no cambian el sonido). Un plugin puede declarar cat:'perc'|'mel'|'acomp'|'fx'.
-const CATS={perc:{name:'Percusión',color:'#ff7a8a',dot:'🔴'},mel:{name:'Melódico',color:'#7aa8ff',dot:'🔵'},acomp:{name:'Acompañamiento',color:'#6fe0a8',dot:'🟢'},fx:{name:'Efectos',color:'#c58bff',dot:'🟣'}};
+const CATS={perc:{name:'Percusión',color:'#f2b3bd'},mel:{name:'Melódico',color:'#b4c9f2'},acomp:{name:'Acompañamiento',color:'#b5e3c9'},fx:{name:'Efectos',color:'#d6c2f0'}};   // pasteles
 const CAT_ORDER=['perc','mel','acomp','fx'];
 const CAT_OF={kick:'perc',snare:'perc',clap:'perc',snap:'perc',hat:'perc',crash:'perc',rim:'perc',clip:'perc',
   sinte:'mel',pluck:'mel',bell:'mel',bellmk:'mel',chop:'mel',
@@ -1204,7 +1211,7 @@ function mixAuto(K0,st,vol,A,beat,tm){
     d0[o+i]+=x; d1[o+i]+=y; }
 }
 async function mixStems(P,trs,total,beat){
-  const K0=Kit.make(SR,total,P.seed||KIT_SEED); K0.sr=SR;
+  const K0=Kit.make(SR,total,P.seed||KIT_SEED); K0.sr=SR; K0.BPM=P.bpm;      // los kits con efectos en el master (delay) pueden sincronizarse con K.BPM
   for(const tr of trs){ const c=stemCache.get(tr.id); if(!c) continue; const vol=tr.vol==null?1:tr.vol, A={vol:autoPts(tr,'vol'),pan:autoPts(tr,'pan'),cut:autoPts(tr,'cut')}, any=A.vol||A.pan||A.cut;
     for(const st of (c.fxStems||c.stems)){ if(any){ mixAuto(K0,st,vol,A,beat,tmap(P)); continue; } const g=vol*st.pk/32767; for(let ch=0;ch<2;ch++){ const d=K0[st.bus][ch],q=st.q[ch],o=st.s0; for(let i=0;i<q.length;i++) d[o+i]+=q[i]*g; } }
     await tick(); }
@@ -1264,7 +1271,7 @@ function compactTrack(t){
 function expandTrack(t){ if(!Array.isArray(t.n)) return t; t.notes=t.n.map(a=>{ if(!Array.isArray(a)) return a; const n={b:a[0],l:a[1],m:a[2],v:a[3]==null?1:a[3]}; if(a[4]) n.pan=a[4]; if(a[5]) n.o=a[5]; if(a[6]) n.w=a[6]; return n; }); delete t.n; return t; }
 function projectToJSON(P,opts){
   const compact=!!(opts&&opts.compact);
-  const o={format:'demokit-studio',v:compact?2:1,kit:KIT_FORMAT,name:P.name,bpm:P.bpm,bars:P.bars,tempo:(P.tempo&&P.tempo.length)?P.tempo:undefined,sig:barBeats(P)===4&&(!P.sig||P.sig[1]===4)?undefined:P.sig,sigs:sigPts(P).length?sigPts(P):undefined,marks:markPts(P).length?markPts(P):undefined,seed:P.seed,sc:{mode:P.sc.mode,depth:P.sc.depth,rel:P.sc.rel,rate:P.sc.rate},master:masterOf(P),key:P.key||undefined,tracks:compact?P.tracks.map(compactTrack):P.tracks,clips:{},plugins:[]};
+  const o={format:'demokit-studio',v:compact?2:1,kit:KIT_FORMAT,name:P.name,bpm:P.bpm,bars:P.bars,tempo:(P.tempo&&P.tempo.length)?P.tempo:undefined,sig:barBeats(P)===4&&(!P.sig||P.sig[1]===4)?undefined:P.sig,sigs:sigPts(P).length?sigPts(P):undefined,marks:markPts(P).length?markPts(P):undefined,genre:P.genre||undefined,seed:P.seed,sc:{mode:P.sc.mode,depth:P.sc.depth,rel:P.sc.rel,rate:P.sc.rate},master:masterOf(P),key:P.key||undefined,tracks:compact?P.tracks.map(compactTrack):P.tracks,clips:{},plugins:[]};
   if(P.sc.table){ const T=P.sc.table,u=new Uint8Array(T.length); for(let i=0;i<T.length;i++) u[i]=Math.round(clamp(T[i],0,1)*255); o.sc.table=u8ToB64(u); }
   if(typeof pruneBakedClips==='function') pruneBakedClips(P);
   for(const cid in P.clips){ const d=P.clips[cid],q=new Int16Array(d.length); for(let i=0;i<d.length;i++) q[i]=clamp(Math.round(d[i]*16384),-32768,32767); o.clips[cid]=u8ToB64(new Uint8Array(q.buffer)); }
@@ -1279,7 +1286,7 @@ function projectReport(P){
 // opts.allowPlugins===false: no se ejecuta el código de los plugins incluidos (por defecto sí, para compatibilidad; el estudio pregunta antes)
 function projectFromJSON(o,opts){
   const errs=[], skipped=[]; for(const u of o.plugins||[]){ if(opts&&opts.allowPlugins===false){ skipped.push(u.name||u.id); continue; } try{ installPlugin(u.code); }catch(e){ errs.push(u.id+': '+e.message); } }
-  const P=newProject(o.name,o.bpm,o.bars); if(Array.isArray(o.tempo)) P.tempo=tempoPts({bpm:o.bpm,tempo:o.tempo}); if(Array.isArray(o.sig)&&o.sig[0]>0&&o.sig[1]>0) P.sig=[+o.sig[0],+o.sig[1]]; if(Array.isArray(o.sigs)&&o.sigs.length) P.sigs=o.sigs.map(x=>({bar:x.bar,sig:[+x.sig[0],+x.sig[1]]})); if(Array.isArray(o.marks)&&o.marks.length) P.marks=markPts({marks:o.marks}); P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key);
+  const P=newProject(o.name,o.bpm,o.bars); if(Array.isArray(o.tempo)) P.tempo=tempoPts({bpm:o.bpm,tempo:o.tempo}); if(Array.isArray(o.sig)&&o.sig[0]>0&&o.sig[1]>0) P.sig=[+o.sig[0],+o.sig[1]]; if(Array.isArray(o.sigs)&&o.sigs.length) P.sigs=o.sigs.map(x=>({bar:x.bar,sig:[+x.sig[0],+x.sig[1]]})); if(Array.isArray(o.marks)&&o.marks.length) P.marks=markPts({marks:o.marks}); if(typeof o.genre==='string'&&o.genre) P.genre=o.genre.slice(0,60); P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key);
   if(o.sc&&o.sc.table){ const u=b64ToU8(o.sc.table),T=new Float32Array(u.length); for(let i=0;i<u.length;i++) T[i]=u[i]/255; P.sc.table=T; }
   for(const cid in o.clips||{}){ const u=b64ToU8(o.clips[cid]),q=new Int16Array(u.buffer,u.byteOffset,u.length>>1),d=new Float32Array(q.length); for(let i=0;i<q.length;i++) d[i]=q[i]/16384; P.clips[cid]=d; }
   P.tracks=(o.tracks||[]).map(t=>fixTrack(expandTrack(t))); P.loadErrors=errs; P.loadWarnings=[]; if(skipped.length) P.loadWarnings.push('Plugins sin ejecutar: '+skipped.join(', ')+'. Las pistas que los usan quedan sin instrumento.'); if(o.kit!=null&&o.kit!==KIT_FORMAT) P.loadWarnings.push('Este proyecto se guardó con la versión '+o.kit+' del kit y esta es la '+KIT_FORMAT+(o.kit>KIT_FORMAT?': puede sonar distinto o faltar instrumentos. Actualiza la librería.':': puede sonar un poco distinto.')); return P;
@@ -1351,6 +1358,7 @@ function projectToMidi(P){
   const meta=(t,type,data,o)=>({t,o:o==null?0:o,b:[0xFF,type,...midiVlq(data.length),...data]});
   const cond=[meta(0,0x03,midiText(P.name||'Demo Kit')),meta(0,0x58,[sig[0],Math.round(Math.log2(sig[1])),24,8])];
   for(const p of sigPts(P)) if(p.bar<P.bars) cond.push(meta(Math.round(mm.beatOfBar(p.bar)*MIDI_PPQ),0x58,[p.sig[0],Math.round(Math.log2(p.sig[1])),24,8]));
+  for(const m of markPts(P)) if(m.bar<P.bars) cond.push(meta(Math.round(mm.beatOfBar(m.bar)*MIDI_PPQ),0x06,midiText(m.name),-2));   // secciones → marcadores de MIDI (los DAW los muestran en su regla)
   { let lastMp=-1; const cand=new Set([0]); for(let b=0;b<=totalBeats+1e-9;b+=.25) cand.add(+b.toFixed(6)); for(const p of (P.tempo||[])) if(p&&p.b>=0&&p.b<=totalBeats) cand.add(+p.b);
     for(const b of [...cand].sort((x,y)=>x-y)){ const mp=Math.round(60e6/Math.max(1,tm.bpmAt(b))); if(mp!==lastMp){ cond.push(meta(Math.round(b*MIDI_PPQ),0x51,[(mp>>>16)&255,(mp>>>8)&255,mp&255],-1)); lastMp=mp; } } }
   const chunks=[midiTrackBytes(cond,endTick)], skipped=[]; let nextCh=0; const melCh=[0,1,2,3,4,5,6,7,8,10,11,12,13,14,15];
@@ -1367,6 +1375,8 @@ function projectToMidi(P){
   const header=midiChunk('MThd',[0,1,(chunks.length>>8)&255,chunks.length&255,(MIDI_PPQ>>8)&255,MIDI_PPQ&255]);
   return new Uint8Array(header.concat(...chunks));
 }
+// texto de los meta-eventos: casi todos los programas escriben UTF-8, pero algunos usan Latin-1 (acentos); se prueba UTF-8 estricto y, si no cuadra, Latin-1
+function midiDecode(d){ try{ return new TextDecoder('utf-8',{fatal:true}).decode(d); }catch(e){ return new TextDecoder('windows-1252').decode(d); } }
 function parseMidi(u8){
   const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength), tag=(i)=>String.fromCharCode(u8[i],u8[i+1],u8[i+2],u8[i+3]);
   if(u8.length<14||tag(0)!=='MThd') throw new Error('No es un archivo MIDI (falta la cabecera MThd).');
@@ -1379,7 +1389,7 @@ function parseMidi(u8){
     const vlq=()=>{ let v=0,b; do{ b=u8[pos++]; v=(v<<7)|(b&127); }while((b&128)&&pos<end); return v; };
     while(pos<end){ tick+=vlq(); let s=u8[pos];
       if(s===0xFF){ pos++; const ty=u8[pos++], l=vlq(), d=u8.subarray(pos,pos+l); pos+=l; run=0;
-        if(ty===0x03) evs.push({tick,k:'name',text:new TextDecoder('utf-8').decode(d)}); else if(ty===0x51&&l===3) evs.push({tick,k:'tempo',mp:(d[0]<<16)|(d[1]<<8)|d[2]}); else if(ty===0x58&&l>=2) evs.push({tick,k:'sig',n:d[0],d:Math.pow(2,d[1])}); else if(ty===0x2F){ evs.push({tick,k:'end'}); break; } continue; }
+        if(ty===0x03) evs.push({tick,k:'name',text:midiDecode(d)}); else if(ty===0x51&&l===3) evs.push({tick,k:'tempo',mp:(d[0]<<16)|(d[1]<<8)|d[2]}); else if(ty===0x58&&l>=2) evs.push({tick,k:'sig',n:d[0],d:Math.pow(2,d[1])}); else if(ty===0x06||ty===0x07) evs.push({tick,k:'marker',text:midiDecode(d)}); else if(ty===0x2F){ evs.push({tick,k:'end'}); break; } continue; }
       if(s===0xF0||s===0xF7){ pos++; const l=vlq(); pos+=l; run=0; continue; }
       if(s&128){ run=s; pos++; } else if(!run) throw new Error('El archivo MIDI está dañado (dato sin estado previo).'); else s=run;
       const st=run&0xF0, ch=run&15;
@@ -1422,14 +1432,19 @@ function midiToProject(u8,fname){
       if(x.ch===9){ const [inst,lane,gname]=drumTarget(x.key), g=grp('d:'+inst+'|'+gname,()=>({inst,name:gname,kind:'perc',s:st(9),notes:[]})); g.notes.push({b:r6b(x.on),l:.25,m:lane,v:r6(x.vel/100)}); }
       else { const s=st(x.ch), key='m:'+ti+':'+x.ch, g=grp(key,()=>({inst:progInst(s.prog),name:(name&&name.trim())||((FAM[s.prog>>3]||'Pista')+' · canal '+(x.ch+1)),kind:'mel',s,notes:[]})); g.notes.push({b:r6b(x.on),l:Math.max(r6(1/ppq),r6b(x.off-x.on)),m:x.key,v:r6(x.vel/100)}); } } });
   if(!nNotes) throw new Error('El archivo MIDI no tiene notas.');
+  const rawMarks=[]; M.tracks.forEach(evs=>{ for(const x of evs) if(x.k==='marker'&&x.text&&x.text.trim()) rawMarks.push(x); });
   const mmI=meter(P), endBeat=lastTick/ppq; P.bars=Math.max(1,Math.min(256,mmI.barAt(Math.max(0,endBeat-1e-6)).i+1));
   if(mmI.barAt(Math.max(0,endBeat-1e-6)).i+1>256) warn.push('El archivo dura más de 256 compases: recorté el proyecto a 256.');
+  if(rawMarks.length){ rawMarks.sort((a,b)=>a.tick-b.tick); const byBar=new Map(); let snappedM=0, outM=0, dupM=0;
+    for(const x of rawMarks){ const beat=x.tick/ppq, a=mmI.barAt(Math.max(0,beat)), bi=(beat-a.start)>a.len/2?a.i+1:a.i; if(Math.abs(beat-mmI.beatOfBar(bi))>1e-3) snappedM++; if(bi>=P.bars){ outM++; continue; } if(byBar.has(bi)){ dupM++; continue; } byBar.set(bi,{bar:bi,name:x.text.trim().slice(0,40)}); }
+    if(byBar.size){ P.marks=markPts({marks:[...byBar.values()]}); warn.push('Importé '+P.marks.length+' marcador'+(P.marks.length>1?'es':'')+' como secciones.'); }
+    if(snappedM) warn.push(snappedM+' marcador(es) no caían en límite de compás: los ajusté al compás más cercano.'); if(dupM) warn.push(dupM+' marcador(es) caían en un compás que ya tenía sección: los dejé fuera.'); if(outM) warn.push(outM+' marcador(es) quedaban después del final: los dejé fuera.'); }
   const used={}; for(const g of groups.values()){ const tr=newTrack(g.inst,g.name); if(used[g.name]) tr.name=g.name+' '+(++used[g.name]); else used[g.name]=1;
     if(g.s&&g.s.vol!=null) tr.vol=Math.max(0,Math.min(1.5,g.s.vol/100)); if(g.s&&g.s.pan!=null) tr.pan=Math.max(-1,Math.min(1,(g.s.pan-64)/63));
     tr.notes=g.notes.sort((a,b)=>a.b-b.b); P.tracks.push(tr); }
   const rank=['kick','snare','clap','snap','hat','crash','rim']; const ord=t=>{ const i=rank.indexOf(t.inst); return i<0?100:i; };   // la batería arriba, como al convertir demos
   P.tracks=P.tracks.map((t,i)=>({t,i})).sort((a,b)=>(ord(a.t)-ord(b.t))||(a.i-b.i)).map(x=>x.t);
-  return {project:P,warnings:warn,stats:{tracks:P.tracks.length,notes:nNotes,bars:P.bars,bpm:P.bpm,tempoChanges:(P.tempo||[]).length}};
+  return {project:P,warnings:warn,stats:{tracks:P.tracks.length,notes:nNotes,bars:P.bars,bpm:P.bpm,tempoChanges:(P.tempo||[]).length,marks:(P.marks||[]).length}};
 }
 // ───────────────────────── conversión de demos → proyecto editable ─────────────────────────
 // Se ejecuta la demo con un "kit grabador": cada llamada a kick/snare/syn/bell/… queda registrada en lugar de sonar.
@@ -1683,6 +1698,63 @@ async function recordDemo(src,opts){
 //#CONVERTER-END
 //#ENGINE-END
 
+// ───────────────────────── géneros: plantillas para «Nuevo desde género» ─────────────────────────
+// Un género NO compone: solo pone el andamio (tempo, compás, escala, secciones) y marca con ● lo que le va bien (instrumentos y escalas).
+// Formato de un género (también en archivos genres/*.json:  {"format":"demokit-genres","genres":[ … ]}  o un género suelto):
+//   { id, name, desc,
+//     bpm:[mínimo, máximo, típico],          sig:[pulsos, figura],
+//     keys:['Menor natural','Dórica',…],      // escalas afines (nombres de las del teclado)
+//     inst:{ perc:[ids], mel:[ids], acomp:[ids], fx:[ids] },   // instrumentos afines, por categoría
+//     structures:[ { name, sections:[['Intro',8],['Verso',16],…] } ] }   // [nombre, compases]
+const GENRES=new Map();
+function normGenre(o){
+  if(!o||typeof o!=='object') throw new Error('el género no es un objeto');
+  const name=String(o.name||'').trim().slice(0,40); if(!name) throw new Error('falta el nombre del género');
+  const id=slug(o.id||name), num=(v,d)=>Number.isFinite(+v)&&v!==null&&v!==''?+v:d;
+  let b=Array.isArray(o.bpm)?o.bpm.map(x=>num(x,NaN)).filter(Number.isFinite):[]; if(b.length===2) b.push(Math.round((b[0]+b[1])/2)); if(b.length<3) b=[80,160,120];
+  b=b.slice(0,3).map(x=>Math.max(40,Math.min(260,Math.round(x)))); const lo=Math.min(b[0],b[1]), hi=Math.max(b[0],b[1]); b=[lo,hi,Math.max(lo,Math.min(hi,b[2]))];
+  const sig=Array.isArray(o.sig)&&o.sig[0]>0&&o.sig[1]>0?[+o.sig[0],+o.sig[1]]:[4,4];
+  const inst={}; for(const c of CAT_ORDER) inst[c]=Array.isArray(o.inst&&o.inst[c])?o.inst[c].map(String):[];
+  const structures=[]; for(const st of Array.isArray(o.structures)?o.structures:[]){
+    const secs=[]; let tot=0; for(const x of Array.isArray(st.sections)?st.sections:[]){ const nm=String(Array.isArray(x)?x[0]:x&&x.name||'').trim().slice(0,40), n=Math.round(num(Array.isArray(x)?x[1]:x&&x.bars,0)); if(!nm||n<1||tot+n>256) continue; secs.push([nm,n]); tot+=n; }
+    if(secs.length) structures.push({name:String(st.name||'Estructura').trim().slice(0,40),sections:secs}); }
+  if(!structures.length) throw new Error('«'+name+'» no tiene ninguna estructura válida (secciones con nombre y compases; en total hasta 256 compases)');
+  return {id,name,desc:String(o.desc||'').slice(0,300),bpm:b,sig,keys:Array.isArray(o.keys)?o.keys.map(String):[],inst,structures};
+}
+function registerGenre(o){ const g=normGenre(o); GENRES.set(g.id,g); return g; }
+const genreOf=P=>(P&&P.genre&&GENRES.get(P.genre))||null;
+const genreInst=g=>new Set(CAT_ORDER.flatMap(c=>g.inst[c]));
+const structBars=st=>st.sections.reduce((a,s)=>a+s[1],0);
+const structSecs=(st,bpm,sig)=>structBars(st)*sig[0]*4/sig[1]*60/bpm;       // duración en segundos (el pulso es la negra)
+const fmtDur=s=>{ const t=Math.round(s); return Math.floor(t/60)+':'+String(t%60).padStart(2,'0'); };
+
+// géneros incluidos (los de tu carpeta genres/ y los que sueltes en el estudio se suman a estos o los reemplazan si usan el mismo id)
+const GENRE_BUILTIN=[
+ {id:'lofi',name:'Lo-fi',desc:'Beats polvorientos y cálidos: ritmo suelto, bajo suave, acordes con séptimas y mucho aire.',
+  bpm:[70,90,82],sig:[4,4],keys:['Menor natural','Dórica','Pentatónica menor'],
+  inst:{perc:['kick','snare','hat','snap','rim'],mel:['bell','pluck','chop'],acomp:['pad','sub'],fx:['wash']},
+  structures:[
+   {name:'Corta',sections:[['Intro',4],['Sección A',8],['Sección B',8],['Sección A',8],['Outro',4]]},
+   {name:'Estándar',sections:[['Intro',8],['Sección A',16],['Sección B',16],['Sección A',16],['Outro',8]]}]},
+ {id:'poprock',name:'Pop-rock',desc:'Verso–coro de toda la vida: batería, bajo, acompañamiento y una melodía que se quede.',
+  bpm:[100,140,120],sig:[4,4],keys:['Mayor','Pentatónica mayor','Menor natural','Mixolidia'],
+  inst:{perc:['kick','snare','hat','crash','clap'],mel:['sinte','pluck'],acomp:['sub','pad','arp'],fx:['riser','impact']},
+  structures:[
+   {name:'Corta',sections:[['Intro',4],['Verso',8],['Coro',8],['Verso',8],['Coro',8],['Puente',4],['Coro',8],['Outro',4]]},
+   {name:'Clásica',sections:[['Intro',8],['Verso',16],['Pre-coro',8],['Coro',16],['Verso',16],['Pre-coro',8],['Coro',16],['Puente',8],['Coro',16],['Outro',8]]}]},
+ {id:'dubstep',name:'Dubstep',desc:'Tensión y drop: intro oscura, subida, bajo pesado y un respiro antes del segundo golpe.',
+  bpm:[138,150,140],sig:[4,4],keys:['Menor natural','Frigia','Menor armónica','Pentatónica menor'],
+  inst:{perc:['kick','snare','hat','clap','crash'],mel:['sinte','chop'],acomp:['reese','reesemk','growl','sub','subfall','pad'],fx:['riser','sweep','impact','wash']},
+  structures:[
+   {name:'Corta',sections:[['Intro',8],['Build-up',8],['Drop',16],['Break',8],['Drop',16],['Outro',8]]},
+   {name:'Estándar',sections:[['Intro',16],['Build-up',16],['Drop',20],['Break',16],['Drop',20],['Outro',12]]}]},
+ {id:'synthwave',name:'Synthwave',desc:'Neón y carretera de noche: sintes anchos, bajo en corcheas, caja con eco y arpegios.',
+  bpm:[80,118,100],sig:[4,4],keys:['Menor natural','Dórica','Pentatónica menor'],
+  inst:{perc:['kick','snare','clap','hat'],mel:['sinte','pluck'],acomp:['supersaw','pad','arp','sub'],fx:['riser','sweep','impact']},
+  structures:[
+   {name:'Corta',sections:[['Intro',8],['Verso',16],['Estribillo',16],['Puente',8],['Estribillo',16],['Outro',8]]},
+   {name:'Completa',sections:[['Intro',8],['Verso',16],['Estribillo',16],['Verso',16],['Estribillo',16],['Puente',8],['Estribillo',16],['Outro',8]]}]}];
+
 // ═══════════════════════════════════════════════════════════════════════
 //  INTERFAZ
 // ═══════════════════════════════════════════════════════════════════════
@@ -1819,7 +1891,7 @@ const undo=()=>histGo(hist.undo,hist.redo,'deshacer'), redo=()=>histGo(hist.redo
 function loadProject(proj){
   stop(); P=proj; sel=0; selNotes.clear(); tSel=null; tDrag=null; cursorBeat=0; cache=null; dirty=true; version++;
   $('pname').value=P.name; $('bpm').value=P.bpm; $('bars').value=P.bars; $('sig').value=sigStr();
-  renderTracks(); renderInspector(); layoutSpacer(); centerTrack(); updateStat(); invalidate(); histReset(); refreshTempoUI();
+  renderTracks(); renderInspector(); layoutSpacer(); centerTrack(); updateStat(); invalidate(); histReset(); refreshTempoUI(); populateAddInst();
   if(P.loadErrors&&P.loadErrors.length) toast('Plugins con error: '+P.loadErrors.join('; '),'err');
   if(P.loadWarnings&&P.loadWarnings.length) toast(P.loadWarnings.join(' '),'err');
 }
@@ -2111,9 +2183,11 @@ function addTrack(instId){
   P.tracks.push(t); sel=P.tracks.length-1; selNotes.clear(); renderTracks(); renderInspector(); centerTrack(); touch();
 }
 function populateAddInst(){
-  const s=$('addInst'), cur=s.value; s.innerHTML=''; const groups={}; for(const c of CAT_ORDER) groups[c]=[]; groups.user=[];
+  const s=$('addInst'), cur=s.value; s.innerHTML=''; const gen=genreOf(P), afin=gen?genreInst(gen):new Set(), groups={}; for(const c of CAT_ORDER) groups[c]=[]; groups.user=[];
   for(const id of INST_ORDER){ const d=INSTRUMENTS[id]; if(d.hidden) continue; (d.user?groups.user:groups[catOf(d)]).push(d); }
-  for(const g in groups){ if(!groups[g].length) continue; const og=el('optgroup',{label:g==='user'?'Plugins de usuario':CATS[g].name}); for(const d of groups[g]) og.append(el('option',{value:d.id,text:CATS[catOf(d)].dot+' '+d.name})); s.append(og); }
+  for(const g in groups){ if(!groups[g].length) continue; const og=el('optgroup',{label:g==='user'?'Plugins de usuario':CATS[g].name});
+    for(const d of groups[g].slice().sort((a,b)=>(afin.has(b.id)?1:0)-(afin.has(a.id)?1:0))){ const on=afin.has(d.id), o=el('option',{value:d.id,text:(on?'● ':gen?'\u00a0\u00a0\u00a0':'')+d.name}); if(on) o.style.color=CATS[catOf(d)].color; og.append(o); }
+    s.append(og); }
   if(cur&&INSTRUMENTS[cur]) s.value=cur;
 }
 
@@ -2229,7 +2303,8 @@ function rowBg(m){ if(!scaleOn()) return isBlack(m)?'#0a0b10':'#0f1118'; const k
 { const r=$('kRoot'),s=$('kScale'),c=$('kChord'); NOTE_NAMES.forEach((n,i)=>r.append(el('option',{value:i,text:n}))); for(const k of Object.keys(SCALES)) s.append(el('option',{value:k,text:k==='off'?'Ninguna':k}));
   for(const k of Object.keys(CHORDS)) c.append(el('option',{value:k,text:CHORDS[k].n}));
   r.onchange=()=>{ KEY().root=+r.value; touch(); buildOsk(); }; s.onchange=()=>{ KEY().scale=s.value; touch(); buildOsk(); }; $('kFit').onchange=e=>{ KEY().fit=e.target.checked; touch(); }; c.onchange=()=>{ chordMode=c.value; }; }
-function syncKeyUI(){ const k=KEY(); $('kRoot').value=k.root; $('kScale').value=k.scale; $('kFit').checked=!!k.fit; }
+function syncKeyUI(){ const k=KEY(), gen=genreOf(P); $('kRoot').value=k.root; $('kFit').checked=!!k.fit;
+  for(const o of $('kScale').options){ const af=!!gen&&gen.keys.includes(o.value); o.textContent=(af?'● ':gen?'\u00a0\u00a0\u00a0':'')+(o.value==='off'?'Ninguna':o.value); o.style.color=af?'#f3e3a0':''; } $('kScale').value=k.scale; }
 // teclado en pantalla
 let oskOn=false;
 function buildOsk(){ const box=$('osk'); box.hidden=!oskOn; $('bOsk').classList.toggle('on',oskOn); if(!oskOn) return; box.innerHTML=''; const tr=P.tracks[sel]; if(!tr||!INSTRUMENTS[tr.inst]) return; const info=trackInfo(tr);
@@ -2497,12 +2572,28 @@ async function ingest(file,opts){
   }
   const txt=await file.text();
   try{
-    if(/^\s*\{/.test(txt)){ const o=JSON.parse(txt); if(o.format==='demokit-studio'){ loadProject(projectFromFile(o,name)); populateAddInst(); toast('Proyecto «'+o.name+'» cargado','ok'); return; } }
-    if(/function\s+demoKit\s*\(/.test(txt)){ if(!trustCode('Kit «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código que reemplazará al kit incluido.')){ toast('Kit no cargado','err'); return; } const f=new Function(txt+'\nreturn demoKit;')(); const k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); Kit.make=f; bumpKit(); kitName=name; cache=null; dirty=true; const kept=rememberKit(name,txt); renderLib(); updateStat(); toast('Kit «'+name+'» cargado: los instrumentos y plugins lo usan desde ahora'+(kept?' y se recordará en este navegador':' (no pude guardarlo en este navegador: pesa demasiado; durará solo esta sesión)'),kept?'ok':'err'); return; }
+    if(/^\s*\{/.test(txt)){ const o=JSON.parse(txt); if(o.format==='demokit-genres'){ const r=addGenres(o,opts); toast(r.ok.length?'Géneros listos: '+r.ok.join(', ')+(r.bad.length?' · con avisos: '+r.bad.join(' · '):''):'No pude leer géneros: '+r.bad.join(' · '),r.ok.length?'ok':'err'); return; } if(o.format==='demokit-studio'){ loadProject(projectFromFile(o,name)); populateAddInst(); toast('Proyecto «'+o.name+'» cargado','ok'); return; } }
+    if(/function\s+demoKit\s*\(/.test(txt)){ if(!trustCode('Kit «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código que reemplazará al kit incluido.')){ toast('Kit no cargado','err'); return; } const f=new Function(txt+'\nreturn demoKit;')(); const k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); const probs=kitCheck(f); if(probs.length&&!confirm('Revisé el kit «'+name+'» y encontré esto:\n\n• '+probs.join('\n• ')+'\n\n¿Cargarlo de todos modos?')){ toast('Kit no cargado','err'); return; } Kit.make=f; bumpKit(); kitName=name; cache=null; dirty=true; const kept=rememberKit(name,txt); renderLib(); updateStat(); toast('Kit «'+name+'» cargado: los instrumentos y plugins lo usan desde ahora'+(kept?' y se recordará en este navegador':' (no pude guardarlo en este navegador: pesa demasiado; durará solo esta sesión)'),kept?'ok':'err'); return; }
     if(/async\s+function\s+render\w*\s*\(/.test(txt)){ const fn=/async\s+function\s+(render\w*)/.exec(txt)[1]; const d={name:demoName(txt,name.replace(/\.js$/,'')),fn,src:txt,out:null,trusted:!!(opts&&opts.trusted)}; const i=demos.findIndex(x=>x.name===d.name); if(i>=0) demos[i]=d; else demos.push(d); renderLib(); openModal('libModal'); toast('Demo «'+d.name+'» lista: reprodúcela o conviértela','ok'); return; }
     if(/registerInstrument\s*\(/.test(txt)){ if(!trustCode('Plugin «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código. Empieza así:\n'+txt.slice(0,160).replace(/\s+/g,' ')+'…')){ toast('Plugin no instalado','err'); return; } const def=installPlugin(txt); populateAddInst(); renderLib(); toast('Plugin «'+def.name+'» registrado','ok'); return; }
     toast('No reconocí «'+name+'» (¿demo, plugin, kit o proyecto?)','err');
   }catch(e){ console.error(e); toast('Error con «'+name+'»: '+e.message,'err'); }
+}
+// ───────────── revisión de un kit al cargarlo (prueba corta: no sustituye a escucharlo) ─────────────
+function kitCheck(make){
+  const out=[], sr=SR||44100, E=a=>{ let e=0; for(let c=0;c<2;c++){ const x=a[c]; for(let i=0;i<x.length;i+=2) e+=x[i]*x[i]; } return e; }, bad=a=>{ for(let c=0;c<2;c++){ const x=a[c]; for(let i=0;i<x.length;i+=3) if(!isFinite(x[i])) return true; } return false; };
+  const kit=(s)=>{ const K=make(sr,s,1); K.sr=sr; return K; };
+  try{
+    { const K=kit(.8); K.syn(K.mu,0,.25,220,.2,0,{det:[-8,0,8],lp:2000}); if(E(K.mu)<1e-9&&E(K.dr)>1e-9) out.push('K.syn ignora el búfer que se le pasa y suena siempre en la percusión: los pads y bajos no los agacha el sidechain.'); }
+    { const K=kit(.9); K.syn(K.mu,0,.25,880,.2,0,{det:[0],lp:14000}); K.syn(K.mu,.3,.3,110,.2,0,{det:[-10,10],lp:t=>400+12000*Math.exp(-t*3)}); if(bad(K.mu)||bad(K.dr)) out.push('El filtro de K.syn se desborda (valores NaN) con cortes altos o barridos fuertes: la mezcla se corta mientras dura la nota.'); }
+    { const K=kit(2.5), fns=[['kick',()=>K.kick(0,1)],['snare',()=>K.snare(.1,1)],['clap',()=>K.clap(.2,1)],['snap',()=>K.snap(.3,1)],['hat',()=>K.hat(.4,1)],['crash',()=>K.crash(.5,.5)],['bell',()=>K.bell(.6,69,.5)],['chop',()=>K.chop(.7,.3,60,.5)],['riser',()=>K.riser(.8,.5,.5)],['sweep',()=>K.sweep(1,.5,200,2000,.5)]];
+      for(const [nm,f] of fns){ try{ f(); }catch(err){ out.push('K.'+nm+' falla: '+err.message); } }
+      if(bad(K.dr)||bad(K.mu)) out.push('Alguna percusión o textura produce valores NaN.'); }
+    const song=(mk)=>{ const K=mk(sr,2.5,1); for(let i=0;i<8;i++) K.kick(i*.25,1); K.syn(K.mu,0,2,220,.12,0,{det:[-6,0,6],lp:1800}); K.hat(.125,1); K.snare(.5,1); return K.mix(()=>1); };
+    let r=null; try{ r=song(make); }catch(err){ out.push('K.mix falla al mezclar: '+err.message); }
+    if(r){ if(bad([r.L,r.R])) out.push('K.mix devuelve valores NaN.'); else { const rms=o=>{ let e=0; for(let i=0;i<o.L.length;i++) e+=o.L[i]*o.L[i]; return Math.sqrt(e/o.L.length); }, db=20*Math.log10(rms(r)/rms(song(demoKit))); if(db>4) out.push('Con las mismas notas la mezcla sale '+db.toFixed(1)+' dB más fuerte que con el kit incluido: puede saturar (baja las ganancias o el empuje del kit).'); } }
+  }catch(err){ out.push('La revisión no pudo terminar: '+err.message); }
+  return out;
 }
 async function handleFiles(list){ for(const f of list) await ingest(f); }
 // ───────────── el repositorio: demos/, plugins/, proyectos/ y project_examples/ aparecen solos ─────────────
@@ -2514,6 +2605,7 @@ const REPO_GROUPS=[
   {id:'demos',title:'Demos',dirs:['demos'],ext:/\.js$/i,kind:'demo',what:'archivos .js de demos'},
   {id:'plugins',title:'Plugins de instrumento',dirs:['plugins'],ext:/\.js$/i,kind:'plugin',what:'archivos .js de plugins'},
   {id:'proyectos',title:'Proyectos',dirs:['proyectos','projects'],ext:/\.json$/i,kind:'project',what:'archivos .demokit.json (proyectos guardados)'},
+  {id:'generos',title:'Géneros',dirs:['genres','generos'],ext:/\.json$/i,kind:'genre',what:'archivos .json de géneros (formato demokit-genres)'},
   {id:'ejemplos',title:'Ejemplos de proyectos',dirs:['project_examples'],ext:/\.json$/i,kind:'project',what:'archivos .demokit.json de ejemplo'}];
 const REPO_BASE=()=>new URL('.',location.href).href;
 async function fetchT(url,ms,opts){ const c=new AbortController(), t=setTimeout(()=>c.abort(),ms||8000); try{ return await fetch(url,Object.assign({signal:c.signal},opts||{})); } finally{ clearTimeout(t); } }
@@ -2539,7 +2631,7 @@ async function repoScan(force){
 }
 async function repoLoad(g,f){
   try{ if(g.kind==='project'&&P.tracks.some(t=>t.notes.length)&&!confirm('Esto reemplaza el proyecto actual. ¿Continuar?')) return;
-    const r=await fetchT(f.url,20000); if(!r.ok) throw new Error('respondió '+r.status); const txt=await r.text(); await ingest(new File([txt],f.name),{trusted:g.kind==='demo'}); if(g.kind==='project') closeModal('libModal'); }
+    const r=await fetchT(f.url,20000); if(!r.ok) throw new Error('respondió '+r.status); const txt=await r.text(); await ingest(new File([txt],f.name),{trusted:g.kind==='demo',repo:true}); if(g.kind==='project') closeModal('libModal'); }
   catch(e){ console.error(e); toast('No pude cargar «'+f.name+'»: '+e.message,'err'); }
 }
 async function renderRepo(force){
@@ -2818,6 +2910,58 @@ $('pname').onchange=e=>{ P.name=e.target.value||'Sin título'; touch(); };
 $('bpm').onchange=e=>{ P.bpm=clamp(+e.target.value||120,40,260); e.target.value=P.bpm; touch(); prewarm(); };
 $('sig').onchange=e=>{ const [a,b]=e.target.value.split('/').map(Number); P.sig=[a,b]; layoutSpacer(); invalidate(); touch(); refreshTempoUI(); };
 $('bars').onchange=e=>{ P.bars=clamp(Math.round(+e.target.value)||8,1,256); e.target.value=P.bars; layoutSpacer(); touch(); };
+// ───────────── Nuevo desde género ─────────────
+for(const o of GENRE_BUILTIN){ try{ registerGenre(o); }catch(e){ console.warn('género',o.id,e); } }
+const GEN_LS='demokit-genres', genLoaded=new Set(); let GS=null;
+function genSave(o){ try{ const id=slug(o.id||o.name), a=JSON.parse(localStorage.getItem(GEN_LS)||'[]').filter(x=>slug(x.id||x.name)!==id); a.push(o); localStorage.setItem(GEN_LS,JSON.stringify(a)); }catch(e){} }
+try{ for(const o of JSON.parse(localStorage.getItem(GEN_LS)||'[]')){ try{ registerGenre(o); }catch(e){} } }catch(e){}
+function addGenres(o,opts){ const list=Array.isArray(o.genres)?o.genres:(o&&o.name?[o]:[]), ok=[], bad=[];
+  for(const x of list){ try{ const g=registerGenre(x); ok.push(g.name); if(!(opts&&opts.repo)) genSave(x); }catch(e){ bad.push(e.message); } }
+  if($('genModal').classList.contains('show')) renderGenre(); return {ok,bad}; }
+function genPick(id){ const g=GENRES.get(id), keep=GS||{name:'',tracks:false}, sc=g.keys.find(k=>SCALES[k])||'Menor natural';
+  GS={gid:id,si:0,bpm:g.bpm[2],sig:g.sig.slice(),root:/mayor$/i.test(sc)||sc==='Mayor'?0:9,scale:sc,name:keep.name,tracks:keep.tracks}; }
+function renderGenre(){
+  const box=$('genBody'); box.innerHTML=''; if(!GENRES.size){ box.textContent='No hay géneros cargados.'; return; }
+  if(!GS||!GENRES.has(GS.gid)) genPick([...GENRES.keys()][0]); const g=GENRES.get(GS.gid);
+  const chips=el('div',{class:'gchips'}); for(const x of GENRES.values()) chips.append(el('button',{class:'sm'+(x.id===g.id?' on':''),text:x.name,onclick:()=>{ genPick(x.id); renderGenre(); }}));
+  box.append(el('div',{class:'sec'},el('h4',{text:'1 · Género'}),chips,el('div',{class:'desc',text:g.desc||''})));
+  const sl=el('div',{}), durs=[];
+  g.structures.forEach((st,i)=>{ const d=el('span',{}); durs.push([st,d]);
+    sl.append(el('label',{class:'gstr'+(i===GS.si?' on':'')},el('input',{type:'radio',name:'genStr',checked:i===GS.si,onchange:()=>{ GS.si=i; [...sl.children].forEach((c,j)=>c.classList.toggle('on',j===i)); }}),' ',el('b',{text:st.name}),' · '+structBars(st)+' compases · ≈ ',d,el('small',{text:st.sections.map(x=>x[0]+' '+x[1]).join(' · ')}))); });
+  const upd=()=>{ for(const [st,d] of durs) d.textContent=fmtDur(structSecs(st,GS.bpm,GS.sig)); }; upd();
+  box.append(el('div',{class:'sec'},el('h4',{text:'2 · Estructura'}),sl));
+  const bpmIn=el('input',{type:'number',min:40,max:260,step:1,value:GS.bpm,style:'width:70px',onchange:e=>{ GS.bpm=clamp(Math.round(+e.target.value)||g.bpm[2],40,260); e.target.value=GS.bpm; upd(); }});
+  const sigSel=el('select',{onchange:e=>{ GS.sig=e.target.value.split('/').map(Number); upd(); }}); const sl2=SIGS.slice(); if(!sl2.some(x=>x[0]===GS.sig[0]&&x[1]===GS.sig[1])) sl2.push(GS.sig); for(const [a,b] of sl2) sigSel.append(el('option',{value:a+'/'+b,text:a+'/'+b})); sigSel.value=GS.sig[0]+'/'+GS.sig[1];
+  const rootSel=el('select',{onchange:e=>{ GS.root=+e.target.value; }}); NOTE_NAMES.forEach((n,i)=>rootSel.append(el('option',{value:i,text:n}))); rootSel.value=GS.root;
+  const scSel=el('select',{onchange:e=>{ GS.scale=e.target.value; }}), names=Object.keys(SCALES).filter(k=>k!=='off');
+  for(const k of names.filter(k=>g.keys.includes(k))) scSel.append(el('option',{value:k,text:'● '+k,style:'color:#f3e3a0'}));
+  for(const k of [...names.filter(k=>!g.keys.includes(k)),'off']) scSel.append(el('option',{value:k,text:'\u00a0\u00a0\u00a0'+(k==='off'?'Ninguna':k)})); scSel.value=GS.scale;
+  const nameIn=el('input',{type:'text',maxlength:60,placeholder:'Nueva rola · '+g.name,value:GS.name,style:'width:200px',oninput:e=>{ GS.name=e.target.value; }});
+  box.append(el('div',{class:'sec'},el('h4',{text:'3 · Ajustes'}),el('div',{class:'gset'},el('label',{},'BPM ',bpmIn,el('span',{class:'hint',text:'típico '+g.bpm[0]+'–'+g.bpm[1]})),el('label',{},'Compás ',sigSel),el('label',{},'Nota ',rootSel),el('label',{},'Escala ',scSel),el('label',{},'Nombre ',nameIn))));
+  const ins=el('div',{class:'sec'},el('h4',{text:'Instrumentos afines'})); GS.ids=[];
+  for(const c of CAT_ORDER){ const L=g.inst[c].filter(id=>INSTRUMENTS[id]&&!INSTRUMENTS[id].hidden); if(!L.length) continue; GS.ids.push(...L);
+    ins.append(el('div',{class:'gcat'},el('b',{text:CATS[c].name+':',style:'color:'+CATS[c].color}),...L.map(id=>el('span',{text:'● '+INSTRUMENTS[id].name,style:'color:'+CATS[c].color})))); }
+  ins.append(el('div',{class:'hint',text:'Aparecerán primero y con ● en el selector de instrumentos y de escalas; los demás siguen disponibles.'}),
+    el('label',{class:'chk'},el('input',{type:'checkbox',checked:GS.tracks,onchange:e=>{ GS.tracks=e.target.checked; }}),' Agregar también una pista por cada instrumento marcado'));
+  box.append(ins,el('div',{class:'btnrow'},el('button',{class:'pri',text:'Crear proyecto',onclick:genCreate}),el('button',{text:'Cancelar',onclick:()=>closeModal('genModal')})));
+}
+function genCreate(){
+  const g=GENRES.get(GS&&GS.gid), st=g&&g.structures[GS.si]; if(!st) return;
+  if(P.tracks.some(t=>t.notes.length)&&!confirm('Crear un proyecto nuevo reemplaza el actual (usa Guardar antes si lo quieres conservar). ¿Continuar?')) return;
+  const bars=structBars(st), np=newProject(GS.name.trim()||('Nueva rola · '+g.name),GS.bpm,bars);
+  np.sig=GS.sig.slice(); np.genre=g.id; np.key={root:GS.root,scale:GS.scale,fit:false}; let at=0; np.marks=[]; for(const [nm,n] of st.sections){ np.marks.push({bar:at,name:nm}); at+=n; }
+  loadProject(np); if(GS.tracks){ for(const id of GS.ids) addTrack(id); selectTrack(0); }
+  closeModal('genModal'); toast('Proyecto «'+np.name+'» listo: '+bars+' compases a '+GS.bpm+' BPM, '+(GS.scale==='off'?'sin escala':NOTE_NAMES[GS.root]+' '+GS.scale)+', '+st.sections.length+' secciones en la regla.','ok');
+}
+async function genRepoSync(){          // géneros sueltos en genres/ del repositorio: aparecen solos (son datos, no código)
+  if(location.protocol==='file:') return;
+  try{ const data=await repoScan(false); let n=0;
+    for(const r of (data.generos||[]).filter(r=>r.status==='ok')) for(const f of r.files){ if(genLoaded.has(f.url)) continue; genLoaded.add(f.url);
+      try{ const rr=await fetchT(f.url,10000); if(!rr.ok) continue; const o=JSON.parse(await rr.text()); if(o.format!=='demokit-genres') continue; const out=addGenres(o,{repo:true}); n+=out.ok.length; if(out.bad.length) toast('Género «'+f.name+'»: '+out.bad.join(' · '),'err'); }catch(e){ console.warn(e); } }
+    if(n&&$('genModal').classList.contains('show')) renderGenre();
+  }catch(e){}
+}
+$('bGen').onclick=()=>{ renderGenre(); openModal('genModal'); genRepoSync(); };
 $('bNew').onclick=()=>{ if(P.tracks.some(t=>t.notes.length)&&!confirm('¿Empezar un proyecto vacío? Se pierde lo no guardado.')) return; loadProject(newProject('Sin título',120,8)); };
 $('bMidiOut').onclick=()=>{ try{ download(new Blob([projectToMidi(P)],{type:'audio/midi'}),(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'.mid'); toast('MIDI exportado (el sonido no viaja: solo notas, tempo, compás, volumen y pan)','ok'); }catch(e){ console.error(e); toast('No pude exportar MIDI: '+e.message,'err'); } };
 $('bSave').onclick=()=>{ try{ download(new Blob([JSON.stringify(projectToJSON(P))],{type:'application/json'}),(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'.demokit.json'); }catch(e){ toast('No pude guardar: '+e.message,'err'); } };
