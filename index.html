@@ -595,7 +595,7 @@ html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *:
   <div class="sec fold" data-fold="demos"><h4 class="ft">Demos cargadas</h4><div id="demoList"></div></div>
   <div class="sec fold" data-fold="plugins"><h4 class="ft">Instrumentos de usuario (plugins)</h4><div id="plgList"></div>
     <div class="btnrow"><button id="bNewPlg" class="pri">Escribir un plugin nuevo…</button></div></div>
-  <div class="sec fold" data-fold="kit"><h4 class="ft">Kit de síntesis</h4><div id="kitInfo" class="desc"></div><div class="btnrow"><button id="kitReset" class="sm" hidden>Volver al kit incluido</button></div></div>
+  <div class="sec fold" data-fold="kit"><h4 class="ft">Kit de síntesis</h4><div id="kitInfo" class="desc"></div><div id="kitChar" class="btnrow" hidden><label>Carácter del kit <select id="kitCharSel" class="sm"></select></label><span class="hint" id="kitCharHint"></span></div><div class="btnrow"><button id="kitReset" class="sm" hidden>Volver al kit incluido</button></div></div>
 </div></div>
 
 <div id="genModal" class="modal"><div class="card">
@@ -1256,7 +1256,10 @@ function encodeWav(L,R,sr){
 function u8ToB64(u8){let s='';const C=0x8000;for(let i=0;i<u8.length;i+=C)s+=String.fromCharCode.apply(null,u8.subarray(i,i+C));return btoa(s);}
 function b64ToU8(b){const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u;}
 // Un kit alterno puede declararse con demoKit.info={id,name,version}; el proyecto lo anota (P.engine) para avisar si se abre con otro kit.
-function kitInfo(){ const i=Kit.make&&Kit.make.info; return i&&typeof i.id==='string'?{id:i.id.slice(0,40),v:String(i.version||'').slice(0,20)}:null; }
+// Si el kit trae varios caracteres (info.characters, p. ej. Evol: orgánico / digital), el activo viaja en el proyecto como engine.c.
+function kitChars(){ const i=Kit.make&&Kit.make.info; return i&&Array.isArray(i.characters)?i.characters:[]; }
+function kitInfo(){ const i=Kit.make&&Kit.make.info; if(!(i&&typeof i.id==='string')) return null; const o={id:i.id.slice(0,40),v:String(i.version||'').slice(0,20)}, c=Kit.make.character; if(c&&kitChars().includes(c)) o.c=c; return o; }
+function setKitChar(c){ if(!Kit.make) return; Kit.make.character=(c&&kitChars().includes(c))?c:undefined; bumpKit(); }
 const KIT_FORMAT=1;      // sube cuando un cambio del kit/motor haga sonar distinto un proyecto ya guardado
 const NOTE_KEYS=new Set(['b','l','m','v','pan','o','w']);
 function compactNote(n){
@@ -1288,7 +1291,7 @@ function projectReport(P){
 // opts.allowPlugins===false: no se ejecuta el código de los plugins incluidos (por defecto sí, para compatibilidad; el estudio pregunta antes)
 function projectFromJSON(o,opts){
   const errs=[], skipped=[]; for(const u of o.plugins||[]){ if(opts&&opts.allowPlugins===false){ skipped.push(u.name||u.id); continue; } try{ installPlugin(u.code); }catch(e){ errs.push(u.id+': '+e.message); } }
-  const P=newProject(o.name,o.bpm,o.bars); if(Array.isArray(o.tempo)) P.tempo=tempoPts({bpm:o.bpm,tempo:o.tempo}); if(Array.isArray(o.sig)&&o.sig[0]>0&&o.sig[1]>0) P.sig=[+o.sig[0],+o.sig[1]]; if(Array.isArray(o.sigs)&&o.sigs.length) P.sigs=o.sigs.map(x=>({bar:x.bar,sig:[+x.sig[0],+x.sig[1]]})); if(Array.isArray(o.marks)&&o.marks.length) P.marks=markPts({marks:o.marks}); if(typeof o.genre==='string'&&o.genre) P.genre=o.genre.slice(0,60); if(o.engine&&typeof o.engine.id==='string') P.engine={id:o.engine.id.slice(0,40),v:String(o.engine.v||'').slice(0,20)}; P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key);
+  const P=newProject(o.name,o.bpm,o.bars); if(Array.isArray(o.tempo)) P.tempo=tempoPts({bpm:o.bpm,tempo:o.tempo}); if(Array.isArray(o.sig)&&o.sig[0]>0&&o.sig[1]>0) P.sig=[+o.sig[0],+o.sig[1]]; if(Array.isArray(o.sigs)&&o.sigs.length) P.sigs=o.sigs.map(x=>({bar:x.bar,sig:[+x.sig[0],+x.sig[1]]})); if(Array.isArray(o.marks)&&o.marks.length) P.marks=markPts({marks:o.marks}); if(typeof o.genre==='string'&&o.genre) P.genre=o.genre.slice(0,60); if(o.engine&&typeof o.engine.id==='string'){ P.engine={id:o.engine.id.slice(0,40),v:String(o.engine.v||'').slice(0,20)}; if(typeof o.engine.c==='string') P.engine.c=o.engine.c.slice(0,20); } P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key);
   if(o.sc&&o.sc.table){ const u=b64ToU8(o.sc.table),T=new Float32Array(u.length); for(let i=0;i<u.length;i++) T[i]=u[i]/255; P.sc.table=T; }
   for(const cid in o.clips||{}){ const u=b64ToU8(o.clips[cid]),q=new Int16Array(u.buffer,u.byteOffset,u.length>>1),d=new Float32Array(q.length); for(let i=0;i<q.length;i++) d[i]=q[i]/16384; P.clips[cid]=d; }
   P.tracks=(o.tracks||[]).map(t=>fixTrack(expandTrack(t))); P.loadErrors=errs; P.loadWarnings=[]; if(skipped.length) P.loadWarnings.push('Plugins sin ejecutar: '+skipped.join(', ')+'. Las pistas que los usan quedan sin instrumento.'); if(o.kit!=null&&o.kit!==KIT_FORMAT) P.loadWarnings.push('Este proyecto se guardó con la versión '+o.kit+' del kit y esta es la '+KIT_FORMAT+(o.kit>KIT_FORMAT?': puede sonar distinto o faltar instrumentos. Actualiza la librería.':': puede sonar un poco distinto.')); return P;
@@ -1896,7 +1899,10 @@ function loadProject(proj){
   renderTracks(); renderInspector(); layoutSpacer(); centerTrack(); updateStat(); invalidate(); histReset(); refreshTempoUI(); populateAddInst();
   if(P.loadErrors&&P.loadErrors.length) toast('Plugins con error: '+P.loadErrors.join('; '),'err');
   if(P.loadWarnings&&P.loadWarnings.length) toast(P.loadWarnings.join(' '),'err');
-  { const ki=kitInfo(); if(P.engine&&(!ki||ki.id!==P.engine.id)) toast('Este proyecto se hizo con el kit «'+P.engine.id+'»'+(P.engine.v?' '+P.engine.v:'')+' y ahora suena con '+(ki?'«'+ki.id+'»':'el kit incluido')+': puede sonar distinto. Cárgalo en «Demos y plugins».','err'); }
+  { const ki=kitInfo(), same=P.engine&&ki&&ki.id===P.engine.id;
+    if(same&&(P.engine.c||'')!==(ki.c||'')){
+      if(confirm('Este proyecto se guardó con el carácter «'+charName(P.engine.c)+'» del kit '+ki.id+' y ahora está en «'+charName(ki.c)+'».\n\n¿Cambiar el carácter a «'+charName(P.engine.c)+'»? (Vuelve a renderizar; si dices que no, suena con el actual.)')){ setKitChar(P.engine.c); rememberChar(); cache=null; dirty=true; syncKitChar(); updateStat(); } }
+    else if(P.engine&&(!ki||ki.id!==P.engine.id)) toast('Este proyecto se hizo con el kit «'+P.engine.id+'»'+(P.engine.v?' '+P.engine.v:'')+' y ahora suena con '+(ki?'«'+ki.id+'»':'el kit incluido')+': puede sonar distinto. Cárgalo en «Demos y plugins».','err'); }
 }
 const sigStr=()=>(P.sig?P.sig[0]+'/'+P.sig[1]:'4/4');
 function fitBars(){ let end=0; for(const t of P.tracks) for(const n of t.notes) end=Math.max(end,n.b+(n.l||.25)); const need=end>0?meter(P).barAt(end-1e-6).i+1:0; if(need>P.bars){ P.bars=need; $('bars').value=need; layoutSpacer(); } }
@@ -2122,9 +2128,15 @@ $('sDup').onclick=dupSel; $('sDel').onclick=delSel; $('sUp').onclick=()=>shiftSe
 // la franja y la cabecera se pliegan; en pantallas chicas arrancan cerradas (el estado se recuerda en este navegador)
 function rememberKit(name,src){ try{ localStorage.setItem('demokit-kit',JSON.stringify({name,src})); return true; }catch(e){ try{ localStorage.removeItem('demokit-kit'); }catch(_){} return false; } }
 function restoreKit(){ let o=null; try{ o=JSON.parse(localStorage.getItem('demokit-kit')||'null'); }catch(e){ return; } if(!o||typeof o.src!=='string') return;
-  try{ const f=new Function(o.src+'\nreturn demoKit;')(), k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); Kit.make=f; bumpKit(); kitName=o.name||'propio'; cache=null; dirty=true; toast('Kit «'+kitName+'» restaurado (el que cargaste antes). Lo quitas en «Demos y plugins» → «Volver al kit incluido»','ok'); }
+  try{ const f=new Function(o.src+'\nreturn demoKit;')(), k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); Kit.make=f; applyStoredChar(); bumpKit(); kitName=o.name||'propio'; cache=null; dirty=true; toast('Kit «'+kitName+'» restaurado (el que cargaste antes). Lo quitas en «Demos y plugins» → «Volver al kit incluido»','ok'); }
   catch(e){ console.error(e); try{ localStorage.removeItem('demokit-kit'); }catch(_){} toast('El kit guardado no funcionó ('+e.message+'): volví al kit incluido','err'); } }
 const lsGet=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } }, lsSet=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} }, smallScr=()=>matchMedia('(max-width:700px)').matches;
+// ── carácter del kit (si el kit cargado lo soporta: demoKit.info.characters) ──
+const CHAR_LBL={'':['Neutro','Sin variación añadida: el kit tal como suena de fábrica.'],organico:['Orgánico','Cada golpe y cada nota varían un poco, el filtro respira y hay saturación suave, como un equipo analógico.'],digital:['Digital','Exacto y repetible, con 12 bits y la mitad de frecuencia de muestreo: un grano retro.']};
+const charName=c=>(CHAR_LBL[c||'']||[c])[0];
+function rememberChar(){ try{ const i=Kit.make&&Kit.make.info, c=Kit.make&&Kit.make.character; if(i&&c) localStorage.setItem('demokit-char',JSON.stringify({id:i.id,c})); else localStorage.removeItem('demokit-char'); }catch(e){} }
+function applyStoredChar(){ try{ const o=JSON.parse(localStorage.getItem('demokit-char')||'null'), i=Kit.make&&Kit.make.info; if(o&&i&&o.id===i.id&&kitChars().includes(o.c)){ Kit.make.character=o.c; bumpKit(); } }catch(e){} }
+function syncKitChar(){ const L=kitChars(), box=$('kitChar'); box.hidden=!L.length; if(!L.length) return; const sel=$('kitCharSel'); sel.innerHTML=''; for(const c of ['',...L]){ const [n,t]=CHAR_LBL[c]||[c,'']; sel.append(el('option',{value:c,text:n,title:t})); } sel.value=Kit.make.character||''; $('kitCharHint').textContent=(CHAR_LBL[sel.value]||[])[1]||''; }
 function setMore(open,save){ $('rmore').hidden=!open; $('rMoreBtn').classList.toggle('on',open); $('rMoreBtn').setAttribute('aria-expanded',String(open)); if(save) lsSet('demokit-rmore',open?'1':'0'); }
 $('rMoreBtn').onclick=()=>setMore($('rmore').hidden,true); { const v=lsGet('demokit-rmore'); setMore(v==null?!smallScr():v==='1'); }
 const HDR=document.querySelector('header');
@@ -2551,6 +2563,7 @@ ${chunks.join(',\n')}
 $('bDemoJs').onclick=exportDemoJs;
 
 const BUILTIN_KIT=Kit.make;
+$('kitCharSel').onchange=e=>{ setKitChar(e.target.value); rememberChar(); cache=null; dirty=true; syncKitChar(); updateStat(); toast('Carácter del kit: '+charName(e.target.value)+' (el siguiente Play vuelve a renderizar)','ok'); };
 $('kitReset').onclick=()=>{ Kit.make=BUILTIN_KIT; bumpKit(); kitName='incluido'; try{ localStorage.removeItem('demokit-kit'); }catch(e){} cache=null; dirty=true; renderLib(); updateStat(); toast('Kit incluido restaurado','ok'); };
 // ───────────── seguridad: el código ajeno solo se ejecuta si lo confirmas ─────────────
 // Un plugin, un kit o un proyecto con plugins es JavaScript que corre con los mismos permisos que esta página.
@@ -2576,7 +2589,7 @@ async function ingest(file,opts){
   const txt=await file.text();
   try{
     if(/^\s*\{/.test(txt)){ const o=JSON.parse(txt); if(o.format==='demokit-genres'){ const r=addGenres(o,opts); toast(r.ok.length?'Géneros listos: '+r.ok.join(', ')+(r.bad.length?' · con avisos: '+r.bad.join(' · '):''):'No pude leer géneros: '+r.bad.join(' · '),r.ok.length?'ok':'err'); return; } if(o.format==='demokit-studio'){ loadProject(projectFromFile(o,name)); populateAddInst(); toast('Proyecto «'+o.name+'» cargado','ok'); return; } }
-    if(/function\s+demoKit\s*\(/.test(txt)){ if(!trustCode('Kit «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código que reemplazará al kit incluido.')){ toast('Kit no cargado','err'); return; } const f=new Function(txt+'\nreturn demoKit;')(); const k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); const probs=kitCheck(f); if(probs.length&&!confirm('Revisé el kit «'+name+'» y encontré esto:\n\n• '+probs.join('\n• ')+'\n\n¿Cargarlo de todos modos?')){ toast('Kit no cargado','err'); return; } Kit.make=f; bumpKit(); kitName=name; cache=null; dirty=true; const kept=rememberKit(name,txt); renderLib(); updateStat(); toast('Kit «'+name+'» cargado: los instrumentos y plugins lo usan desde ahora'+(kept?' y se recordará en este navegador':' (no pude guardarlo en este navegador: pesa demasiado; durará solo esta sesión)'),kept?'ok':'err'); return; }
+    if(/function\s+demoKit\s*\(/.test(txt)){ if(!trustCode('Kit «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código que reemplazará al kit incluido.')){ toast('Kit no cargado','err'); return; } const f=new Function(txt+'\nreturn demoKit;')(); const k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); const probs=kitCheck(f); if(probs.length&&!confirm('Revisé el kit «'+name+'» y encontré esto:\n\n• '+probs.join('\n• ')+'\n\n¿Cargarlo de todos modos?')){ toast('Kit no cargado','err'); return; } Kit.make=f; applyStoredChar(); bumpKit(); kitName=name; cache=null; dirty=true; const kept=rememberKit(name,txt); renderLib(); updateStat(); toast('Kit «'+name+'» cargado: los instrumentos y plugins lo usan desde ahora'+(kept?' y se recordará en este navegador':' (no pude guardarlo en este navegador: pesa demasiado; durará solo esta sesión)'),kept?'ok':'err'); return; }
     if(/async\s+function\s+render\w*\s*\(/.test(txt)){ const fn=/async\s+function\s+(render\w*)/.exec(txt)[1]; const d={name:demoName(txt,name.replace(/\.js$/,'')),fn,src:txt,out:null,trusted:!!(opts&&opts.trusted)}; const i=demos.findIndex(x=>x.name===d.name); if(i>=0) demos[i]=d; else demos.push(d); renderLib(); openModal('libModal'); toast('Demo «'+d.name+'» lista: reprodúcela o conviértela','ok'); return; }
     if(/registerInstrument\s*\(/.test(txt)){ if(!trustCode('Plugin «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código. Empieza así:\n'+txt.slice(0,160).replace(/\s+/g,' ')+'…')){ toast('Plugin no instalado','err'); return; } const def=installPlugin(txt); populateAddInst(); renderLib(); toast('Plugin «'+def.name+'» registrado','ok'); return; }
     toast('No reconocí «'+name+'» (¿demo, plugin, kit o proyecto?)','err');
@@ -2687,7 +2700,7 @@ function renderLib(){
   for(const u of USER_PLUGINS) pl.append(el('div',{class:'item'},el('div',{class:'nm'},el('b',{text:u.name}),el('small',{text:u.id})),
     el('button',{class:'sm',text:'Editar',onclick:()=>openPlugin(u.code)}),el('button',{class:'sm',text:'＋ Pista',onclick:()=>{ addTrack(u.id); closeModal('libModal'); }}),
     el('button',{class:'sm danger',text:'Quitar',onclick:()=>{ removePlugin(u.id); delete INSTRUMENTS[u.id]; const i=INST_ORDER.indexOf(u.id); if(i>=0) INST_ORDER.splice(i,1); populateAddInst(); renderLib(); }})));
-  $('kitInfo').textContent='Kit en uso: '+kitName+'. Puedes soltar un demo_kit.js propio (con funciones nuevas) para reemplazar el incluido: los plugins podrán usar sus funciones desde K. Se recuerda en este navegador hasta que pulses «Volver al kit incluido». Cómo escribir uno: README → «Extender el kit».'; $('kitReset').hidden=kitName==='incluido';
+  syncKitChar(); $('kitInfo').textContent='Kit en uso: '+kitName+'. Puedes soltar un demo_kit.js propio (con funciones nuevas) para reemplazar el incluido: los plugins podrán usar sus funciones desde K. Se recuerda en este navegador hasta que pulses «Volver al kit incluido». Cómo escribir uno: README → «Extender el kit».'; $('kitReset').hidden=kitName==='incluido';
 }
 const openModal=id=>{ const was=$(id).classList.contains('show'); $(id).classList.add('show'); if(!was&&id==='libModal'&&typeof renderRepo==='function') renderRepo(false); }, closeModal=id=>$(id).classList.remove('show');
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>closeModal(b.dataset.close)));

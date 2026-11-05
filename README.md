@@ -55,10 +55,10 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 - **Piano roll** con rejilla (1/4 a 1/32, tresillos o libre), zoom, notas fantasma de las otras pistas, selección múltiple, velocidad por nota y **deshacer/rehacer global** (notas, pistas, parámetros, efectos, master, BPM… hasta 100 pasos; los sliders y arrastres cuentan como un solo paso). Con el ratón, **clic derecho** sobre una nota la borra; en pantallas táctiles hay modos **Dibujar / Navegar / Borrar / Seleccionar**.
 
-- **Carpetas del repositorio:** en «Demos y plugins» aparece la sección **En el repositorio** con lo que haya en `demos/` (demos `.js`), `plugins/` (plugins `.js`), `proyectos/` o `projects/` (proyectos `.demokit.json`) y `project_examples/` (ejemplos). Cada archivo trae su botón **Cargar** / **Abrir** (y «Cargar todas» en demos).
+- **Carpetas del repositorio:** en «Demos y plugins» aparece la sección **En el repositorio** con lo que haya en `demos/` (demos `.js`), `plugins/` (plugins `.js`), `genres/` (géneros `.json`), `kits/bootleg/` (kits de síntesis alternos `.js`), `proyectos/` o `projects/` (proyectos `.demokit.json`) y `project_examples/` (ejemplos). Cada archivo trae su botón **Cargar** / **Abrir** (y «Cargar todas» en demos). Los géneros son datos y se cargan directo; los kits y plugins son código y piden confirmación (ver [Kits alternos](#kits-alternos)).
   - Si una carpeta no existe, el estudio te dice cómo se llama y que la crees junto a `index.html`: en cuanto pongas archivos ahí, aparecen solos.
   - Cómo encuentra los archivos, en este orden: (1) un `manifest.json` dentro de la carpeta (una lista de nombres, p. ej. `["cancion.js","otra.js"]`); (2) la API de GitHub si está en GitHub Pages; (3) el listado de carpeta de un servidor local (`python3 -m http.server`).
-  - **Recomendado:** el repo trae un workflow (`.github/workflows/manifests.yml`) que, en cada push a esas carpetas, regenera solo el `manifest.json` de cada una. Así el estudio nunca toca la API de GitHub (que limita a unas 60 consultas por hora) y funciona igual en cualquier hosting. Si el workflow no corre en tu fork, actívalo en la pestaña *Actions* o genera los manifest a mano con `node .github/scripts/gen-manifests.js`.
+  - **Recomendado:** el repo trae un workflow (`.github/workflows/manifests.yml`) que, en cada push a esas carpetas, regenera solo el `manifest.json` de cada una. Así el estudio nunca toca la API de GitHub (que limita a unas 60 consultas por hora) y funciona igual en cualquier hosting. Si el workflow no corre en tu fork, actívalo en la pestaña *Actions* o genera los manifest a mano con `node .github/scripts/gen-manifests.js` (el script y el workflow deben incluir `genres/` y `kits/bootleg/`).
   - Ojo: si existe un `manifest.json`, el estudio confía en él; si subes archivos sin que el workflow corra, no aparecerán hasta que se regenere.
   - Abriendo el HTML como archivo (`file://`) un navegador no puede mirar carpetas, y el estudio lo avisa. El código que cargues desde ahí pasa por la misma confirmación de seguridad que cualquier otro.
 
@@ -73,6 +73,15 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
   - Con un punto seleccionado puedes teclear su BPM exacto y marcar **«rampa hasta aquí»**: el tempo cambia gradualmente desde el punto anterior y llega a ese BPM en ese pulso (acelerando / ritardando); sin la marca salta de golpe.
   - Todo sigue el tempo: notas, sidechain, automatización, el eco (delay), el cursor, la grabación y el bucle; el wobble de un bajo toma el tempo del inicio de cada nota. Cambiar el tempo vuelve a renderizar las pistas.
   - Se guarda como `"tempo": [{"b":16,"bpm":90,"ramp":true}]` y la librería lo respeta.
+
+- **Secciones de la canción** (🏷 Sección): tercera pestaña de la pista de tempo, junto a BPM y Compás. Marcas con nombre (Intro, Verso, Pre-coro, Coro, Puente, Drop, Break, Outro, o el que escribas) que aparecen en una franja sobre la regla.
+  - **Clic** en un compás = marca nueva con el nombre del cuadro de texto; elige una marca y cambia el nombre o toca un atajo para renombrarla; **arrastra** para moverla de compás; **doble clic o clic derecho** para quitarla. Cada sección dura hasta la siguiente marca.
+  - Solo organizan: **no cambian el sonido**. Se guardan en el proyecto (`marks`), entran en el deshacer y viajan en el MIDI (ver más abajo).
+
+- **Nuevo desde género** (✨ Género): «destila» la estructura típica de un género para arrancar una rola rápido. Eliges género, una de sus estructuras (con duración aproximada según el BPM y el compás), y ajustas BPM, compás, tónica, escala y nombre; el estudio crea un proyecto nuevo con el tempo, el compás y la escala puestos y las **secciones ya marcadas** en la regla.
+  - **Incluidos:** Lo-fi, Pop-rock, Dubstep y Synthwave.
+  - **Instrumentos afines marcados:** los instrumentos y las escalas típicos del género salen primero y con un ● en los selectores (los demás siguen disponibles), y una casilla permite agregar además una pista por cada instrumento afín. Los instrumentos se agrupan en cuatro categorías, cada una con su color pastel: **percusión**, **melódicos**, **acompañamiento** y **efectos**; el borde de cada pista lleva el color de su categoría.
+  - **Extensible:** un género es un archivo `.json` (`{"format":"demokit-genres","genres":[…]}`, ver [Géneros](#géneros-genres)). Suéltalo en la ventana, ponlo en `genres/` o créalo desde el propio panel; los géneros propios se recuerdan en el navegador. `genres/reggae.json` es un ejemplo completo.
 
 - **Pistas / capas ilimitadas**, cada una con su instrumento, volumen, paneo, mute y solo.
 
@@ -128,7 +137,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 - **Exportación a WAV** (estéreo, 16 bits, 44.1 kHz) y **a stems**: un ZIP con un WAV por pista (incluidas las silenciadas), con los efectos de cada pista pero sin el master, para seguir mezclando en otro DAW.
 
-- **MIDI:** «⬇ MIDI» descarga un `.mid` con una pista por pista, más tempo, compás (con sus cambios), volumen y paneo (las pistas silenciadas salen con volumen 0; la automatización no se exporta). **Cargar archivos** acepta `.mid`/`.midi` y lo abre como **proyecto nuevo** (con los cambios de tempo y de compás que traiga; si un cambio de compás no cae en límite de compás, se ajusta y se avisa). Es para llevar las notas a otro programa y de vuelta: el sonido de Demo Kit no viaja en el MIDI.
+- **MIDI:** «⬇ MIDI» descarga un `.mid` con una pista por pista, más tempo, compás (con sus cambios), volumen y paneo (las pistas silenciadas salen con volumen 0; la automatización no se exporta). **Cargar archivos** acepta `.mid`/`.midi` y lo abre como **proyecto nuevo** (con los cambios de tempo y de compás que traiga; si un cambio de compás no cae en límite de compás, se ajusta y se avisa). Las **secciones** viajan como marcadores del `.mid` (eventos de texto, en el compás donde empiezan) y al importar se leen de vuelta, incluidos los «cue points» de otros programas; si un marcador no cae en un compás exacto se ajusta al más cercano y se avisa. Es para llevar las notas a otro programa y de vuelta: el sonido de Demo Kit no viaja en el MIDI.
 
 - **Pantalla completa:** toca el logo «dk» de la cabecera. El fondo (aurora y partículas) se queda quieto cuando no hay actividad y despierta con un toque, una tecla o Play.
 
@@ -404,12 +413,43 @@ function demoKit(sr, seconds, seed0) {
 // si quieres que las demos con demoKit.metric sigan funcionando, copia también el bloque «demoKit.metric = …» del kit original
 ```
 
-**Lo mínimo:** tu función debe llamarse `demoKit`, aceptar `(sr, seconds, seed)` y devolver al menos `syn` y `mix` (el estudio lo comprueba al cargarlo). Conserva las funciones originales tal cual: si cambias su sonido, las canciones ya hechas sonarán distinto.
+**Lo mínimo:** tu función debe llamarse `demoKit`, aceptar `(sr, seconds, seed)` y devolver al menos `syn` y `mix` (el estudio lo comprueba al cargarlo). Dos reglas que los kits ajenos rompen a menudo: `K.syn(buf, …)` debe escribir en el `buf` que recibe (no siempre en la percusión) y los filtros deben ser estables con cualquier corte. Conserva las funciones originales tal cual: si cambias su sonido, las canciones ya hechas sonarán distinto.
 
 **Límites a tener presentes**
-- El kit cargado en el estudio **se recuerda en el navegador** hasta que pulses «Volver al kit incluido» (si el kit guardado ya no carga, vuelve el incluido). Un proyecto no recuerda con qué kit se hizo (solo guarda la versión del formato). Si abres un proyecto o un plugin que dependa de tus funciones sin cargar antes tu kit, fallará o sonará distinto.
+- El kit cargado en el estudio **se recuerda en el navegador** hasta que pulses «Volver al kit incluido» (si el kit guardado ya no carga, vuelve el incluido). Un proyecto solo recuerda con qué kit se hizo si ese kit se identifica con `demoKit.info = {id, name, version}` (como Evol): entonces el `.demokit.json` lleva `"engine": {"id": "evol", "v": "1.2.0"}` y el estudio avisa al abrirlo con otro kit. Un kit sin `info` no deja rastro (solo se guarda la versión del formato), y con el kit incluido no se escribe nada. Si abres un proyecto o un plugin que dependa de tus funciones sin cargar antes tu kit, fallará o sonará distinto.
 - Al **convertir una demo** en proyecto, solo se registran las funciones conocidas del kit. Si la demo llama a una función tuya, el estudio lo avisa («funciones de un kit propio que el conversor no conoce»): el sonido no entra en el proyecto. Para que sea editable, hazla un **plugin** (instrumento con parámetros) que use tus funciones.
 - Cambiar de kit invalida solo la caché de render del estudio; los proyectos guardados no se tocan.
+
+### Kits alternos
+
+El kit incluido **es y seguirá siendo el predeterminado**: así toda canción ya hecha suena siempre igual. Los demás son alternativas que se cargan a propósito, para quien prefiera otro carácter (cada sonido tiene lo suyo).
+
+- **Cómo se cargan:** desde **En el repositorio → Kits de síntesis** (carpeta `kits/bootleg/`), o soltando el `.js` en la ventana. Siempre piden confirmación (es código) y, antes de reemplazar el kit, el estudio lo **revisa solo** con unas notas de prueba y avisa si: `K.syn` ignora el búfer que se le pasa (los pads y bajos no los agacharía el sidechain), el filtro se desborda (valores NaN) con cortes altos, alguna percusión falla, o la mezcla sale más de 4 dB más fuerte que con el kit incluido (puede saturar). Puedes cargarlo de todos modos.
+- **`kits/bootleg/`:** copias de los kits que se hicieron con Éter (*ultra-SAFE*, *Pro_SAFE*, los primeros *Ultra* y *Pro*) con arreglos de compatibilidad, y **Evol** (abajo). Cada carpeta trae una nota que explica qué es cada archivo.
+- **`kits/experiments/`:** los kits originales, sin arreglar. No funcionan como reemplazo directo y no aparecen en el panel; se guardan como referencia.
+- **Volver:** «Volver al kit incluido» en «Demos y plugins».
+
+#### Evol
+
+`demo-kit-Evol.js` es un kit alterno más fino para los **instrumentos de síntesis** y la **percusión**; el resto (snap, campana, chop, riser, sweep y mezcla) es idéntico al incluido. No necesita que cambies nada de lo que ya tienes: es un kit más, y el mejor modo de entenderlo es escucharlo con una canción tuya.
+
+| Qué | Qué hace |
+|---|---|
+| Osciladores | sierra, cuadrada (con ancho de pulso) y seno con **PolyBLEP**: mucho menos aliasing arriba (medido en notas agudas: −31 a −37 dB de energía no armónica contra −13 a −18 dB del kit incluido, sin la deriva) |
+| Filtro | **TPT-SVF**, estable con cualquier corte y resonancia (probado de 20 Hz a 40 kHz y Q hasta 24), con modos pasa-bajos, pasa-banda y pasa-altos |
+| Voces | unísono **estéreo**: cada voz en su sitio del panorama y con una deriva lenta de afinación (con la semilla del kit, sin `Math.random`) |
+| Envolventes | ataque suave y release exponencial |
+| Percusión | bombo en capas (cuerpo, grave sostenido y golpe seco), caja con cuerpo y cresta, hi-hat metálico de seis cuadradas, palma de cuatro ráfagas y crash con brillo |
+| Niveles | calibrados contra el kit incluido: casi todo a ±1 dB, así que cambiar de kit no obliga a remezclar |
+| Reproducible | mismo proyecto y misma semilla → mismo audio (comprobado) |
+
+`K.syn` acepta las mismas opciones de siempre (`det`, `atk`, `rel`, `w`, `dec`, `lp` en Hz o función del tiempo) y, opcionales: `filt` (`'lp'`, `'bp'`, `'hp'`, `'off'`), `res` (Q, .5–24), `drive` (0–1), `pw` (ancho de pulso), `sub` (sub-oscilador una octava abajo), `noise`, `kt` (seguimiento de tecla), `fenv: [octavas, caída_s]` (el corte sube y cae), `spread` (apertura estéreo) y `drift` (cents). Un plugin que use alguna de las opciones nuevas debe avisar que necesita Evol (con el kit incluido simplemente se ignoran).
+
+**Carácter.** Con Evol cargado, en «Demos y plugins» → «Kit de síntesis» aparece el selector **Carácter del kit: Neutro · Orgánico · Digital**. Es **global** (vale para toda la canción), se recuerda en el navegador y el siguiente Play vuelve a renderizar. Si abres un proyecto guardado con otro carácter, el estudio **pregunta** si quieres cambiarlo para que suene como se guardó. Para ir más fino (por instrumento o por nota) se usa un plugin o código: `demoKit.character = 'organico'` antes de crear el kit, o `K.syn(…, {character})` para una sola nota. Sin nada, es el neutro.
+- `organico`: cada golpe y cada nota varían un poco (nivel, afinación, caída), el filtro «respira» y hay saturación suave, como un equipo analógico.
+- `digital`: todo exacto y repetible, con reducción de bits (12) y de frecuencia de muestreo (mantiene cada 2 muestras).
+
+**Pruebas.** `node test_evol.js demo-kit-Evol.js demo_kit.js` (script sin navegador) revisa el contrato del kit, el determinismo, un barrido de filtros sin NaN, los niveles contra el kit incluido y el carácter. Sirve para probar cualquier kit alterno: `node test_evol.js otro_kit.js demo_kit.js`.
 
 ## Usar la música en otros proyectos (librería) lib/
 
@@ -457,6 +497,9 @@ function demoKit(sr, seconds, seed0) {
   "sig": [3, 4],            // compás inicial (solo si no es 4/4); el pulso del proyecto es la negra
   "sigs": [{"bar": 8, "sig": [6, 8]}],   // cambios de compás (opcional); "bar" cuenta desde 0 (8 = el compás 9)
   "tempo": [{"b": 16, "bpm": 90, "ramp": true}],   // cambios de tempo (opcional); "bpm" de arriba es el tempo inicial
+  "marks": [{"bar": 0, "name": "Intro"}, {"bar": 8, "name": "Verso"}],   // secciones (opcional); "bar" cuenta desde 0; no cambian el sonido
+  "genre": "lofi",          // género con el que se creó (opcional, informativo)
+  "engine": {"id": "evol", "v": "1.2.0", "c": "organico"},   // kit alterno con el que se hizo y su carácter (opcional; solo si el kit se identifica con demoKit.info)
   "sc": { "mode": "param|table", "depth": 0.7, "rel": 0.12, "rate": 800, "table": "<base64>" },
   "tracks": [{
     "name": "Bajo", "inst": "subfall", "vol": 1, "pan": 0,
@@ -480,6 +523,31 @@ function demoKit(sr, seconds, seed0) {
 `b` = pulso de inicio, `l` = largo en pulsos, `m` = nota MIDI (en percusión, el carril), `v` = velocidad, `o` = parámetros propios de esa nota, `w` = palabra de la nota (instrumentos con letra). `kit` es la versión del kit con que se guardó (si no coincide, la librería avisa en `song.warnings`).
 
 **Formato compacto** (`"v": 2`, el de «⬇ Compacto»): las notas van como arreglos `[b, l, m, v, pan, o, w]` en `n` (los últimos valores se omiten si son los de fábrica: `[0, 0.5, 60]` es una nota con velocidad 1 y sin paneo) y `params` solo trae lo que difiere del instrumento. El estudio y la librería leen los dos formatos.
+
+## Géneros (`genres/`)
+
+Un archivo de géneros es un `.json` con una lista; cada género describe qué proponer al crear un proyecto nuevo:
+
+```jsonc
+{
+  "format": "demokit-genres",
+  "genres": [{
+    "id": "reggae", "name": "Reggae",
+    "desc": "Pulso relajado con el golpe en el contratiempo…",
+    "bpm": [60, 90, 75],           // mínimo, máximo y típico
+    "sig": [4, 4],                 // compás
+    "keys": ["Mayor", "Menor natural", "Pentatónica menor", "Mixolidia"],   // escalas afines (nombres como en el selector)
+    "inst": {                      // instrumentos afines por categoría (ids del estudio o de plugins instalados)
+      "perc": ["kick", "snare", "hat", "rim"], "mel": ["pluck", "bell"], "acomp": ["sub", "pad"], "fx": ["wash"]
+    },
+    "structures": [                // una o más; cada sección es [nombre, compases]
+      { "name": "Corta", "sections": [["Intro", 4], ["Verso", 8], ["Coro", 8], ["Outro", 4]] }
+    ]
+  }]
+}
+```
+
+El total de una estructura no puede pasar de 256 compases. Los ids de instrumento que no existan se ignoran. Para sumar un género: suelta el archivo en la ventana, ponlo en `genres/` (aparece en **En el repositorio → Géneros**) o crea uno desde el panel ✨ Género. Los instrumentos del estudio se reparten así: **percusión** (bombo, caja, palma, chasquido, hi-hat, crash, rim, clip), **melódicos** (sinte, pluck, campana, chop), **acompañamiento** (pad, supersaw, arpegio, sub, reese, growl) y **efectos** (riser, barrido, viento, impacto); un plugin cae en la categoría que declare con `cat` (`'perc'`, `'mel'`, `'acomp'` o `'fx'`) y, si no declara ninguna, en percusión o melódicos según su `kind`.
 
 ## Arquitectura
 
@@ -516,6 +584,7 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 * Síntesis y estudio: Brujo, con Ámbar.
 * Icono y banner: Velvet.
 * Kit de síntesis (`kits/demo_kit.js`, `kits/demo_kit_comentado.js`) y librería (`lib/`): Ámbar.
+* Secciones, géneros, categorías de instrumentos, marcadores MIDI, revisión de kits y kit Evol: Ámbar, a partir de ideas de Brujo y de una propuesta inicial de Éter para los géneros.
 
 **Demos (`demos/`)**
 
@@ -545,6 +614,19 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 | `neuro_bloom.js` | Velvet |
 | `theremin_fantasma.js` | Ámbar |
 | `cristal_fm.js` | Ámbar |
+
+**Kits alternos (`kits/bootleg/`)**
+
+| Archivo | Autoría |
+|---|---|
+| `demo-kit-Evol.js` | Ámbar |
+| `demo-kit-ultra-SAFE_fix.js`, `demo-kit-Pro_SAFE_fix.js`, `demo-kit-Ultra_fix.js`, `demo-kit-Pro_fix.js` | originales de Brujo y Éter; arreglos de compatibilidad de Ámbar |
+
+**Géneros (`genres/`)**
+
+| Archivo | Autoría |
+|---|---|
+| `reggae.json` | Ámbar |
 
 **Proyectos**
 

@@ -233,7 +233,9 @@ registerInstrument((() => {
     'Neutra': { gen: .5, tono: 0, form: 0, vel: 1, asp: .12, aire: .12, ruido: .62, vib: .15, micro: .42, timbre: .35, agua: 0, coro: 1, coro2: -12, coro3: 12, coro4: 0, sib: .3 },
     'Grave': { gen: .05, tono: -2, form: -1.5, vel: .95, asp: .18, aire: .16, ruido: .68, vib: .1, micro: .32, timbre: .55, agua: 0, coro: 1, coro2: -12, coro3: 12, coro4: 0, sib: .25 },
     'Aguda': { gen: .95, tono: 2, form: 1, vel: 1.05, asp: .1, aire: .08, ruido: .62, vib: .2, micro: .42, timbre: .45, agua: 0, coro: 1, coro2: -12, coro3: 12, coro4: 0, sib: .35 },
-    'Hueca': { gen: .4, tono: -1, form: -3, vel: .9, asp: .32, aire: .28, ruido: .72, vib: .5, micro: .58, timbre: .8, agua: .18, coro: 2, coro2: -12, coro3: 12, coro4: 0, sib: .25 }
+    'Hueca': { gen: .4, tono: -1, form: -3, vel: .9, asp: .32, aire: .28, ruido: .72, vib: .5, micro: .58, timbre: .8, agua: .18, coro: 2, coro2: -12, coro3: 12, coro4: 0, sib: .25 },
+    // Rapero de barrio cansado de la vida: nada lo sorprende (pero algo sí, a medias). Energía, Sorpresa y Cansancio van aquí como valor general; por nota se siguen pudiendo editar.
+    'El Brayan': { energia: 0, sorpresa: 50, cansancio: 100, gain: .84, gen: .79, tono: 2, form: -.5, vel: 1.05, legato: .15, asp: .15, aire: .08, ruido: .17, vib: .27, micro: .33, timbre: .59, sib: .15, agua: .56, coro: 1, coro2: 5, coro3: -5, coro4: -2, adn: 'AMI' }
   };
   const N = PRESETS.Neutra;
   return {
