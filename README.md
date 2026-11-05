@@ -395,6 +395,16 @@ El plugin [`plugins/automata_vocal.js`](plugins/automata_vocal.js) («Voz cantad
 - **Por nota: Energía, Sorpresa y Cansancio** (sliders en «Notas», para las notas seleccionadas o todas si no hay selección): energía = brillo y volumen, sorpresa = inflexión de tono al entrar y al terminar, cansancio = caída de tono, más aire y menos vibrato. Los demás controles (género, tono, formantes, aspereza, aire, vibrato, timbre, agua, coro de 1 a 4 voces, ADN…) son de la pista, con **preajustes** Robot, Neutra, Grave, Aguda y Hueca.
 - **Límites:** cada nota es una voz independiente (el slider **Legato** de la pista une cada nota con la anterior y la siguiente si están casi pegadas; en 0, cada nota es independiente); no hay modo hablado aparte (para una voz plana, deja Sorpresa y Cansancio en 0 y el vibrato bajo, con notas largas del mismo tono), y las voces guardadas en el `localStorage` del Autómata original no se importan.
 
+## Guitarra acompañante (`plugins/guitarra_acompanante.js`)
+
+Un instrumento que **toca acompañamientos en vez de notas sueltas**. Una nota larga en el piano roll es un *pasaje*: la altura de la nota elige la tónica (do, re, mi…) y su largo, cuánto tiempo acompaña. Dentro, la guitarra recorre un **círculo de acordes** y toca un **patrón de mano derecha**; cada acorde dura los *pulsos por acorde* que elijas y el círculo se repite hasta cubrir la nota. Dibujas una nota por sección (Verso, Coro…) y, con otro círculo, patrón o intérprete en otra pista, cambias de aire.
+
+- **Círculos:** Lo-fi romántico (I–vi–ii–V), Jazz 2-5-1, Bossa (I–#i°–ii–V), Andaluza (i–VII–VI–V), Menor (i–VI–III–VII), Pop (I–V–vi–IV), Ranchera (I–IV–V–I) y el círculo de quintas completo. Los acordes pueden ser tríadas, séptimas o novenas.
+- **Intérpretes:** Pedro Infante (caricia: rasgueo lento, yema, cálida), Flamenco (aporreado: rápido, uña, brillante), Bossa (suave), Ranchera (con uña) y Lo-fi (apagada). Cada uno cambia la velocidad del rasgueo, la dureza del ataque, el brillo y cuánto suena la cuerda.
+- **Patrones:** abajo, balada, ida y vuelta, arpegio, bossa (aproximación del patrón clásico), ranchera, vals (3 pulsos) y flamenco. Hay preajustes completos por estilo.
+- **Sonido:** cada cuerda es un modelo físico de cuerda pulsada (Karplus-Strong con afinación fraccionaria; los agudos se apagan antes, como en una guitarra), con posición de la púa, golpe de uña y una caja de resonancia. Los retardos entre cuerdas y la fuerza de cada golpe varían un poco (parámetro *Humanización*), todo con la semilla de la pista: el mismo proyecto suena igual siempre.
+- **Compatibilidad:** solo usa `K.add` y `K.rnd`, así que funciona con el kit incluido y con los alternos. Asume un tempo constante dentro de cada nota; si hay un cambio de tempo en medio de un pasaje, parte el pasaje en dos notas.
+
 ## Extender el kit
 
 El kit (`demo_kit.js`) es solo una función `demoKit(sr, segundos, semilla)` que devuelve un objeto con herramientas. Puedes escribir **tu propia versión con funciones nuevas** y usarla sin tocar el HTML:
@@ -614,6 +624,7 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 | `neuro_bloom.js` | Velvet |
 | `theremin_fantasma.js` | Ámbar |
 | `cristal_fm.js` | Ámbar |
+| `guitarra_acompanante.js` | Ámbar (la idea de programar el acompañamiento salió de la «guitarrita» de Éter) |
 
 **Kits alternos (`kits/bootleg/`)**
 
