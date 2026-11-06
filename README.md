@@ -436,8 +436,8 @@ function demoKit(sr, seconds, seed0) {
 El kit incluido **es y seguirá siendo el predeterminado**: así toda canción ya hecha suena siempre igual. Los demás son alternativas que se cargan a propósito, para quien prefiera otro carácter (cada sonido tiene lo suyo).
 
 - **Cómo se cargan:** desde **En el repositorio → Kits de síntesis** (carpeta `kits/bootleg/`), o soltando el `.js` en la ventana. Siempre piden confirmación (es código) y, antes de reemplazar el kit, el estudio lo **revisa solo** con unas notas de prueba y avisa si: `K.syn` ignora el búfer que se le pasa (los pads y bajos no los agacharía el sidechain), el filtro se desborda (valores NaN) con cortes altos, alguna percusión falla, o la mezcla sale más de 4 dB más fuerte que con el kit incluido (puede saturar). Puedes cargarlo de todos modos.
-- **`kits/bootleg/`:** copias de los kits que se hicieron con Éter (*ultra-SAFE*, *Pro_SAFE*, los primeros *Ultra* y *Pro*) con arreglos de compatibilidad, y **Evol** (abajo). Cada carpeta trae una nota que explica qué es cada archivo.
-- **`kits/experiments/`:** los kits originales, sin arreglar. No funcionan como reemplazo directo y no aparecen en el panel; se guardan como referencia.
+- **`kits/bootleg/`:** los kits alternos que sí funcionan como reemplazo: los que se hicieron con Éter con arreglos de compatibilidad (*ultra-SAFE*, *Pro_SAFE*, *Ultra*, *Pro*), la serie *ultimate* y *fidelity*, y **Evol** (abajo). Cada archivo pasa por la revisión automática al cargarlo. Aquí vive también `test_evol.js`, el script de pruebas (no es un kit y no aparece en el panel). Cada carpeta trae una nota que explica qué es cada archivo.
+- **`kits/experiments/`:** los kits originales sin arreglar y versiones anteriores de Evol. No funcionan como reemplazo directo y no aparecen en el panel; se guardan como referencia.
 - **Volver:** «Volver al kit incluido» en «Demos y plugins».
 
 #### Evol

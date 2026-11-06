@@ -2620,7 +2620,7 @@ const REPO_GROUPS=[
   {id:'plugins',title:'Plugins de instrumento',dirs:['plugins'],ext:/\.js$/i,kind:'plugin',what:'archivos .js de plugins'},
   {id:'proyectos',title:'Proyectos',dirs:['proyectos','projects'],ext:/\.json$/i,kind:'project',what:'archivos .demokit.json (proyectos guardados)'},
   {id:'generos',title:'Géneros',dirs:['genres','generos'],ext:/\.json$/i,kind:'genre',what:'archivos .json de géneros (formato demokit-genres)'},
-  {id:'kits',title:'Kits de síntesis',dirs:['kits/bootleg'],ext:/^(?!make_kit).*\.js$/i,kind:'kit',what:'archivos .js de kits (demoKit)'},
+  {id:'kits',title:'Kits de síntesis',dirs:['kits/bootleg'],ext:/^(?!make_kit|test_).*\.js$/i,kind:'kit',what:'archivos .js de kits (demoKit)'},
   {id:'ejemplos',title:'Ejemplos de proyectos',dirs:['project_examples'],ext:/\.json$/i,kind:'project',what:'archivos .demokit.json de ejemplo'}];
 const REPO_BASE=()=>new URL('.',location.href).href;
 async function fetchT(url,ms,opts){ const c=new AbortController(), t=setTimeout(()=>c.abort(),ms||8000); try{ return await fetch(url,Object.assign({signal:c.signal},opts||{})); } finally{ clearTimeout(t); } }
