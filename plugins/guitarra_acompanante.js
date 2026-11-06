@@ -95,7 +95,7 @@ registerInstrument((() => {
 
   const choice = (k, label, opts, vals, def) => ({ k, label, type: 'choice', opts, vals, def });
   return {
-    id: 'guitarra_acomp', name: 'Guitarra acompañante', kind: 'melodic',
+    id: 'guitarra_acomp', name: 'Guitarra acompañante', kind: 'melodic', cat: 'acomp',
     desc: 'Una nota larga = un pasaje: la guitarra acompaña ese tiempo con un círculo de acordes y un patrón de rasgueo, tocado por un intérprete (Pedro Infante, Flamenco, Bossa, Ranchera, Lo-fi). La altura de la nota elige la tónica; el largo, cuánto acompaña.',
     params: [
       { k: 'gain', label: 'Ganancia', min: 0, max: 1.5, step: .01, def: .5 },

@@ -1,7 +1,7 @@
 # 📂 demo-kit
 
-> Generado el 2026-11-04 23:44:19  
-> Ruta: `C:\Users\Hp\Documents\GitHub\demo-kit`
+> Generado el 2026-11-05 20:41:11  
+> Ruta: `\demo-kit\`
 
 ```
 📁 demo-kit/
@@ -38,11 +38,13 @@
 │   ├── exportado.js
 │   └── libreria.html
 ├── 📁 genres/
+│   ├── electronica.json            <- 💃
+│   ├── latinos.json                <- 💃
 │   ├── manifest.json
 │   └── reggae.json
 ├── 📁 kits/
 │   ├── 📁 bootleg/
-│   │   ├── AmbarEdits
+│   │   ├── AmbarEvolKit (sus Fixes al esfuerzo del club)
 │   │   ├── demo-kit-Evol.js
 │   │   ├── demo-kit-fidelity.js
 │   │   ├── demo-kit-fidelity_FIX.js
@@ -55,9 +57,9 @@
 │   │   ├── demo-kit-ultra-SAFE_fix.js
 │   │   ├── demo-kit-Ultra_fix.js
 │   │   ├── manifest.json
-│   │   └── test_evol.js
+│   │   └── test_evol.js (El juicio supremo)
 │   ├── 📁 experiments/
-│   │   ├── demo-kit-Evol_v0.js
+│   │   ├── demo-kit-Evol_v1.js 
 │   │   ├── demo-kit-Evol_v2.js
 │   │   ├── demo-kit-Pro.js
 │   │   ├── demo-kit-Pro_SAFE.js
@@ -74,8 +76,9 @@
 │   └── demokit.min.js
 ├── 📁 plugins/
 │   ├── aether_choir.js
-│   ├── automata_vocal.js
+│   ├── automata_vocal.js                       <-   Los Brayans
 │   ├── cristal_fm.js
+│   ├── guitarra_acompanante.js                 <-  La nueva joya
 │   ├── manifest.json
 │   ├── neuro_bloom.js
 │   └── theremin_fantasma.js
@@ -90,7 +93,7 @@
 │   ├── marea_de_ceniza.demokit.json
 │   └── tres_constantes_completa.demokit.json
 ├── 📁 proyectos/
-│   ├── crea esta junto a tu demo kit para cargar tus proyectos
+│   ├── aqui puedes guardar tus proyectos
 │   ├── la_casa_que_respira.demokit.json
 │   ├── manifest.json
 │   └── Nexo_Latente.demokit.json
@@ -98,21 +101,22 @@
 │   ├── la_casa_que_respira.wav
 │   ├── la_casa_que_respira_theremin.wav
 │   └── Marea_de_ceniza.wav
-├── 📁 tools/
+├── 📁 tools/                                   <-   Herramientas que usamos en varios repos, hacen la vida más facil
 │   ├── extract_comments.py
 │   ├── icons.py
-│   ├── mapear_folder.py
+│   ├── mapear_folder.py                        <-    como este script hace este arbolito
 │   └── repo_diff.py
+├── árbol.md                                    <-    este archivo
 ├── demo_kit_studio.html
 ├── favicon.ico
 ├── index.html
 ├── LICENSE
+├── mapear_folder.py
 ├── README.md
 ├── site.webmanifest
-├── sw.js
-└── árbol.md (éste archivo)
+└── sw.js
 ```
 
 ---
 
-**17** carpetas · **89** archivos
+**17** carpetas · **93** archivos

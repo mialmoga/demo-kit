@@ -80,6 +80,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 - **Nuevo desde género** (✨ Género): «destila» la estructura típica de un género para arrancar una rola rápido. Eliges género, una de sus estructuras (con duración aproximada según el BPM y el compás), y ajustas BPM, compás, tónica, escala y nombre; el estudio crea un proyecto nuevo con el tempo, el compás y la escala puestos y las **secciones ya marcadas** en la regla.
   - **Incluidos:** Lo-fi, Pop-rock, Dubstep y Synthwave.
+  - **En `genres/`:** Cumbia, Bossa nova, Ranchera, Bolero y Ska (`latinos.json`), y House, Trap y Épica cinematográfica (`electronica.json`), más el ejemplo Reggae. Los géneros con guitarra marcan como afín la **Guitarra acompañante**.
   - **Instrumentos afines marcados:** los instrumentos y las escalas típicos del género salen primero y con un ● en los selectores (los demás siguen disponibles), y una casilla permite agregar además una pista por cada instrumento afín. Los instrumentos se agrupan en cuatro categorías, cada una con su color pastel: **percusión**, **melódicos**, **acompañamiento** y **efectos**; el borde de cada pista lleva el color de su categoría.
   - **Extensible:** un género es un archivo `.json` (`{"format":"demokit-genres","genres":[…]}`, ver [Géneros](#géneros-genres)). Suéltalo en la ventana, ponlo en `genres/` o créalo desde el propio panel; los géneros propios se recuerdan en el navegador. `genres/reggae.json` es un ejemplo completo.
 
@@ -392,7 +393,7 @@ El plugin [`plugins/automata_vocal.js`](plugins/automata_vocal.js) («Voz cantad
 - **Escribir la letra:** doble clic o doble toque sobre una nota, mantenerla pulsada, `Intro` con una nota seleccionada, o el botón **✎ Letra**. Aparece un cuadro sobre la nota; la palabra se dibuja encima de la barra y se guarda en el proyecto. Cada nota canta lo que lleva escrito, repartiendo sus sílabas dentro de su duración, con el tono de la nota.
 - **Saltar a la siguiente nota mientras escribes:** `Espacio`, guion `-` o `Tab` confirman la palabra y pasan a la siguiente nota (en el teclado de Android también funciona el `Espacio`). `Shift+Tab` o `Retroceso` con el cuadro vacío vuelven a la anterior; `Intro` cierra; `Esc` cancela. Un `Espacio` sin escribir nada salta la nota sin cambiarla. Si pegas varias palabras de golpe, se reparten una por nota. Una sesión de escritura es un solo paso de deshacer.
 - **Pegar letra…** (en el inspector): partes un texto en sílabas y se reparte una por nota, en orden de tiempo, desde la nota seleccionada. **Borrar letra** quita todas las palabras de la pista.
-- **Por nota: Energía, Sorpresa y Cansancio** (sliders en «Notas», para las notas seleccionadas o todas si no hay selección): energía = brillo y volumen, sorpresa = inflexión de tono al entrar y al terminar, cansancio = caída de tono, más aire y menos vibrato. Los demás controles (género, tono, formantes, aspereza, aire, vibrato, timbre, agua, coro de 1 a 4 voces, ADN…) son de la pista, con **preajustes** Robot, Neutra, Grave, Aguda y Hueca.
+- **Por nota: Energía, Sorpresa y Cansancio** (sliders en «Notas», para las notas seleccionadas o todas si no hay selección): energía = brillo y volumen, sorpresa = inflexión de tono al entrar y al terminar, cansancio = caída de tono, más aire y menos vibrato. Los demás controles (género, tono, formantes, aspereza, aire, vibrato, timbre, agua, coro de 1 a 4 voces, ADN…) son de la pista, con **preajustes**: Robot, Neutra, Grave, Aguda, Hueca y la familia de personajes de *El Brayan* (El Brayan, El Brayan seco, Brayan y su banda, Don Brayan y La Brayana).
 - **Límites:** cada nota es una voz independiente (el slider **Legato** de la pista une cada nota con la anterior y la siguiente si están casi pegadas; en 0, cada nota es independiente); no hay modo hablado aparte (para una voz plana, deja Sorpresa y Cansancio en 0 y el vibrato bajo, con notas largas del mismo tono), y las voces guardadas en el `localStorage` del Autómata original no se importan.
 
 ## Guitarra acompañante (`plugins/guitarra_acompanante.js`)
@@ -637,7 +638,7 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 
 | Archivo | Autoría |
 |---|---|
-| `reggae.json` | Ámbar |
+| `reggae.json`, `latinos.json`, `electronica.json` | Ámbar |
 
 **Proyectos**
 

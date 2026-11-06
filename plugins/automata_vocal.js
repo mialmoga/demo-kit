@@ -235,7 +235,12 @@ registerInstrument((() => {
     'Aguda': { gen: .95, tono: 2, form: 1, vel: 1.05, asp: .1, aire: .08, ruido: .62, vib: .2, micro: .42, timbre: .45, agua: 0, coro: 1, coro2: -12, coro3: 12, coro4: 0, sib: .35 },
     'Hueca': { gen: .4, tono: -1, form: -3, vel: .9, asp: .32, aire: .28, ruido: .72, vib: .5, micro: .58, timbre: .8, agua: .18, coro: 2, coro2: -12, coro3: 12, coro4: 0, sib: .25 },
     // Rapero de barrio cansado de la vida: nada lo sorprende (pero algo sí, a medias). Energía, Sorpresa y Cansancio van aquí como valor general; por nota se siguen pudiendo editar.
-    'El Brayan': { energia: 0, sorpresa: 50, cansancio: 100, gain: .84, gen: .79, tono: 2, form: -.5, vel: 1.05, legato: .15, asp: .15, aire: .08, ruido: .17, vib: .27, micro: .33, timbre: .59, sib: .15, agua: .56, coro: 1, coro2: 5, coro3: -5, coro4: -2, adn: 'AMI' }
+    'El Brayan': { energia: 0, sorpresa: 50, cansancio: 100, gain: .84, gen: .79, tono: 2, form: -.5, vel: 1.05, legato: .15, asp: .15, aire: .08, ruido: .17, vib: .27, micro: .33, timbre: .59, sib: .15, agua: .56, coro: 1, coro2: 5, coro3: -5, coro4: -2, adn: 'AMI' },
+    // Familia de El Brayan: misma base, otra persona con cada pequeño cambio
+    'El Brayan (seco)': { energia: 0, sorpresa: 50, cansancio: 100, gain: .84, gen: .79, tono: 2, form: -.5, vel: 1.05, legato: .15, asp: .15, aire: .08, ruido: .17, vib: .27, micro: .33, timbre: .59, sib: .15, agua: .1, coro: 1, coro2: 5, coro3: -5, coro4: -2, adn: 'AMI' },
+    'Brayan y su banda': { energia: 20, sorpresa: 50, cansancio: 80, gain: .8, gen: .79, tono: 2, form: -.5, vel: 1.05, legato: .15, asp: .15, aire: .08, ruido: .17, vib: .27, micro: .4, timbre: .59, sib: .15, agua: .3, coro: 3, coro2: -12, coro3: 5, coro4: -2, adn: 'AMI' },
+    'Don Brayan': { energia: 0, sorpresa: 20, cansancio: 100, gain: .9, gen: .12, tono: -3, form: -1.5, vel: .9, legato: .3, asp: .2, aire: .14, ruido: .2, vib: .4, micro: .38, timbre: .62, sib: .12, agua: .2, coro: 1, coro2: -12, coro3: 12, coro4: 0, adn: 'AMI' },
+    'La Brayana': { energia: 30, sorpresa: 60, cansancio: 60, gain: .84, gen: .97, tono: 3, form: 1, vel: 1.1, legato: .2, asp: .12, aire: .1, ruido: .15, vib: .3, micro: .36, timbre: .55, sib: .2, agua: .35, coro: 1, coro2: 5, coro3: -5, coro4: -2, adn: 'AMI' }
   };
   const N = PRESETS.Neutra;
   return {

@@ -70,6 +70,22 @@ Opciones de `syn` (`o`):
 
 Ejemplos que se convierten bien: `lp: t => 900 + 4500 * Math.exp(-t * 14)` (el filtro se cierra: pluck), `det: [-16, -6, 5, 16]`.
 
+**Opciones extra de `syn` en kits alternos (Evol).** Con el kit incluido se ignoran sin error; con Evol cargado (`kits/bootleg/demo-kit-Evol.js`) se aprovechan. Úsalas solo si sabes que la demo se va a oír con Evol, y ten en cuenta que **al convertir una demo en proyecto editable no se conservan** (el conversor solo reconoce las opciones de arriba).
+
+| Opción | Significado | Por defecto |
+|---|---|---|
+| `filt` | tipo de filtro: `'lp'`, `'bp'`, `'hp'` o `'off'` | `'lp'` |
+| `res` | resonancia (Q), .5–24 | .7 |
+| `drive` | saturación antes del filtro, 0–1 | 0 |
+| `pw` | ancho de pulso de la cuadrada, .05–.95 | .5 |
+| `sub` | nivel de un sub-oscilador una octava abajo | 0 |
+| `noise` | nivel de ruido mezclado | 0 |
+| `kt` | seguimiento de tecla del filtro, 0–1 | 0 |
+| `fenv` | `[octavas, caída_s]`: el corte sube N octavas al empezar y cae | — |
+| `spread` | apertura estéreo de las voces, 0–1 | .45 (si hay más de una voz) |
+| `drift` | deriva lenta de afinación por voz, en cents | 3 |
+| `character` | `'organico'` o `'digital'` solo para esa nota (ver §9) | el del kit |
+
 Niveles orientativos de `a`: kick 1 · snare .8 · hat .2–.4 · bajos .3–.45 · pads y arpegios .08–.15 · campanas .1. `mix` limita el pico a .92, así que no hace falta ser preciso, pero si todo está a 1 se aplasta.
 
 ## 4. Canales y sidechain
@@ -105,7 +121,25 @@ No se convierte (queda fuera del proyecto): procesado hecho **después** de `K.m
 - Notas más largas que la canción se recortan solas; la cola de 2.5 s deja respirar la reverberación del final.
 - Rendimiento: una canción de 90 s tarda de 1 a 3 s. Cede el hilo cada pocos compases con `await sleep(0)` para que la barra de progreso se mueva; evita bucles de miles de llamadas a `add` con funciones pesadas.
 
-## 8. Cómo oír y probar
+## 8. Plugins y demos: cuál usar
+
+- Un **sonido nuevo con parámetros** que el estudio pueda mostrar con sliders es un **plugin** (`registerInstrument`), no un `K.add` suelto dentro de una demo. El README tiene la plantilla.
+- Un plugin puede tocar **frases enteras** y no solo una nota: `plugins/guitarra_acompanante.js` toma una nota larga como *pasaje* (la altura es la tónica, el largo es cuánto acompaña) y adentro programa acordes, rasgueos y retardos entre cuerdas. Es un buen molde para cualquier instrumento que «interprete»: usa solo `K.add` y `K.rnd`, así que suena con cualquier kit, y toda la variación sale de `K.rnd` (nunca `Math.random`) para que el proyecto suene igual siempre.
+- El estado de un filtro o una fase se crea **dentro de `play()`**: cada nota necesita el suyo.
+
+## 9. Kits alternos (cuando alguien carga otro `demoKit`)
+
+El kit incluido es el predeterminado y no cambia. Un kit alterno es otro `demoKit(sr, seconds, seed)` que se carga a propósito (panel «Kits de síntesis» o soltando el `.js`); el estudio lo **revisa solo** antes de aceptarlo. Para que pase la revisión y para que las canciones ya hechas sigan sonando bien:
+
+- **Devuelve los mismos nombres** que el kit incluido (`n, dr, mu, rnd, hz, lpc, add, kick, snare, clap, snap, hat, crash, syn, bell, chop, riser, sweep, mix`) y copia `demoKit.metric`.
+- **`syn(buf, …)` debe escribir en el `buf` que recibe** (`K.mu` o `K.dr`), no siempre en uno de los dos: si no, el sidechain no agacha los pads y bajos.
+- **Filtros estables con cualquier corte y resonancia** (nada de valores NaN): un filtro de variable de estado TPT lo es; el clásico de Chamberlin se desborda por encima de ~sr/6.
+- **Mismo nivel que el incluido** (±1 dB es un buen objetivo): así cambiar de kit no obliga a remezclar. La revisión avisa si la mezcla sale más de 4 dB más fuerte.
+- **Determinista:** todo el azar sale de `rnd()`, misma semilla → mismo audio.
+- **Identifícate:** `demoKit.info = { id: 'evol', name: 'Evol', version: '1.2.0', characters: ['organico', 'digital'] }`. Con `info`, los proyectos guardados anotan con qué kit se hicieron (`engine` en el `.demokit.json`) y el estudio avisa si se abren con otro. `characters` es opcional: si lo pones, el estudio muestra el selector **Carácter del kit** (Neutro + los que listes) y fija `demoKit.character` antes de crear el kit; tu kit lo lee al construirse (sin carácter debe sonar igual que sin soportarlo).
+- **Prueba:** `node test_evol.js tu_kit.js demo_kit.js` revisa contrato, determinismo, barrido de filtros, niveles y carácter.
+
+## 10. Cómo oír y probar
 
 - **Estudio** (`demo_kit_studio.html`): «Demos y plugins» → suelta el archivo → «▶ Original» o «✎ Convertir en editable».
 - **Librería** (`lib/demokit.min.js`): `const song = await DemoKit.load('mi_demo.js'); song.play({loop:true})`.

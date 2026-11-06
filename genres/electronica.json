@@ -1,0 +1,315 @@
+{
+  "format": "demokit-genres",
+  "genres": [
+    {
+      "id": "house",
+      "name": "House",
+      "desc": "Cuatro al piso sin pausa: bombo constante, palmas en el dos y el cuatro, hi-hat abierto en el contratiempo y tensión que crece hasta el drop.",
+      "bpm": [
+        118,
+        130,
+        124
+      ],
+      "sig": [
+        4,
+        4
+      ],
+      "keys": [
+        "Menor natural",
+        "Dórica",
+        "Pentatónica menor"
+      ],
+      "inst": {
+        "perc": [
+          "kick",
+          "clap",
+          "hat"
+        ],
+        "mel": [
+          "pluck",
+          "bell",
+          "chop"
+        ],
+        "acomp": [
+          "sub",
+          "pad",
+          "supersaw"
+        ],
+        "fx": [
+          "riser",
+          "sweep",
+          "impact",
+          "wash"
+        ]
+      },
+      "structures": [
+        {
+          "name": "Pista de club",
+          "sections": [
+            [
+              "Intro",
+              16
+            ],
+            [
+              "Construcción",
+              16
+            ],
+            [
+              "Drop",
+              32
+            ],
+            [
+              "Break",
+              16
+            ],
+            [
+              "Construcción",
+              8
+            ],
+            [
+              "Drop",
+              32
+            ],
+            [
+              "Outro",
+              16
+            ]
+          ]
+        },
+        {
+          "name": "Corta",
+          "sections": [
+            [
+              "Intro",
+              8
+            ],
+            [
+              "Construcción",
+              8
+            ],
+            [
+              "Drop",
+              16
+            ],
+            [
+              "Break",
+              8
+            ],
+            [
+              "Drop",
+              16
+            ],
+            [
+              "Outro",
+              8
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "trap",
+      "name": "Trap",
+      "desc": "Medio tiempo pesado: hi-hats que rebotan en treintaidosavos, caja en el tres, 808 largo y una melodía fría arriba.",
+      "bpm": [
+        120,
+        160,
+        140
+      ],
+      "sig": [
+        4,
+        4
+      ],
+      "keys": [
+        "Menor natural",
+        "Frigia",
+        "Menor armónica"
+      ],
+      "inst": {
+        "perc": [
+          "kick",
+          "snare",
+          "clap",
+          "hat",
+          "snap"
+        ],
+        "mel": [
+          "bell",
+          "pluck",
+          "sinte"
+        ],
+        "acomp": [
+          "sub",
+          "reese",
+          "pad"
+        ],
+        "fx": [
+          "riser",
+          "impact"
+        ]
+      },
+      "structures": [
+        {
+          "name": "Corta",
+          "sections": [
+            [
+              "Intro",
+              4
+            ],
+            [
+              "Verso",
+              16
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Verso",
+              16
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Outro",
+              4
+            ]
+          ]
+        },
+        {
+          "name": "Con puente",
+          "sections": [
+            [
+              "Intro",
+              4
+            ],
+            [
+              "Verso",
+              16
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Verso",
+              16
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Puente",
+              8
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Outro",
+              4
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "epica",
+      "name": "Épica cinematográfica",
+      "desc": "Crece desde un susurro hasta el estruendo: pads enormes, campanas, impactos y subidas que no dejan respirar.",
+      "bpm": [
+        66,
+        110,
+        88
+      ],
+      "sig": [
+        4,
+        4
+      ],
+      "keys": [
+        "Menor natural",
+        "Menor armónica",
+        "Dórica"
+      ],
+      "inst": {
+        "perc": [
+          "kick",
+          "snare",
+          "crash"
+        ],
+        "mel": [
+          "bell",
+          "chop",
+          "pluck"
+        ],
+        "acomp": [
+          "pad",
+          "supersaw",
+          "sub"
+        ],
+        "fx": [
+          "riser",
+          "impact",
+          "wash",
+          "sweep"
+        ]
+      },
+      "structures": [
+        {
+          "name": "Tráiler",
+          "sections": [
+            [
+              "Apertura",
+              8
+            ],
+            [
+              "Construcción",
+              16
+            ],
+            [
+              "Clímax",
+              16
+            ],
+            [
+              "Calma",
+              8
+            ],
+            [
+              "Final",
+              8
+            ]
+          ]
+        },
+        {
+          "name": "Tema",
+          "sections": [
+            [
+              "Introducción",
+              8
+            ],
+            [
+              "Tema",
+              16
+            ],
+            [
+              "Desarrollo",
+              16
+            ],
+            [
+              "Clímax",
+              16
+            ],
+            [
+              "Resolución",
+              8
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

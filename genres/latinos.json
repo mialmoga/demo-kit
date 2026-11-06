@@ -1,0 +1,524 @@
+{
+  "format": "demokit-genres",
+  "genres": [
+    {
+      "id": "cumbia",
+      "name": "Cumbia",
+      "desc": "Pulso que camina: bombo y rim en el contratiempo, bajo tumbado, acordes sencillos y una melodía que se queda en la cabeza.",
+      "bpm": [
+        78,
+        105,
+        92
+      ],
+      "sig": [
+        4,
+        4
+      ],
+      "keys": [
+        "Menor natural",
+        "Pentatónica menor",
+        "Mayor",
+        "Dórica"
+      ],
+      "inst": {
+        "perc": [
+          "kick",
+          "snare",
+          "rim",
+          "hat"
+        ],
+        "mel": [
+          "pluck",
+          "bell",
+          "sinte"
+        ],
+        "acomp": [
+          "sub",
+          "pad",
+          "guitarra_acomp"
+        ],
+        "fx": [
+          "riser"
+        ]
+      },
+      "structures": [
+        {
+          "name": "Corta",
+          "sections": [
+            [
+              "Intro",
+              4
+            ],
+            [
+              "Verso",
+              8
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Verso",
+              8
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Outro",
+              4
+            ]
+          ]
+        },
+        {
+          "name": "Con puente",
+          "sections": [
+            [
+              "Intro",
+              8
+            ],
+            [
+              "Verso",
+              16
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Verso",
+              16
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Puente",
+              8
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Outro",
+              4
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bossa",
+      "name": "Bossa nova",
+      "desc": "Balanceo suave en dos tiempos: guitarra de nailon con bajo y acordes sincopados, séptimas y novenas, casi susurrada.",
+      "bpm": [
+        100,
+        140,
+        125
+      ],
+      "sig": [
+        4,
+        4
+      ],
+      "keys": [
+        "Mayor",
+        "Dórica",
+        "Mixolidia",
+        "Menor natural"
+      ],
+      "inst": {
+        "perc": [
+          "rim",
+          "hat",
+          "kick"
+        ],
+        "mel": [
+          "pluck",
+          "bell"
+        ],
+        "acomp": [
+          "guitarra_acomp",
+          "sub",
+          "pad"
+        ],
+        "fx": [
+          "wash"
+        ]
+      },
+      "structures": [
+        {
+          "name": "Estándar AABA",
+          "sections": [
+            [
+              "Intro",
+              4
+            ],
+            [
+              "A",
+              8
+            ],
+            [
+              "A",
+              8
+            ],
+            [
+              "B",
+              8
+            ],
+            [
+              "A",
+              8
+            ],
+            [
+              "Outro",
+              4
+            ]
+          ]
+        },
+        {
+          "name": "Corta",
+          "sections": [
+            [
+              "Intro",
+              4
+            ],
+            [
+              "A",
+              8
+            ],
+            [
+              "B",
+              8
+            ],
+            [
+              "A",
+              8
+            ],
+            [
+              "Outro",
+              4
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ranchera",
+      "name": "Ranchera",
+      "desc": "Chuntata clásica: bajo en el uno y el tres, acordes en el dos y el cuatro, melodía cantada con sentimiento.",
+      "bpm": [
+        70,
+        115,
+        92
+      ],
+      "sig": [
+        4,
+        4
+      ],
+      "keys": [
+        "Mayor",
+        "Mixolidia",
+        "Menor natural"
+      ],
+      "inst": {
+        "perc": [
+          "kick",
+          "snare",
+          "rim"
+        ],
+        "mel": [
+          "pluck",
+          "bell",
+          "chop"
+        ],
+        "acomp": [
+          "guitarra_acomp",
+          "sub"
+        ],
+        "fx": [
+          "riser"
+        ]
+      },
+      "structures": [
+        {
+          "name": "Corta",
+          "sections": [
+            [
+              "Intro",
+              4
+            ],
+            [
+              "Verso",
+              8
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Verso",
+              8
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Outro",
+              4
+            ]
+          ]
+        },
+        {
+          "name": "Con puente",
+          "sections": [
+            [
+              "Intro",
+              4
+            ],
+            [
+              "Verso",
+              8
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Verso",
+              8
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Puente",
+              4
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Outro",
+              4
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bolero",
+      "name": "Bolero",
+      "desc": "Caricia en cámara lenta: arpegios de guitarra, bajo redondo y mucho aire entre frase y frase.",
+      "bpm": [
+        56,
+        90,
+        72
+      ],
+      "sig": [
+        4,
+        4
+      ],
+      "keys": [
+        "Menor natural",
+        "Mayor",
+        "Menor armónica"
+      ],
+      "inst": {
+        "perc": [
+          "rim",
+          "hat",
+          "kick"
+        ],
+        "mel": [
+          "bell",
+          "pluck",
+          "chop"
+        ],
+        "acomp": [
+          "guitarra_acomp",
+          "pad",
+          "sub"
+        ],
+        "fx": [
+          "wash"
+        ]
+      },
+      "structures": [
+        {
+          "name": "Corta",
+          "sections": [
+            [
+              "Intro",
+              4
+            ],
+            [
+              "Verso",
+              8
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Verso",
+              8
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Outro",
+              4
+            ]
+          ]
+        },
+        {
+          "name": "Con puente",
+          "sections": [
+            [
+              "Intro",
+              8
+            ],
+            [
+              "Verso",
+              8
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Verso",
+              8
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Puente",
+              8
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Outro",
+              8
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ska",
+      "name": "Ska",
+      "desc": "Contratiempo veloz: bajo caminando, guitarra y teclado picando en el 'y', caja seca y metales que gritan.",
+      "bpm": [
+        130,
+        185,
+        160
+      ],
+      "sig": [
+        4,
+        4
+      ],
+      "keys": [
+        "Mayor",
+        "Mixolidia",
+        "Pentatónica mayor"
+      ],
+      "inst": {
+        "perc": [
+          "kick",
+          "snare",
+          "hat",
+          "rim"
+        ],
+        "mel": [
+          "pluck",
+          "sinte"
+        ],
+        "acomp": [
+          "sub",
+          "guitarra_acomp"
+        ],
+        "fx": [
+          "crash"
+        ]
+      },
+      "structures": [
+        {
+          "name": "Corta",
+          "sections": [
+            [
+              "Intro",
+              4
+            ],
+            [
+              "Verso",
+              16
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Verso",
+              16
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Outro",
+              4
+            ]
+          ]
+        },
+        {
+          "name": "Con solo",
+          "sections": [
+            [
+              "Intro",
+              4
+            ],
+            [
+              "Verso",
+              16
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Solo",
+              16
+            ],
+            [
+              "Verso",
+              16
+            ],
+            [
+              "Coro",
+              8
+            ],
+            [
+              "Outro",
+              4
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}
