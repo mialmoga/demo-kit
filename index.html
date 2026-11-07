@@ -72,7 +72,7 @@ aside{background:var(--p);overflow:auto;min-height:0}
 .rtool{padding:6px 8px;background:var(--p);border-bottom:1px solid var(--b);position:sticky;top:0;z-index:6}
 .rbar,#rmore{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
 #rmore{margin-top:6px;padding-top:6px;border-top:1px solid var(--b)}
-#rmore[hidden],#selAct[hidden]{display:none}
+#rmore[hidden],#selAct[hidden],#kitChar[hidden]{display:none}
 #rMoreBtn.on{background:#26304f;border-color:var(--a)}
 .rbar button i{font-style:normal}
 .rbar .nm{max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2134,9 +2134,13 @@ const lsGet=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } 
 // ── carácter del kit (si el kit cargado lo soporta: demoKit.info.characters) ──
 const CHAR_LBL={'':['Neutro','Sin variación añadida: el kit tal como suena de fábrica.'],organico:['Orgánico','Cada golpe y cada nota varían un poco, el filtro respira y hay saturación suave, como un equipo analógico.'],digital:['Digital','Exacto y repetible, con 12 bits y la mitad de frecuencia de muestreo: un grano retro.'],pro:['Pro','Sinte grueso por defecto (cinco voces), deriva viva, bombo con wavefolding y limitador suave en la mezcla.'],ultra:['Ultra','Como Pro, y además el filtro se abre con la fuerza de cada nota.']};
 const charName=c=>(CHAR_LBL[c||'']||[c])[0];
+// etiqueta «kit-carácter» para los nombres de los WAV exportados: evol-organico, ultimate-neutro, incluido…
+function kitTag(){ const i=Kit.make&&Kit.make.info, L=kitChars();
+  if(i&&typeof i.id==='string'){ const c=Kit.make.character; return slug(i.id)+(L.length?'-'+(c&&L.includes(c)?slug(c):'neutro'):''); }
+  return kitName==='incluido'?'incluido':(slug(String(kitName).replace(/\.js$/i,'').replace(/^demo[-_ ]?kit[-_ ]?/i,''))||'kit'); }
 function rememberChar(){ try{ const i=Kit.make&&Kit.make.info, c=Kit.make&&Kit.make.character; if(i&&c) localStorage.setItem('demokit-char',JSON.stringify({id:i.id,c})); else localStorage.removeItem('demokit-char'); }catch(e){} }
 function applyStoredChar(){ try{ const o=JSON.parse(localStorage.getItem('demokit-char')||'null'), i=Kit.make&&Kit.make.info; if(o&&i&&o.id===i.id&&kitChars().includes(o.c)){ Kit.make.character=o.c; bumpKit(); } }catch(e){} }
-function syncKitChar(){ const L=kitChars(), box=$('kitChar'); box.hidden=!L.length; if(!L.length) return; const sel=$('kitCharSel'); sel.innerHTML=''; for(const c of ['',...L]){ const [n,t]=CHAR_LBL[c]||[c,'']; sel.append(el('option',{value:c,text:n,title:t})); } sel.value=Kit.make.character||''; $('kitCharHint').textContent=(CHAR_LBL[sel.value]||[])[1]||''; }
+function syncKitChar(){ const L=kitChars(), box=$('kitChar'); box.hidden=!L.length; if(!L.length){ $('kitCharSel').innerHTML=''; $('kitCharHint').textContent=''; return; } const sel=$('kitCharSel'); sel.innerHTML=''; for(const c of ['',...L]){ const [n,t]=CHAR_LBL[c]||[c,'']; sel.append(el('option',{value:c,text:n,title:t})); } sel.value=Kit.make.character||''; $('kitCharHint').textContent=(CHAR_LBL[sel.value]||[])[1]||''; }
 function setMore(open,save){ $('rmore').hidden=!open; $('rMoreBtn').classList.toggle('on',open); $('rMoreBtn').setAttribute('aria-expanded',String(open)); if(save) lsSet('demokit-rmore',open?'1':'0'); }
 $('rMoreBtn').onclick=()=>setMore($('rmore').hidden,true); { const v=lsGet('demokit-rmore'); setMore(v==null?!smallScr():v==='1'); }
 const HDR=document.querySelector('header');
@@ -2682,7 +2686,7 @@ async function playDemo(d){
     const out=await fn(SR,p=>prog(p)); d.out=out; prog(0); updateStat(); startPlayback(toAudioBuffer(out),0,false,false); }
   catch(e){ prog(0); updateStat(); console.error(e); toast('Error en la demo: '+e.message,'err'); }
 }
-async function demoWav(d){ if(!d.out){ if(!demoOk(d)) return; try{ const fn=compileDemo(d.src,d.fn,sleep); d.out=await fn(SR,p=>prog(p)); prog(0); }catch(e){ prog(0); toast('Error: '+e.message,'err'); return; } } download(encodeWav(d.out.L,d.out.R,SR),d.name.replace(/\W+/g,'_')+'.wav'); }
+async function demoWav(d){ if(!d.out){ if(!demoOk(d)) return; try{ const fn=compileDemo(d.src,d.fn,sleep); d.out=await fn(SR,p=>prog(p)); prog(0); }catch(e){ prog(0); toast('Error: '+e.message,'err'); return; } } download(encodeWav(d.out.L,d.out.R,SR),d.name.replace(/\W+/g,'_')+'_'+kitTag()+'.wav'); }
 async function convertDemo(d){
   if(P.tracks.some(t=>t.notes.length)&&!confirm('Esto reemplaza el proyecto actual. ¿Continuar?')) return;
   const emb=embeddedProject(d.src); if(emb){ try{ loadProject(projectFromFile(emb,d.name)); populateAddInst(); closeModal('libModal'); toast('«'+d.name+'»: proyecto original recuperado sin pérdidas','ok'); }catch(e){ console.error(e); toast('No pude abrir el proyecto incrustado: '+e.message,'err'); } return; }
@@ -2912,7 +2916,7 @@ async function exportStems(){
   try{
     const r=await renderStems(P,prog); const used=new Set(), files=[];
     r.files.forEach((f,i)=>{ let nm=String(i+1).padStart(2,'0')+'_'+(f.name.replace(/[^\w\-áéíóúüñÁÉÍÓÚÜÑ ]+/g,'').trim().replace(/\s+/g,'_')||'pista'); while(used.has(nm)) nm+='_'; used.add(nm); files.push({name:nm+'.wav',blob:encodeWav(f.L,f.R,SR)}); });
-    const zip=await makeZip(files); download(zip,(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'_stems.zip');
+    const zip=await makeZip(files); download(zip,(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'_'+kitTag()+'_stems.zip');
     if(r.errors.length) toast('Aviso en «'+r.errors[0].track+'»: '+r.errors[0].msg,'err');
     toast('Stems listos: '+files.length+' WAV en un ZIP ('+((performance.now()-t0)/1000).toFixed(1)+' s).','ok');
   }catch(e){ console.error(e); toast('Error al exportar stems: '+e.message,'err'); }
@@ -2987,7 +2991,7 @@ $('fileIn').onchange=async e=>{ await handleFiles([...e.target.files]); e.target
 $('bLib').onclick=()=>{ renderLib(); openModal('libModal'); };
 $('bExample').onclick=()=>{ loadProject(starterProject()); closeModal('libModal'); };
 $('bNewPlg').onclick=()=>openPlugin();
-$('bWav').onclick=async()=>{ if(dirty||!cache){ if(!(await doRender())) return; } download(encodeWav(cache.L,cache.R,SR),(P.name||'cancion').replace(/[^\w\-]+/g,'_')+'.wav'); };
+$('bWav').onclick=async()=>{ if(dirty||!cache){ if(!(await doRender())) return; } download(encodeWav(cache.L,cache.R,SR),(P.name||'cancion').replace(/[^\w\-]+/g,'_')+'_'+kitTag()+'.wav'); };
 $('bAdd').onclick=()=>addTrack($('addInst').value);
 $('mDraw').onclick=()=>setMode('draw'); $('mNav').onclick=()=>setMode('nav'); $('mErase').onclick=()=>setMode('erase'); $('mSel').onclick=()=>setMode('select');
 $('zIn').onclick=()=>zoom(1.25); $('zOut').onclick=()=>zoom(1/1.25);

@@ -4,7 +4,7 @@
 //  y las reproduce con Web Audio. Todo se sintetiza en el momento: no hay muestras.
 // ═══════════════════════════════════════════════════════════════════════
 persistPlugins=function(){};            // en la librería no se escribe en localStorage
-const LIB_VERSION='1.4.0';
+const LIB_VERSION='1.5.0';
 let _ctx=null, _dest=null, _out=null;
 function audioCtx(){
   if(!_ctx){ const AC=(typeof AudioContext!=='undefined'&&AudioContext)||(typeof webkitAudioContext!=='undefined'&&webkitAudioContext); if(!AC) throw new Error('Este entorno no tiene Web Audio: usa DemoKit.load() y lee song.L / song.R'); _ctx=new AC({latencyHint:'interactive'}); }
