@@ -5751,8 +5751,8 @@ ${chunks.join(',\n')}
                        'plugins'  ]  ,  ext  :  /\.js$/i  ,  kind  :
                        'plugin' , what :  'archivos .js de plugins' }
                       , {  id : 'proyectos' ,  title  : 'Proyectos' ,
-                      dirs :  [  'proyectos' , 'projects'  ]  , ext :
-                       /\.json$/i  ,  kind  :  'project'  ,  what  :
+                      dirs : [ 'projects' ] , ext : /\.json$/i , kind
+                                    : 'project' , what :
                        'archivos .demokit.json (proyectos guardados)'
                         } , { id  : 'generos' ,  title : 'Géneros' ,
                         dirs : [ 'genres'  ,  'generos' ] ,  ext  :
@@ -5854,7 +5854,7 @@ url , 20000 ) ; if ( ! r . ok ) throw new Error ( 'respondió ' + r . status ) ;
                            ; box .  innerHTML = ''  ; if ( data .
                          offline ) { box . append ( el ( 'div' , {
                                   class : 'hint' , text :
-'Estás abriendo el estudio como archivo local, y desde ahí un navegador no puede mirar carpetas. Ábrelo desde GitHub Pages o con un servidor (por ejemplo «python3 -m http.server» dentro de la carpeta del repo) y aquí aparecerán solos los archivos de demos/, plugins/, proyectos/ y project_examples/.'
+'Estás abriendo el estudio como archivo local, y desde ahí un navegador no puede mirar carpetas. Ábrelo desde GitHub Pages o con un servidor (por ejemplo «python3 -m http.server» dentro de la carpeta del repo) y aquí aparecerán solos los archivos de demos/, plugins/, projects/ y project_examples/.'
                } ) ) ; return ; } for ( const g  of REPO_GROUPS ) { const res
            = data [ g . id ] || [ ] , found = res . filter  ( r => r . status ===
        'ok' ) , files =  found . flatMap  ( r =>  r . files  . map (  f => Object  .
