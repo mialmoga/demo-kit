@@ -1,13 +1,4 @@
 [
   "demo-kit-Evol.js",
-  "demo-kit-fidelity_FIX.js",
-  "demo-kit-fidelity.js",
-  "demo-kit-Pro_fix.js",
-  "demo-kit-Pro_SAFE_fix.js",
-  "demo-kit-ultimate_v2.js",
-  "demo-kit-ultimate_v3.1.js",
-  "demo-kit-ultimate_v3.js",
-  "demo-kit-ultimate.js",
-  "demo-kit-Ultra_fix.js",
-  "demo-kit-ultra-SAFE_fix.js"
+  "demo-kit-ultimate.js"
 ]
