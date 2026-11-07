@@ -12,7 +12,6 @@ const GROUPS = [
   { dir: 'plugins', ext: /\.js$/i },
   { dir: 'kits/bootleg', ext: /\.js$/i },
   { dir: 'genres', ext: /\.json$/i },
-  { dir: 'proyectos', ext: /\.json$/i },
   { dir: 'projects', ext: /\.json$/i },
   { dir: 'project_examples', ext: /\.json$/i },
 ];
