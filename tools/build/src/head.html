@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Demo Kit</title>
+<meta name="description" content="A tiny procedural synth studio. Runs in your browser.">
+<link rel="icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="./site.webmanifest">
+<script>if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)) addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
+<meta name="theme-color" content="#4a5578">
+<meta property="og:type" content="website">
+<meta property="og:title" content="dk — demo kit">
+<meta property="og:description" content="A tiny procedural synth studio. Runs in your browser.">
+<meta property="og:image" content="https://mialmoga.github.io/demo-kit/assets/banner.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+:root{--bg:#0d0e12;--p:#14161c;--p2:#1a1d25;--b:#272b36;--t:#e7e9ef;--m:#8b92a3;--a:#8fa8ff;--a2:#ff7ab8;--ok:#6ee7a8;--err:#ff6b6b}
+*{box-sizing:border-box}
+/* barras de desplazamiento a juego con el tema */
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2c3244;border-radius:10px;border:3px solid transparent;background-clip:padding-box;min-height:36px;min-width:36px}
+::-webkit-scrollbar-thumb:hover{background:#4a5578;background-clip:padding-box;border:3px solid transparent}
+::-webkit-scrollbar-thumb:active{background:var(--a);background-clip:padding-box;border:3px solid transparent}
+::-webkit-scrollbar-corner{background:transparent}
+@supports (-moz-appearance:none){*{scrollbar-width:thin;scrollbar-color:#3a4258 transparent}}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--t);font:13px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{display:flex;flex-direction:column;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{background:var(--p2);border:1px solid var(--b);border-radius:7px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:#3d4457}
+button.pri{background:var(--a);color:#0b0d14;border-color:var(--a);font-weight:700}
+button.on{background:#2a3350;border-color:var(--a)}
+button.sm{padding:2px 7px;font-size:12px}
+button.danger:hover{border-color:var(--err);color:var(--err)}
+#fullscreen-btn {border-color: #14161c;background: #14161c;}
+#fullscreen-btn:hover {opacity: 1;border-color: #14161c;background: #14161c;}
+input[type=number],input[type=text],select,textarea{background:#0f1117;border:1px solid var(--b);border-radius:6px;padding:4px 6px}
+input[type=number]{width:64px}
+input[type=range]{accent-color:var(--a);width:100%;min-width:0}
+label.chk{display:inline-flex;align-items:center;gap:4px;color:var(--m);cursor:pointer;white-space:nowrap}
+header{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 12px;background:var(--p);border-bottom:1px solid var(--b);position:relative}
+header .brand{font-weight:700;letter-spacing:.2px}
+header .brand span{color:var(--m);font-weight:400}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.grp label{color:var(--m);display:flex;gap:4px;align-items:center}
+#pname{width:150px}
+#repo{margin-left:auto;color:var(--m);text-decoration:none;font-size:12px}
+#repo:hover{color:var(--a)}
+#stat{color:var(--m);font-size:12px}
+#stat.warn{color:#ffd166}
+#prog{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--a2);transition:width .1s}
+main{flex:1;min-height:0;display:grid;grid-template-columns:250px minmax(0,1fr) 300px}
+aside{background:var(--p);overflow:auto;min-height:0}
+#tracks{border-right:1px solid var(--b)}
+#insp{border-left:1px solid var(--b);padding-bottom:30px}
+.ph{display:flex;gap:6px;align-items:center;padding:8px;position:sticky;top:0;background:var(--p);z-index:2;border-bottom:1px solid var(--b)}
+.ph select{flex:1;min-width:0}
+.trk{display:grid;grid-template-columns:auto 1fr auto;gap:2px 6px;align-items:center;padding:6px 8px;border-bottom:1px solid #1d2029;cursor:pointer}
+.trk.sel{background:#1d2234}
+.trk .dot{width:10px;height:10px;border-radius:50%}
+.trk .tname{background:transparent;border:1px solid transparent;padding:2px 4px;min-width:0;width:100%}
+.trk .tname:focus{border-color:var(--b);background:#0f1117}
+.trk .btns{display:flex;gap:3px}
+.trk .mini{grid-column:2/4;color:var(--m);font-size:11px;display:flex;gap:6px;align-items:center}
+.trk .mini input{flex:1}
+.trk .sw.act{background:var(--a);color:#0b0d14;border-color:var(--a)}
+.trk .mu.act{background:#ffd166;color:#0b0d14;border-color:#ffd166}
+#roll{display:flex;flex-direction:column;min-width:0;min-height:0}
+.rtool{padding:6px 8px;background:var(--p);border-bottom:1px solid var(--b);position:sticky;top:0;z-index:6}
+.rbar,#rmore{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+#rmore{margin-top:6px;padding-top:6px;border-top:1px solid var(--b)}
+#rmore[hidden],#selAct[hidden]{display:none}
+#rMoreBtn.on{background:#26304f;border-color:var(--a)}
+.rbar button i{font-style:normal}
+.rbar .nm{max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#mSel.on,#mDraw.on,#mNav.on,#mErase.on{background:#26304f;border-color:var(--a)}
+#hToggle{display:none}
+.trk .tn{display:flex;align-items:center;gap:2px;min-width:0}
+.trk span.tname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:2px 4px}
+.trk .ed{padding:0 5px;opacity:.75;background:transparent;border-color:transparent}
+.rtool .nm{font-weight:600}
+.rtool .sp{flex:1}
+.rtool .live{gap:4px;padding-left:10px;border-left:1px solid var(--b)}
+#oct{min-width:26px;text-align:center;font-variant-numeric:tabular-nums;color:var(--a)}
+#midiIn{max-width:150px}
+.fxg{border:1px solid var(--b);border-radius:8px;padding:6px 8px;margin:6px 0}
+.fxh{color:var(--t);font-weight:600}
+#bRec.armed{background:#8f2b34;border-color:#ff6b6b;color:#fff;animation:recp 1.4s ease-in-out infinite}
+@keyframes recp{50%{box-shadow:0 0 0 3px #ff6b6b44}}
+#wrap{flex:1;min-height:0;overflow:auto;position:relative;background:#0d0f14}
+.abar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:5px 8px;background:var(--p);border-top:1px solid var(--b)}
+#awrap{height:124px;flex:none;position:relative;background:#0d0f14;border-top:1px solid var(--b)}
+#acv{display:block;width:100%;height:100%;touch-action:none}
+.abar[hidden]{display:none}
+.abar [hidden]{display:none!important}.tabs{display:inline-flex;gap:4px}.gchips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}.gstr{display:block;padding:6px 8px;margin:0 0 4px;border:1px solid var(--b);border-radius:8px;cursor:pointer}.gstr.on{border-color:var(--a);background:#26304f55}.gstr small{display:block;color:var(--m);font-size:11px;margin-top:2px}.gset{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}.gset label{display:inline-flex;align-items:center;gap:5px;color:var(--m)}.gcat{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin:0 0 4px;font-size:12px}.gcat b{font-weight:600}.tabs .sm.on{background:#26304f;border-color:var(--a)}
+#twrap{height:84px;flex:none;position:relative;background:#0d0f14;border-bottom:1px solid var(--b)}
+#tcv{display:block;width:100%;height:100%;touch-action:none}
+.abar input[type=number]{width:62px}
+.keyg{gap:6px;padding-left:10px;border-left:1px solid var(--b);display:flex;align-items:center;flex-wrap:wrap}
+#osk{display:flex;gap:0;padding:6px 8px;background:var(--p);border-bottom:1px solid var(--b);overflow-x:auto;touch-action:none;user-select:none;-webkit-user-select:none}
+#osk .wk{position:relative;flex:0 0 34px;height:88px;background:#d9dce6;border:1px solid #0b0d14;border-radius:0 0 5px 5px;margin-right:-1px;color:#0b0d14;font:10px system-ui;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;cursor:pointer}
+#osk[hidden]{display:none}
+#osk .wk.on,#osk .bk.on,#osk .pad.on{background:#8fa8ff}
+#osk .wk.sc::after{content:"";position:absolute;top:6px;width:5px;height:5px;border-radius:50%;background:#5c6bc0}
+#osk .bk{flex:0 0 0;position:relative;z-index:2;width:0}
+#osk .bk i{position:absolute;left:-11px;top:-1px;width:22px;height:54px;background:#15171f;border:1px solid #000;border-radius:0 0 4px 4px;cursor:pointer;display:block}
+#osk .bk i.on{background:#5c76e0}
+#osk .pad{flex:0 0 78px;height:64px;margin-right:6px;background:#1a1d27;border:1px solid #2a3040;border-radius:8px;color:#b8bdca;font:12px system-ui;display:flex;align-items:center;justify-content:center;cursor:pointer}
+#cv{position:sticky;top:0;left:0;display:block}
+#sp{pointer-events:none}
+.sec{padding:10px;border-bottom:1px solid #1d2029}
+.sec h4{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--m)}
+.sec .desc{color:var(--m);font-size:12px;margin:0 0 8px}
+.row{display:grid;grid-template-columns:104px minmax(0,1fr) 46px;gap:6px;align-items:center;margin:3px 0}
+.row label{color:#b8bdca;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .val{text-align:right;color:var(--m);font-variant-numeric:tabular-nums;font-size:12px}
+.row select,.row input[type=text]{grid-column:2/4;min-width:0}
+.btnrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.copyrow{display:flex;gap:4px;align-items:center;flex-wrap:wrap;color:var(--m);font-size:12px}
+.copyrow input{width:52px}
+.empty{padding:14px;color:var(--m)}
+.hint{color:var(--m);font-size:11px;margin-top:4px}
+#toasts{position:fixed;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px;z-index:50;max-width:min(420px,90vw)}
+.toast{background:#202537;border:1px solid #38405a;border-radius:8px;padding:8px 12px;box-shadow:0 6px 24px #0008}
+.toast.err{border-color:var(--err);background:#2a1a1e}
+.toast.ok{border-color:var(--ok)}
+#lyInp{position:fixed;z-index:30;display:none;box-sizing:border-box;height:24px;min-width:96px;padding:0 6px;font:600 13px system-ui;color:#fff;background:#0b0d14;border:2px solid #ffd76a;border-radius:5px;outline:none}
+#lyInp.on{display:block}
+.modal{position:fixed;inset:0;background:#000a;display:none;align-items:flex-start;justify-content:center;padding:4vh 12px;z-index:40;overflow:auto}
+.modal.show{display:flex}
+.card{background:var(--p);border:1px solid var(--b);border-radius:12px;padding:14px;width:min(820px,100%);max-height:92vh;overflow:auto}
+.card h3{margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.card h3 .x{margin-left:auto}
+.drop{border:2px dashed #353b4d;border-radius:10px;padding:16px;text-align:center;color:var(--m);margin:8px 0}
+.drop.over{border-color:var(--a);color:var(--t)}
+.item{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #1d2029;flex-wrap:wrap}
+.item .nm{flex:1;min-width:140px}
+.item .nm small{color:var(--m);display:block}
+#plgCode{width:100%;height:320px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;tab-size:2;white-space:pre;resize:vertical}
+details{margin:8px 0;color:#b8bdca}
+details pre{background:#0f1117;border:1px solid var(--b);border-radius:8px;padding:10px;overflow:auto;font-size:12px}
+details summary{cursor:pointer;color:var(--a)}
+.kgrp h4{margin:12px 0 6px;color:var(--m);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.kt{display:grid;grid-template-columns:minmax(120px,auto) 1fr;gap:6px 14px;align-items:start;font-size:13px}
+@media(max-width:700px){.kt{grid-template-columns:1fr}.kt>span:nth-child(odd){margin-top:6px}}
+kbd{display:inline-block;min-width:1.5em;text-align:center;padding:1px 6px;border:1px solid var(--b);border-bottom-width:2px;border-radius:5px;background:#12151d;font:600 12px ui-monospace,Menlo,Consolas,monospace;color:var(--t)}
+.fold>.ft{cursor:pointer;user-select:none}
+.fold>.ft::before{content:'▾';display:inline-block;width:1.1em;color:var(--m)}
+.fold.closed>.ft::before{content:'▸'}
+.fold.closed>*:not(.ft){display:none}
+#repoList .fold{margin:6px 0 10px}
+@media(max-width:700px){
+  #hToggle{display:inline-flex}
+  header.hclosed .hx{display:none!important}
+  .rbar .lb{display:none}
+  .rbar button.sm{padding:6px 10px;font-size:15px}
+  .rbar{gap:6px}
+  .rbar .nm{max-width:none;flex:1 0 100%}
+}
+@media(max-width:1000px){
+  body{overflow:auto}
+  main{display:block}
+  aside{max-height:none}
+  #tracks{border-right:0;border-bottom:1px solid var(--b);max-height:260px}
+  #wrap{height:58vh;flex:none}
+  #roll{min-height:auto}
+  #insp{border-left:0}
+}
+</style>
+<style id="skinGlass">
+/* ═══════════ PIEL DE CRISTAL · Demo Kit ═══════════
+   Paleta NaN (violeta + cian sobre noche profunda) y paneles glassmorphism.
+   Solo estilos: no toca la lógica del estudio. */
+:root{
+  --bg:#070913;--p:rgba(15,23,42,.78);--p2:rgba(255,255,255,.06);--b:rgba(255,255,255,.12);
+  --t:#e9ecf8;--m:#b3bedb;--a:#22d3ee;--a2:#a855f7;
+  --glass:rgba(15,23,42,.78);--glass-b:rgba(255,255,255,.12);--glass-hi:rgba(255,255,255,.07);
+  --nan-cyan:#22d3ee;--nan-violet:#a855f7;
+  --shadow:0 18px 50px -22px rgba(0,0,0,.75),inset 0 1px 0 var(--glass-hi);
+  color-scheme:dark;
+}
+@supports((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){:root{--glass:rgba(15,23,42,.52)}}
+html{background:#070913}
+body{
+  background:
+    radial-gradient(1100px 680px at 10% -8%,rgba(168,85,247,.30),transparent 62%),
+    radial-gradient(900px 620px at 96% 6%,rgba(34,211,238,.20),transparent 62%),
+    radial-gradient(1000px 720px at 50% 125%,rgba(99,102,241,.24),transparent 60%),
+    #070913;
+  background-attachment:fixed;
+}
+::selection{background:rgba(168,85,247,.55);color:#fff}
+
+/* scrollbars */
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(34,211,238,.45);background-clip:padding-box}
+::-webkit-scrollbar-thumb:active{background:var(--a);background-clip:padding-box}
+@supports(-moz-appearance:none){*{scrollbar-color:rgba(255,255,255,.18) transparent}}
+
+/* superficies de cristal */
+header,aside,.rtool,.abar,#osk,.card,.toast{
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%);
+  border-color:var(--glass-b);
+}
+header{margin:10px 10px 0;border:1px solid var(--glass-b);border-radius:18px;box-shadow:var(--shadow);padding:8px 14px;z-index:5}
+header .brand{letter-spacing:.4px;background:linear-gradient(90deg,#fff,#a5f3fc 55%,#d8b4fe);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+header .brand span{-webkit-text-fill-color:var(--m)}
+header .brand button{-webkit-text-fill-color:initial}
+#fullscreen-btn,#fullscreen-btn:hover{background:transparent;border-color:transparent;opacity:1}
+#prog{height:2px;border-radius:2px;background:linear-gradient(90deg,var(--nan-cyan),var(--nan-violet));box-shadow:0 0 10px rgba(34,211,238,.7)}
+#repo:hover{color:var(--nan-cyan)}
+
+/* disposición flotante en escritorio */
+main{gap:10px;padding:10px}
+aside{border:1px solid var(--glass-b);border-radius:18px;box-shadow:var(--shadow)}
+#tracks,#insp{border-left:1px solid var(--glass-b);border-right:1px solid var(--glass-b)}
+#roll{border:1px solid var(--glass-b);border-radius:18px;box-shadow:var(--shadow);overflow:clip;background:rgba(7,9,19,.55)}
+.ph{background:rgba(15,23,42,.72);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom-color:var(--glass-b)}
+.rtool{border-bottom:1px solid var(--glass-b)}
+.abar{border-top-color:var(--glass-b)}
+#wrap,#awrap,#twrap{border-color:var(--glass-b)}
+
+/* botones */
+button{background:rgba(255,255,255,.06);border:1px solid var(--glass-b);border-radius:10px;transition:background .18s,border-color .18s,box-shadow .18s,transform .12s}
+button:hover{background:rgba(255,255,255,.12);border-color:rgba(34,211,238,.45)}
+button:active{transform:translateY(1px) scale(.98)}
+button.pri{background:linear-gradient(135deg,#22d3ee,#a855f7);border-color:transparent;color:#070913;font-weight:700;box-shadow:0 6px 20px -8px rgba(168,85,247,.8)}
+button.pri:hover{filter:brightness(1.12);border-color:transparent;box-shadow:0 8px 26px -8px rgba(34,211,238,.85)}
+button.on,#mSel.on,#mDraw.on,#mNav.on,#mErase.on,#rMoreBtn.on,.tabs .sm.on{background:rgba(34,211,238,.16);border-color:rgba(34,211,238,.6);color:#cffafe;box-shadow:0 0 14px -4px rgba(34,211,238,.6)}
+button.danger:hover{background:rgba(255,107,107,.14);border-color:var(--err);color:#ffb4b4}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid rgba(34,211,238,.7);outline-offset:1px}
+#bRec.armed{background:rgba(143,43,52,.75)}
+
+/* campos */
+input[type=number],input[type=text],select,textarea{background:rgba(7,9,19,.55);border:1px solid var(--glass-b);border-radius:9px;transition:border-color .18s,box-shadow .18s}
+input[type=number]:focus,input[type=text]:focus,select:focus,textarea:focus{border-color:rgba(34,211,238,.6);box-shadow:0 0 0 3px rgba(34,211,238,.14);outline:none}
+input[type=checkbox]{accent-color:var(--nan-violet)}
+input[type=range]{accent-color:var(--nan-cyan)}
+@media(hover:hover){
+  input[type=range]{-webkit-appearance:none;appearance:none;height:5px;background:rgba(255,255,255,.14);border-radius:3px;outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,#22d3ee,#a855f7);border:2px solid #0b1020;box-shadow:0 0 10px rgba(34,211,238,.6);cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:linear-gradient(135deg,#22d3ee,#a855f7);border:2px solid #0b1020;box-shadow:0 0 10px rgba(34,211,238,.6);cursor:pointer}
+  input[type=range]::-moz-range-track{height:5px;background:rgba(255,255,255,.14);border-radius:3px}
+}
+
+/* pistas */
+.trk{border-bottom:1px solid rgba(255,255,255,.07);transition:background .2s}
+.trk:hover{background:rgba(255,255,255,.04)}
+.trk.sel{background:linear-gradient(90deg,rgba(168,85,247,.24),rgba(34,211,238,.07));box-shadow:inset 2px 0 0 var(--nan-cyan)}
+.trk .dot{box-shadow:0 0 9px 1px rgba(255,255,255,.35)}
+.trk .tname:focus{background:rgba(7,9,19,.55)}
+.trk .sw.act{background:linear-gradient(135deg,#22d3ee,#a855f7);border-color:transparent}
+
+/* inspector */
+.sec{border-bottom:1px solid rgba(255,255,255,.07)}
+.sec h4,.kgrp h4{background:linear-gradient(90deg,#a5f3fc,#d8b4fe);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.fxg{border-color:var(--glass-b);border-radius:12px;background:rgba(255,255,255,.03)}
+.row label{color:#c3cbe3}
+#oct{color:var(--nan-cyan)}
+.rtool .live,.keyg{border-left-color:var(--glass-b)}
+#rmore{border-top-color:var(--glass-b)}
+details pre{background:rgba(7,9,19,.6);border-color:var(--glass-b)}
+details summary{color:var(--nan-cyan)}
+kbd{background:rgba(255,255,255,.08);border-color:var(--glass-b)}
+
+/* teclado en pantalla */
+#osk .pad{background:rgba(255,255,255,.06);border-color:var(--glass-b);border-radius:10px}
+#osk .wk.on,#osk .bk.on,#osk .pad.on{background:var(--nan-cyan)}
+#osk .bk i.on{background:var(--nan-violet)}
+
+/* modales y avisos */
+.modal{background:rgba(4,6,15,.58);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.card{border:1px solid var(--glass-b);border-radius:22px;box-shadow:0 30px 80px -20px rgba(0,0,0,.85),inset 0 1px 0 var(--glass-hi);background:rgba(15,23,42,.72)}
+.drop{border:2px dashed rgba(255,255,255,.2);border-radius:14px;background:rgba(255,255,255,.03)}
+.drop.over{border-color:var(--nan-cyan);background:rgba(34,211,238,.08)}
+.item{border-bottom-color:rgba(255,255,255,.07)}
+.toast{border:1px solid rgba(168,85,247,.4);border-radius:14px;box-shadow:0 14px 40px -12px rgba(0,0,0,.8)}
+.toast.err{border-color:var(--err);background:rgba(60,20,28,.7)}
+.toast.ok{border-color:var(--ok)}
+#lyInp{border-radius:8px;border-color:#fcd34d;box-shadow:0 0 18px -2px rgba(252,211,77,.55)}
+
+/* móvil y tableta */
+@media(max-width:1000px){
+  header{margin:8px 8px 0;border-radius:16px}
+  main{padding:8px;gap:8px}
+  aside,#roll{border-radius:16px}
+  #tracks{border-bottom:1px solid var(--glass-b);margin-bottom:8px}
+  #roll{margin-bottom:8px}
+}
+@media(max-width:700px){header{padding:6px 10px}}
+</style>
+<style>
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ═══════════ FONDO VIVO (aurora + constelación que se aquieta) ═══════════ */
+#bgfx{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block}
+body>header,body>main{position:relative;z-index:1}
+
+/* ═══════════ OSCILOSCOPIO DEL HEADER ═══════════ */
+#scope{order:100;flex:1 1 190px;min-width:160px;max-width:440px;height:52px;margin-left:auto;display:block;cursor:pointer;
+  border-radius:12px;border:1px solid var(--glass-b);background:rgba(7,9,19,.5);box-shadow:inset 0 0 18px rgba(34,211,238,.06)}
+#scope:hover{border-color:rgba(34,211,238,.45)}
+@media(max-width:700px){#scope{flex:1 1 100%;max-width:none;height:44px}}
+
+/* el header en dos columnas: controles (izq.) + osciloscopio (der.) */
+header{flex-wrap:nowrap;align-items:stretch;gap:14px}
+header .hl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;flex:1 1 0;min-width:0}
+#scope{order:0;flex:0 0 clamp(220px,24vw,340px);max-width:none;min-width:0;height:auto;min-height:64px;margin-left:0;align-self:stretch}
+@media(max-width:1000px){header{flex-wrap:wrap}header .hl{flex:1 1 100%}#scope{flex:1 1 100%;height:48px;min-height:48px}}
+@media(max-width:700px){#scope{height:44px;min-height:44px}}
+
+/* ═══════════ ESPECTRO DEL PIANO ROLL ═══════════ */
+#roll{position:relative}
+#rspec{position:absolute;z-index:1;pointer-events:none;mix-blend-mode:screen;opacity:.6;display:block}
+
+/* ═══════════ PANEL DE PISTAS COLAPSABLE (móvil / tableta) ═══════════ */
+#tTogWrap{display:none}
+@media(max-width:1000px){
+  #tTogWrap{display:block;position:sticky;top:0;height:0;z-index:4}
+  #tToggle{position:absolute;left:8px;top:9px;width:30px;height:30px;padding:0;border-radius:50%;line-height:1;font-size:15px;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.08);border:1px solid var(--glass-b);color:#cffafe}
+  #tToggle:hover{border-color:rgba(34,211,238,.6)}
+  #tracks .ph{padding-left:46px}
+  #tracks.tcol{max-height:none;overflow:visible}
+  #tracks.tcol .ph{display:none}
+  #tracks.tcol #tlist .trk:not(.sel){display:none}
+  #tracks.tcol #tlist .trk.sel{padding:8px 8px 8px 46px;min-height:48px;border-bottom:0;box-shadow:none;background:linear-gradient(90deg,rgba(168,85,247,.24),rgba(34,211,238,.07))}
+  #tracks.tcol #tlist .trk.sel .mini{display:none}
+  #tracks.tcol:not(:has(.trk.sel)) .ph{display:flex}
+}
+
+/* ═══════════ «MÁS» → FLECHITA (cabe en la misma línea de herramientas) ═══════════ */
+#rMoreBtn{font-size:0;width:30px;height:28px;padding:0;margin-left:auto;display:inline-flex;align-items:center;justify-content:center;line-height:1}
+#rMoreBtn::before{content:'▾';font-size:14px;color:#cffafe}
+#rMoreBtn[aria-expanded="true"]::before{content:'▴'}
+@media(max-width:700px){#rMoreBtn{width:34px;height:34px}}
+@media(max-width:430px){.rbar button.sm{padding:6px 8px}}
+@media(min-width:1001px) and (max-width:1500px){.rbar{column-gap:8px}.rbar .nm{max-width:150px}}
+@media(min-width:1001px) and (max-width:1320px){.rbar .lb{display:none}.rbar button.sm{padding:4px 9px;font-size:14px}}
+@media(min-width:1001px) and (max-width:1199px){.rbar .nm{max-width:100px}}
+
+/* ═══════════ APARIENCIA Y RENDIMIENTO (panel ⚙) ═══════════
+   data-skin="classic" apaga la piel de cristal (hoja #skinGlass); los demás atributos quitan efectos caros */
+html[data-skin="classic"] #bgfx,html[data-fx="off"] #bgfx{display:none}
+html[data-blur="off"]{--glass:rgba(15,23,42,.88)}
+html[data-blur="off"] *,html[data-blur="off"] *::before,html[data-blur="off"] *::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+#aprModal .card{width:min(460px,100%)}
+.aprrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.aprrow small{display:block;color:var(--m);font-size:12px;margin-top:2px}
+.aprrow input[type=checkbox]{width:18px;height:18px;flex:none}
+.aprhint{color:var(--m);font-size:12px;margin:10px 0 0}
+.toast .tact{margin-left:10px}
+#aprModal .row{display:flex;gap:8px}#aprModal .row button{flex:1}
+</style>
+<script>
+/* Preferencias de apariencia: se aplican antes de pintar para que no parpadee */
+(function(){
+  var D={skin:'glass',blur:true,fx:true,anim:true,warn:true}, A=D;
+  try{ var s=JSON.parse(localStorage.getItem('dk-apr')||'null'); if(s&&typeof s==='object') A=Object.assign({},D,s); }catch(e){}
+  function apply(){
+    var r=document.documentElement, g=document.getElementById('skinGlass');
+    r.dataset.skin=A.skin==='classic'?'classic':'glass'; r.dataset.blur=A.blur?'on':'off'; r.dataset.fx=A.fx?'on':'off'; r.dataset.anim=A.anim?'on':'off';
+    if(g) g.disabled=A.skin==='classic';
+    if(window.__bgfx) window.__bgfx.enable(A.fx&&A.skin!=='classic');
+  }
+  window.dkApr={get:function(){return Object.assign({},A);},set:function(k,v){A[k]=v; try{localStorage.setItem('dk-apr',JSON.stringify(A));}catch(e){} apply();},reset:function(){A=Object.assign({},D); try{localStorage.removeItem('dk-apr');}catch(e){} apply();},apply:apply};
+  apply();
+})();
+</script>
+<script>
+/* Visualizadores reactivos: un analizador "escucha" la salida (sin alterar el sonido) y alimenta
+   el osciloscopio del header y el espectro del piano roll. Sin sonido todo cae a quietud y el bucle se detiene. */
+(function(){
+  var V=window.__viz={level:0,drawers:[],onWake:null,active:false};
+  var AN=new WeakMap(),cur=null,tb=null,fb=null,raf=0,quietSince=0,lv=0;
+  var oc=AudioNode.prototype.connect;
+  AudioNode.prototype.connect=function(d){
+    var r=oc.apply(this,arguments);
+    try{
+      if(typeof AudioDestinationNode!=='undefined'&&d instanceof AudioDestinationNode){
+        var c=d.context;
+        if(!(typeof OfflineAudioContext!=='undefined'&&c instanceof OfflineAudioContext)){
+          var a=AN.get(c);
+          if(!a){a=c.createAnalyser();a.fftSize=2048;a.smoothingTimeConstant=.72;a.minDecibels=-92;a.maxDecibels=-18;AN.set(c,a);}
+          oc.call(this,a);
+          if(cur!==a){cur=a;tb=new Uint8Array(a.fftSize);fb=new Uint8Array(a.frequencyBinCount);V.sr=c.sampleRate;}
+          V.wake();
+        }
+      }
+    }catch(e){}
+    return r;
+  };
+  V.time=function(){return tb};V.freq=function(){return fb};
+  /* bandas logarítmicas suavizadas (ataque rápido, caída lenta) */
+  V.makeBands=function(n,lo,hi){
+    var out=new Float32Array(n);
+    return function(){
+      if(!fb){out.fill(0);return out;}
+      var sr=V.sr||44100,bh=sr/2/fb.length,top=Math.min(hi||16000,sr/2-1),bot=lo||40;
+      for(var i=0;i<n;i++){
+        var f0=bot*Math.pow(top/bot,i/n),f1=bot*Math.pow(top/bot,(i+1)/n);
+        var b0=Math.max(1,Math.floor(f0/bh)),b1=Math.max(b0,Math.ceil(f1/bh)),m=0;
+        for(var b=b0;b<=b1&&b<fb.length;b++) if(fb[b]>m)m=fb[b];
+        var v=m/255; v=v*(1+.9*i/n); if(v>1)v=1;
+        out[i]=v>out[i]?out[i]+(v-out[i])*.65:out[i]*.9;
+      }
+      return out;
+    };
+  };
+  function poll(){
+    if(!cur){lv*=.9;V.level=lv;return;}
+    cur.getByteTimeDomainData(tb);cur.getByteFrequencyData(fb);
+    var s=0;for(var i=0;i<tb.length;i+=2){var x=(tb[i]-128)/128;s+=x*x;}
+    var rms=Math.sqrt(s/(tb.length/2));
+    lv=rms>lv?lv+(rms-lv)*.5:lv*.93;V.level=lv;
+  }
+  function loop(now){
+    raf=0;poll();
+    if(lv>.003)quietSince=now;
+    for(var i=0;i<V.drawers.length;i++){try{V.drawers[i](now,V);}catch(e){}}
+    V.active=(now-quietSince<2200);
+    if(V.active)raf=requestAnimationFrame(loop);
+  }
+  V.wake=function(){quietSince=performance.now();if(!raf)raf=requestAnimationFrame(loop);if(V.onWake)V.onWake();};
+  V.redraw=function(){var now=performance.now();for(var i=0;i<V.drawers.length;i++){try{V.drawers[i](now,V);}catch(e){}}};
+
+  /* ───── osciloscopio del header (Onda ⇄ Espectro con un toque) ───── */
+  function initScope(){
+    var cv=document.getElementById('scope');if(!cv)return;
+    var g=cv.getContext('2d'),W=0,H=0,dpr=1,mode='wave',bands=V.makeBands(44,45,14000),pk=new Float32Array(44),parts=[];
+    try{mode=localStorage.getItem('dkScope')||'wave';}catch(e){}
+    function size(){dpr=Math.min(window.devicePixelRatio||1,2);W=cv.clientWidth;H=cv.clientHeight;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);g.setTransform(dpr,0,0,dpr,0,0);V.redraw();}
+    if(window.ResizeObserver)new ResizeObserver(size).observe(cv);else addEventListener('resize',size);
+    cv.addEventListener('click',function(){mode=mode==='wave'?'spec':'wave';try{localStorage.setItem('dkScope',mode);}catch(e){}V.wake();V.redraw();});
+    function grad(){var gr=g.createLinearGradient(0,0,W,0);gr.addColorStop(0,'#22d3ee');gr.addColorStop(.55,'#a855f7');gr.addColorStop(1,'#ec4899');return gr;}
+    V.drawers.push(function(now,V){
+      if(!W||!H)return;
+      g.clearRect(0,0,W,H);
+      var lvl=V.level,tb=V.time(),mid=H/2,gr=grad();
+      if(mode==='wave'){
+        g.save();g.lineWidth=2;g.lineJoin='round';g.strokeStyle=gr;g.shadowColor='rgba(168,85,247,.8)';g.shadowBlur=lvl>.003?10:0;g.globalAlpha=lvl>.003?1:.45;
+        g.beginPath();
+        if(tb&&lvl>.003){var n=Math.min(Math.floor(W/2),tb.length);for(var i=0;i<n;i++){var x=i/(n-1)*W,y=mid+((tb[Math.floor(i/n*tb.length)]-128)/128)*mid*1.5*.9;i?g.lineTo(x,y):g.moveTo(x,y);}}
+        else{g.moveTo(0,mid);g.lineTo(W,mid);}
+        g.stroke();g.restore();
+        if(lvl>.1&&parts.length<14&&Math.random()<lvl*.9)parts.push({x:Math.random()*W,y:mid+(Math.random()-.5)*H*.7,vx:(Math.random()-.5)*.6,vy:-.2-Math.random()*.5,l:1,r:1+Math.random()*2,c:Math.random()<.5});
+        for(var p=parts.length-1;p>=0;p--){var q=parts[p];q.x+=q.vx;q.y+=q.vy;q.l-=.025;if(q.l<=0){parts.splice(p,1);continue;}
+          g.fillStyle=q.c?'rgba(34,211,238,'+(q.l*.8).toFixed(2)+')':'rgba(216,180,254,'+(q.l*.8).toFixed(2)+')';g.beginPath();g.arc(q.x,q.y,q.r,0,6.2832);g.fill();}
+      }else{
+        var b=bands(),n2=b.length,bw=W/n2;g.fillStyle=gr;
+        for(var k=0;k<n2;k++){var h=Math.max(1.5,b[k]*(H-6));pk[k]=Math.max(pk[k]*.97-.002,b[k]);
+          g.globalAlpha=lvl>.003?.9:.35;g.beginPath();g.roundRect?g.roundRect(k*bw+1,H-h-2,Math.max(1,bw-2),h,2):g.rect(k*bw+1,H-h-2,Math.max(1,bw-2),h);g.fill();
+          if(pk[k]>.04){g.globalAlpha=.7;g.fillRect(k*bw+1,H-pk[k]*(H-6)-3,Math.max(1,bw-2),1.5);}}
+        g.globalAlpha=1;
+      }
+      g.font='9px ui-monospace,Menlo,monospace';g.fillStyle='rgba(165,180,252,.45)';g.textBaseline='top';g.fillText(mode==='wave'?'ONDA':'ESPECTRO',7,5);
+    });
+    size();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initScope);else initScope();
+})();
+</script>
+
+</head>
+<body>
+<canvas id="bgfx" aria-hidden="true"></canvas>
+<header>
+<div class="hl">
+  <div class="brand"><button id="fullscreen-btn" title="Pantalla completa"><img src="assets/icon.png" onerror="this.onerror=null;this.src='favicon.ico'" alt="dk" width="36" height="36" style="vertical-align:middle;border-radius:9px;margin-right:6px"></button> Demo Kit</div>
+  <button id="hToggle" class="sm" aria-expanded="false" title="Mostrar u ocultar el resto de controles del proyecto">☰ Proyecto</button>
+  <button id="bKeys" class="sm" title="Atajos y gestos (F1)">?</button>
+  <button id="bApr" class="sm" title="Apariencia y rendimiento" aria-label="Apariencia y rendimiento">⚙</button>
+  <div class="grp">
+    <button id="bPlay" class="pri">▶ Play</button>
+    <label class="chk"><input type="checkbox" id="loop"> bucle</label>
+    <label class="chk" title="Clic de metrónomo mientras suena el proyecto (sigue el compás y el mapa de tempo; en la grabación suena también)"><input type="checkbox" id="metro"> metrónomo</label>
+    <label class="chk hx" title="Evita que se apague la pantalla mientras suena (Wake Lock)"><input type="checkbox" id="wake" checked> 🔆 pantalla activa</label>
+    <button id="bRec" title="Grabar lo que toques">⏺ Grabar</button>
+    <label class="chk hx" title="Ajusta inicio y largo de lo grabado a la Rejilla (si la rejilla está en «libre», se graba tal cual)"><input type="checkbox" id="recQ" checked> cuantizar</label>
+    <label class="chk hx" title="Un compás de metrónomo antes de empezar a grabar"><input type="checkbox" id="recCount" checked> cuenta previa</label>
+    <label class="chk hx" title="Retraso entre que tocas y que se oye (audio + teclado). Lo grabado se adelanta esos milisegundos. Vacío = automático (latencia de salida del navegador)">latencia <input type="number" id="recLat" min="0" max="500" step="5" placeholder="auto" style="width:58px"> ms</label>
+    <button id="bCalib" class="sm hx" title="8 clics de metrónomo: toca cualquier tecla (o haz clic) al ritmo y se calcula tu latencia">Calibrar</button>
+  </div>
+  <div class="grp">
+    <input type="text" class="hx" id="pname" value="Sin título" aria-label="Nombre del proyecto">
+    <label>BPM <input type="number" id="bpm" min="40" max="260" step="1" value="120"></label>
+    <label class="hx">Compases <input type="number" id="bars" min="1" max="256" step="1" value="8"></label>
+    <button id="tempoOn" class="sm hx" title="Pista de tempo: cambios de tempo y rampas (acelerando / ritardando)">♩ Tempo</button>
+    <label class="hx" title="Compás: cuántos pulsos tiene cada compás. El pulso del proyecto es la negra (6/8 = 3 pulsos por compás)">Compás <select id="sig"></select></label>
+  </div>
+  <div class="grp hx">
+    <button id="bNew" title="Proyecto vacío">Nuevo</button>
+    <button id="bGen" title="Proyecto nuevo desde un género: tempo, compás, escala y secciones ya puestos, con los instrumentos afines marcados">✨ Género</button>
+    <button id="bSave" title="Descarga el proyecto (.json)">Guardar</button>
+    <button id="bOpen" title="Abre proyectos, demos (.js), plugins y kits">Cargar archivos…</button>
+    <button id="bWav">⬇ WAV</button>
+    <button id="bMidiOut" title="Descarga las notas como archivo MIDI (.mid): una pista por pista, tempo, compás, secciones (como marcadores), volumen y pan">⬇ MIDI</button>
+    <button id="bCompact" title="Descarga el proyecto en formato compacto (.demokit.json) para usarlo con la librería, con un reporte de peso">⬇ Compacto</button>
+    <button id="bDemoJs" title="Descarga el proyecto como una demo .js autónoma (con el proyecto editable dentro)">⬇ Demo .js</button>
+    <button id="bStems" title="Un WAV por pista dentro de un .zip (para mezclar en otro DAW)">⬇ Stems</button>
+    <button id="bLib">Demos y plugins</button>
+  </div>
+  <a id="repo" class="hx" href="https://github.com/mialmoga/demo-kit" target="_blank" rel="noopener" title="Código en GitHub">GitHub ↗</a>
+  <div id="stat"></div>
+  </div>
+  <canvas id="scope" title="Toca para cambiar entre onda y espectro" aria-label="Osciloscopio"></canvas>
+  <div id="prog"></div>
+</header>
+<main>
+  <aside id="tracks">
+    <div id="tTogWrap"><button id="tToggle" type="button" aria-controls="tlist" aria-expanded="true" title="Colapsar: solo la pista activa">▴</button></div>
+    <div class="ph"><select id="addInst" aria-label="Instrumento"></select><button id="bAdd" class="pri" title="Agregar pista">＋</button></div>
+    <div id="tlist"></div>
+  </aside>
+  <section id="roll">
+    <div class="rtool">
+      <div class="rbar">
+        <span class="nm" id="rtName">—</span>
+        <span class="grp">
+          <button id="mDraw" class="on sm" title="Dibujar / mover notas"><i>✏️</i><span class="lb"> Dibujar</span></button>
+          <button id="mNav" class="sm" title="Desplazar con el dedo"><i>✋</i><span class="lb"> Navegar</span></button>
+          <button id="mErase" class="sm" title="Tocar una nota la borra"><i>🧽</i><span class="lb"> Borrar</span></button>
+          <button id="mSel" class="sm" title="Seleccionar: arrastra un rectángulo o toca notas para sumarlas o quitarlas"><i>⬚</i><span class="lb"> Seleccionar</span></button>
+        </span>
+        <span class="grp"><button id="bUndo" class="sm" title="Deshacer (Ctrl+Z)" disabled>↶</button><button id="bRedo" class="sm" title="Rehacer (Ctrl+Shift+Z o Ctrl+Y)" disabled>↷</button></span>
+        <span class="grp"><button id="zOut" class="sm" title="Alejar">−</button><button id="zIn" class="sm" title="Acercar">＋</button></span>
+        <span class="grp" id="selAct" hidden>
+          <button id="sDup" class="sm" title="Duplicar la selección justo después (Ctrl+D)">⧉<span class="lb"> Duplicar</span></button>
+          <button id="sLyric" class="sm" hidden title="Escribir la letra sobre las notas (doble toque, mantener pulsada la nota o Intro)">✎<span class="lb"> Letra</span></button>
+          <button id="sUp" class="sm" title="Subir la selección un semitono (en percusión, un carril)">▲</button>
+          <button id="sDn" class="sm" title="Bajar la selección un semitono (en percusión, un carril)">▼</button>
+          <button id="sDel" class="sm danger" title="Borrar la selección (Supr)">🗑<span class="lb"> Borrar</span></button>
+        </span>
+        <button id="rMoreBtn" class="sm" aria-expanded="false" title="Más controles: rejilla, tocar con teclado o MIDI, escala, acorde y teclado en pantalla">⋯<span class="lb"> Más</span></button>
+      </div>
+      <div id="rmore" hidden>
+      <span class="grp"><label>Rejilla <select id="snap"></select></label>
+        </span>
+      <span class="grp live">
+        <button id="bLive" class="sm on" title="Tocar la pista activa con el teclado de la compu (Z S X D C V… y Q 2 W 3 E R…)">⌨ Tocar</button>
+        <button id="oDn" class="sm" title="Octava abajo (tecla −)">−</button><span id="oct" title="Octava de la fila de abajo">C4</span><button id="oUp" class="sm" title="Octava arriba (tecla =)">＋</button>
+        <button id="bMidi" class="sm" title="Conectar un teclado o controlador MIDI">🎛 MIDI</button>
+        <select id="midiIn" hidden aria-label="Entrada MIDI"></select>
+      </span>
+      <span class="grp keyg">
+        <label>Escala <select id="kRoot" aria-label="Tónica"></select> <select id="kScale" aria-label="Escala"></select></label>
+        <label title="Al dibujar, las notas se ajustan a la escala"><input type="checkbox" id="kFit"> ajustar</label>
+        <label title="Al dibujar o tocar, suena el acorde completo">Acorde <select id="kChord" aria-label="Acorde"></select></label>
+        <button id="bOsk" class="sm" title="Teclado en pantalla (ratón o dedo)">🎹 Teclado</button>
+      </span>
+      <span class="hint" id="rtHint">clic = nota · arrastra el borde = largo · Shift+arrastrar = seleccionar · Supr = borrar · Ctrl+D = duplicar · Ctrl+Z = deshacer</span>
+      </div>
+    </div>
+    <div id="osk" hidden></div>
+    <div id="tbar" class="abar" hidden>
+      <span class="tabs"><button id="tabBpm" class="sm on" title="Cambios de tempo y rampas">♩ BPM</button><button id="tabSig" class="sm" title="Cambios de compás (solo en límites de compás)">𝄞 Compás</button><button id="tabMark" class="sm" title="Secciones de la canción: Intro, Verso, Coro…">🏷 Sección</button></span>
+      <span id="tCtl" hidden><span id="tInfo"></span>
+        <label class="chk">BPM <input type="number" id="tBpm" min="20" max="400" step="1"></label>
+        <label class="chk" title="Si está activo, el tempo cambia gradualmente desde el punto anterior y llega a este BPM en este pulso. Si no, salta de golpe."><input type="checkbox" id="tRamp"> rampa hasta aquí</label>
+        <button id="tDel" class="sm danger">Quitar punto</button></span>
+      <span id="sCtl" hidden>Compás <select id="sSel" aria-label="Compás"></select> <span id="sInfo"></span><button id="sDelSig" class="sm danger">Quitar cambio</button></span>
+      <span id="mCtl" hidden>Nombre <input id="mName" type="text" maxlength="40" value="Verso" size="12" aria-label="Nombre de la sección"> <span id="mQuick"></span> <span id="mInfo"></span><button id="mDelBtn" class="sm danger">Quitar marca</button></span>
+      <span id="mHint" class="hint" hidden>clic en un compás = marca nueva con ese nombre · elige una marca y cambia el nombre o toca un atajo para renombrarla · arrastra = mover de compás · doble clic o clic derecho = quitar. Solo organiza: no cambia el sonido</span>
+      <span id="tHint" class="hint">inicial = el BPM de arriba · clic = punto nuevo · arrastra = mover (horizontal: pulso, vertical: BPM) · doble clic o clic derecho = quitar</span>
+      <span id="sHint" class="hint" hidden>inicial = el compás de arriba · clic en un compás = cambio nuevo (con el compás elegido) · arrastra = mover de compás · doble clic o clic derecho = quitar. Las notas no se mueven: cambia dónde caen las barras</span>
+    </div>
+    <div id="twrap" hidden><canvas id="tcv"></canvas></div>
+    <div id="wrap"><canvas id="cv"></canvas><div id="sp"></div></div>
+    <div class="abar">
+      <button id="autoOn" class="sm" title="Mostrar la curva de automatización de la pista activa">📈 Automatización</button>
+      <span id="autoCtl" hidden>
+        <select id="autoK" aria-label="Parámetro a automatizar"></select>
+        <button id="autoClr" class="sm" title="Borrar la curva de este parámetro">Borrar curva</button>
+        <select id="autoLv" hidden title="Con cuántos valores distintos se escalona el parámetro entre notas (el valor se toma al inicio de cada nota)"><option value="8">8 niveles</option><option value="16">16 niveles</option></select>
+        <button id="autoBake" class="sm" hidden title="Renderiza las notas seleccionadas (o toda la pista) con el barrido continuo dentro de cada nota; pesa más al guardar">Hornear barrido</button>
+        <button id="autoUnbake" class="sm" hidden title="Devuelve las notas horneadas a su pista original">Deshornear</button>
+        <span class="hint">clic = punto · arrastra = mover · doble clic o clic derecho = quitar punto · se oye al volver a dar Play</span>
+      </span>
+    </div>
+    <div id="awrap" hidden><canvas id="acv"></canvas></div>
+  </section>
+  <aside id="insp"></aside>
+</main>
+
+<div id="libModal" class="modal"><div class="card">
+  <h3>Demos y plugins <button class="x" data-close="libModal">Cerrar</button></h3>
+  <div class="drop" id="drop">Suelta aquí archivos <b>.js</b>, <b>.json</b> o <b>.mid</b>: demos (.js), plugins de instrumento, un demo_kit.js propio o proyectos guardados.
+    <div class="btnrow" style="justify-content:center"><button id="bPick" class="pri">Elegir archivos…</button><button id="bExample">Cargar proyecto de ejemplo</button></div></div>
+  <div class="sec fold" data-fold="repo"><h4 class="ft">En el repositorio <button id="repoRefresh" class="sm" title="Volver a mirar las carpetas">↻</button></h4><div id="repoList" class="desc"></div></div>
+  <div class="sec fold" data-fold="demos"><h4 class="ft">Demos cargadas</h4><div id="demoList"></div></div>
+  <div class="sec fold" data-fold="plugins"><h4 class="ft">Instrumentos de usuario (plugins)</h4><div id="plgList"></div>
+    <div class="btnrow"><button id="bNewPlg" class="pri">Escribir un plugin nuevo…</button></div></div>
+  <div class="sec fold" data-fold="kit"><h4 class="ft">Kit de síntesis</h4><div id="kitInfo" class="desc"></div><div id="kitChar" class="btnrow" hidden><label>Carácter del kit <select id="kitCharSel" class="sm"></select></label><span class="hint" id="kitCharHint"></span></div><div class="btnrow"><button id="kitReset" class="sm" hidden>Volver al kit incluido</button></div></div>
+</div></div>
+
+<div id="genModal" class="modal"><div class="card">
+  <h3>Nuevo desde género <button class="x" data-close="genModal">Cerrar</button></h3>
+  <div class="desc" style="color:var(--m);margin:0 0 8px">Pone el andamio (tempo, compás, escala y secciones en la regla) y marca con ● lo que le va bien al género. No compone nada: las notas son tuyas.</div>
+  <div id="genBody"></div>
+</div></div>
+
+<div id="lyModal" class="modal"><div class="card">
+  <h3>Pegar letra <button class="x" data-close="lyModal">Cerrar</button></h3>
+  <div class="desc">Escribe o pega la letra: se parte en sílabas y se reparte una por nota, desde la primera nota seleccionada (o desde la primera de la pista), en orden de tiempo. Las palabras que ya tuvieran esas notas se reemplazan.</div>
+  <textarea id="lyText" rows="6" style="width:100%;box-sizing:border-box" placeholder="canción de cuna, duérmete ya…"></textarea>
+  <div class="btnrow"><label class="chk"><input type="checkbox" id="lySyl" checked> Partir en sílabas (si no, una palabra por nota)</label></div>
+  <div class="btnrow"><button id="lyApply" class="pri">Repartir en las notas</button><span id="lyInfo" class="hint"></span></div>
+</div></div>
+
+<div id="plgModal" class="modal"><div class="card">
+  <h3>Editor de plugins <button class="x" data-close="plgModal">Cerrar</button></h3>
+  <p class="desc" style="color:var(--m);margin:0 0 8px">Un plugin es un instrumento nuevo escrito en JavaScript. Recibe el kit completo (<code>K</code>) y los datos de cada nota (<code>n</code>), así que puede combinar <code>K.syn</code>, <code>K.bell</code>, <code>K.add</code> con tus propias funciones de muestra.</p>
+  <textarea id="plgCode" spellcheck="false"></textarea>
+  <div class="btnrow">
+    <button id="plgTest">▶ Probar nota</button>
+    <button id="plgSave" class="pri">Registrar y guardar</button>
+    <button id="plgDl">Descargar .js</button>
+    <button id="plgTpl">Plantilla</button>
+  </div>
+  <details><summary>Referencia rápida del kit</summary><pre id="plgDoc"></pre></details>
+</div></div>
+
+<div id="aprModal" class="modal"><div class="card">
+  <h3>Apariencia y rendimiento <button class="x" data-close="aprModal">Cerrar</button></h3>
+  <div class="aprrow"><div>Tema<small>Cristal: paneles translúcidos y colores de la marca. Clásico: oscuro y plano, el de antes.</small></div>
+    <select id="aprSkin"><option value="glass">Cristal</option><option value="classic">Clásico</option></select></div>
+  <div class="aprrow"><div>Desenfoque de cristal<small>Es lo que más pesa en un teléfono modesto.</small></div><input type="checkbox" id="aprBlur"></div>
+  <div class="aprrow"><div>Fondo animado<small>Aurora y partículas; se quedan quietas cuando no hay actividad.</small></div><input type="checkbox" id="aprFx"></div>
+  <div class="aprrow"><div>Transiciones y animaciones<small>Los pequeños movimientos de botones, paneles y barras.</small></div><input type="checkbox" id="aprAnim"></div>
+  <div class="aprrow"><div>Avisarme si va lento<small>Si el movimiento se entrecorta, te propone apagar el desenfoque y el fondo animado.</small></div><input type="checkbox" id="aprWarn"></div>
+  <p class="aprhint">Solo cambian cómo se ve; el audio y los proyectos no se tocan. Se recuerda en este navegador.</p>
+  <div class="row" style="margin-top:10px"><button id="aprLite">Modo ligero (apagar todo)</button><button id="aprReset">Restablecer</button></div>
+</div></div>
+<div id="keysModal" class="modal"><div class="card">
+  <h3>Atajos y gestos <button class="x" data-close="keysModal">Cerrar</button></h3>
+  <div class="kgrp"><h4>General</h4><div class="kt">
+    <span><kbd>Espacio</kbd></span><span>Reproducir / detener</span>
+    <span><kbd>F1</kbd></span><span>Abrir esta hoja</span>
+    <span><kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>Ctrl</kbd>+<kbd>Y</kbd></span><span>Deshacer · rehacer (también <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>)</span>
+    <span><kbd>Home</kbd></span><span>Cursor al inicio</span></div></div>
+  <div class="kgrp"><h4>Piano roll</h4><div class="kt">
+    <span>Clic / toque en vacío</span><span>Nueva nota (arrastra hacia la derecha para alargarla)</span>
+    <span>Arrastrar una nota</span><span>Moverla (el borde derecho cambia el largo)</span>
+    <span>Clic derecho · modo 🧽</span><span>Borrar una nota</span>
+    <span><kbd>Shift</kbd>+arrastrar · modo ⬚</span><span>Seleccionar con un rectángulo; en modo ⬚ tocar una nota la suma o la quita</span>
+    <span><kbd>Ctrl</kbd>+<kbd>A</kbd></span><span>Seleccionar todas las notas de la pista</span>
+    <span><kbd>Ctrl</kbd>+<kbd>C</kbd> · <kbd>Ctrl</kbd>+<kbd>V</kbd></span><span>Copiar · pegar en el cursor</span>
+    <span><kbd>Ctrl</kbd>+<kbd>D</kbd></span><span>Duplicar la selección justo después</span>
+    <span><kbd>Supr</kbd></span><span>Borrar la selección</span>
+    <span><kbd>←</kbd> <kbd>→</kbd></span><span>Mover la selección (un paso de rejilla; con <kbd>Shift</kbd>, un pulso)</span>
+    <span><kbd>↑</kbd> <kbd>↓</kbd></span><span>Subir / bajar un semitono (con <kbd>Shift</kbd>, una octava)</span>
+    <span><kbd>Esc</kbd></span><span>Quitar la selección</span>
+    <span><kbd>Ctrl</kbd>+rueda</span><span>Zoom horizontal</span>
+    <span>Doble clic en un control</span><span>Vuelve a su valor por defecto</span></div></div>
+  <div class="kgrp"><h4>Tocar con el teclado de la compu</h4><div class="kt">
+    <span><kbd>Z</kbd> <kbd>S</kbd> <kbd>X</kbd> <kbd>D</kbd> <kbd>C</kbd> <kbd>V</kbd> <kbd>G</kbd> <kbd>B</kbd> <kbd>H</kbd> <kbd>N</kbd> <kbd>J</kbd> <kbd>M</kbd></span><span>Fila de abajo: notas desde la octava indicada (en percusión, <kbd>Z X C V B N M</kbd> son los carriles)</span>
+    <span><kbd>Q</kbd> <kbd>2</kbd> <kbd>W</kbd> <kbd>3</kbd> <kbd>E</kbd> <kbd>R</kbd> …</span><span>Fila de arriba: una octava más alto</span>
+    <span><kbd>−</kbd> · <kbd>=</kbd></span><span>Octava abajo · arriba</span></div></div>
+  <p class="desc" style="color:var(--m)">En el teléfono: ✋ navega con el dedo, ⬚ selecciona, ⋯ Más abre rejilla, teclado en pantalla, escala y acorde, y ☰ Proyecto muestra el resto de controles.</p>
+</div></div>
+
+<div id="toasts"></div>
+<input type="file" id="fileIn" multiple accept=".js,.json,.txt,.mid,.midi" style="display:none">
+<script>
