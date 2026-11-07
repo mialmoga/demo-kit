@@ -2610,7 +2610,7 @@ function kitCheck(make){
   return out;
 }
 async function handleFiles(list){ for(const f of list) await ingest(f); }
-// ───────────── el repositorio: demos/, plugins/, proyectos/ y project_examples/ aparecen solos ─────────────
+// ───────────── el repositorio: demos/, plugins/, projects/ y project_examples/ aparecen solos ─────────────
 // Funciona cuando el estudio se abre desde GitHub Pages o desde un servidor (python3 -m http.server): mira las carpetas junto a la página.
 // · GitHub Pages: pregunta a la API de GitHub qué hay en la carpeta (no hace falta ningún índice).
 // · Servidor local: lee el listado de la carpeta. · Cualquier hosting: acepta un manifest.json (en cada carpeta) con la lista de nombres;
@@ -2618,7 +2618,7 @@ async function handleFiles(list){ for(const f of list) await ingest(f); }
 const REPO_GROUPS=[
   {id:'demos',title:'Demos',dirs:['demos'],ext:/\.js$/i,kind:'demo',what:'archivos .js de demos'},
   {id:'plugins',title:'Plugins de instrumento',dirs:['plugins'],ext:/\.js$/i,kind:'plugin',what:'archivos .js de plugins'},
-  {id:'proyectos',title:'Proyectos',dirs:['proyectos','projects'],ext:/\.json$/i,kind:'project',what:'archivos .demokit.json (proyectos guardados)'},
+  {id:'proyectos',title:'Proyectos',dirs:['projects'],ext:/\.json$/i,kind:'project',what:'archivos .demokit.json (proyectos guardados)'},
   {id:'generos',title:'Géneros',dirs:['genres','generos'],ext:/\.json$/i,kind:'genre',what:'archivos .json de géneros (formato demokit-genres)'},
   {id:'kits',title:'Kits de síntesis',dirs:['kits/bootleg'],ext:/^(?!make_kit|test_).*\.js$/i,kind:'kit',what:'archivos .js de kits (demoKit)'},
   {id:'ejemplos',title:'Ejemplos de proyectos',dirs:['project_examples'],ext:/\.json$/i,kind:'project',what:'archivos .demokit.json de ejemplo'}];
@@ -2651,7 +2651,7 @@ async function repoLoad(g,f){
 }
 async function renderRepo(force){
   const box=$('repoList'); box.textContent='Mirando las carpetas del repositorio…'; const data=await repoScan(force); box.innerHTML='';
-  if(data.offline){ box.append(el('div',{class:'hint',text:'Estás abriendo el estudio como archivo local, y desde ahí un navegador no puede mirar carpetas. Ábrelo desde GitHub Pages o con un servidor (por ejemplo «python3 -m http.server» dentro de la carpeta del repo) y aquí aparecerán solos los archivos de demos/, plugins/, proyectos/ y project_examples/.'})); return; }
+  if(data.offline){ box.append(el('div',{class:'hint',text:'Estás abriendo el estudio como archivo local, y desde ahí un navegador no puede mirar carpetas. Ábrelo desde GitHub Pages o con un servidor (por ejemplo «python3 -m http.server» dentro de la carpeta del repo) y aquí aparecerán solos los archivos de demos/, plugins/, projects/ y project_examples/.'})); return; }
   for(const g of REPO_GROUPS){ const res=data[g.id]||[], found=res.filter(r=>r.status==='ok'), files=found.flatMap(r=>r.files.map(f=>Object.assign({dir:r.dir},f)));
     const head=el('div',{class:'nm ft'},el('b',{text:g.title+(found.length?' · '+files.length:'')})); const sec=el('div',{class:'fold'},head); sec.dataset.fold='repo-'+g.id; applyFold(sec);
     if(g.kind==='demo'&&files.length>1){ const b=el('button',{class:'sm',style:'margin-left:8px',text:'Cargar todas',onclick:async e=>{ e.stopPropagation(); for(const f of files) await repoLoad(g,f); toast('Demos cargadas: '+files.length,'ok'); }}); head.append(b); }
