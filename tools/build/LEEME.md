@@ -33,3 +33,6 @@ Haz un merge a tres bandas con `git merge-file` (tu archivo / la build base / la
 
 ## tests/ y song/
 Son scripts sueltos (Playwright, Node, Python) que usaron las sesiones anteriores. **Algunas rutas siguen apuntando al contenedor donde se escribieron** (`/home/claude/work/...`, `/home/claude/repo/...`, `/tmp/srv`) y varios usan archivos que no están en el repo (kits de prueba, adjuntos). Ajusta las rutas antes de correrlos. `build.py` y `build_lib.py` sí son independientes de la ubicación.
+
+## Plugins monofónicos
+Un instrumento (plugin) puede declarar `mono:true` en su definición; el estudio marca en rojo las notas que la siguiente pisa y ofrece recortarlas. Los instrumentos con `lyrics` cuentan como monofónicos sin declararlo.

@@ -72,7 +72,7 @@ aside{background:var(--p);overflow:auto;min-height:0}
 .rtool{padding:6px 8px;background:var(--p);border-bottom:1px solid var(--b);position:sticky;top:0;z-index:6}
 .rbar,#rmore{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
 #rmore{margin-top:6px;padding-top:6px;border-top:1px solid var(--b)}
-#rmore[hidden],#selAct[hidden],#kitChar[hidden]{display:none}
+#rmore[hidden],#selAct[hidden],#kitChar[hidden],#ovAct[hidden]{display:none}
 #rMoreBtn.on{background:#26304f;border-color:var(--a)}
 .rbar button i{font-style:normal}
 .rbar .nm{max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -490,6 +490,7 @@ html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *:
     <input type="text" class="hx" id="pname" value="Sin título" aria-label="Nombre del proyecto">
     <label>BPM <input type="number" id="bpm" min="40" max="260" step="1" value="120"></label>
     <label class="hx">Compases <input type="number" id="bars" min="1" max="256" step="1" value="8"></label>
+    <button id="bFitLen" class="sm hx" title="Ajustar el largo del proyecto a la última nota (en compases completos). Puede acortar o alargar.">Ajustar</button>
     <button id="tempoOn" class="sm hx" title="Pista de tempo: cambios de tempo y rampas (acelerando / ritardando)">♩ Tempo</button>
     <label class="hx" title="Compás: cuántos pulsos tiene cada compás. El pulso del proyecto es la negra (6/8 = 3 pulsos por compás)">Compás <select id="sig"></select></label>
   </div>
@@ -529,6 +530,7 @@ html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *:
         </span>
         <span class="grp"><button id="bUndo" class="sm" title="Deshacer (Ctrl+Z)" disabled>↶</button><button id="bRedo" class="sm" title="Rehacer (Ctrl+Shift+Z o Ctrl+Y)" disabled>↷</button></span>
         <span class="grp"><button id="zOut" class="sm" title="Alejar">−</button><button id="zIn" class="sm" title="Acercar">＋</button></span>
+        <span class="grp" id="ovAct" hidden><button id="bTrimOv" class="sm danger" title="Esta pista es monofónica (una nota a la vez) y hay notas que se pisan. Pulsa para recortar cada nota donde empieza la siguiente."></button></span>
         <span class="grp" id="selAct" hidden>
           <button id="sDup" class="sm" title="Duplicar la selección justo después (Ctrl+D)">⧉<span class="lb"> Duplicar</span></button>
           <button id="sLyric" class="sm" hidden title="Escribir la letra sobre las notas (doble toque, mantener pulsada la nota o Intro)">✎<span class="lb"> Letra</span></button>
@@ -1907,6 +1909,54 @@ function loadProject(proj){
 const sigStr=()=>(P.sig?P.sig[0]+'/'+P.sig[1]:'4/4');
 function fitBars(){ let end=0; for(const t of P.tracks) for(const n of t.notes) end=Math.max(end,n.b+(n.l||.25)); const need=end>0?meter(P).barAt(end-1e-6).i+1:0; if(need>P.bars){ P.bars=need; $('bars').value=need; layoutSpacer(); } }
 
+// ───────────── largo del proyecto vs. contenido ─────────────
+// «Fuera» = notas que empiezan después del último compás (no suenan al exportar). «Sobra» = compases vacíos al final.
+const fmtT=sec=>{ sec=Math.max(0,Math.round(sec)); return Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'); };
+function lenInfo(){ const mm=meter(P), tm=tmap(P), total=mm.total(P.bars); let end=0; const lost=[]; let lostN=0;
+  for(const t of P.tracks){ let c=0; for(const n of t.notes){ end=Math.max(end,n.b+(n.l||.25)); if(n.b>=total-1e-6) c++; } if(c){ const i=INSTRUMENTS[t.inst]; lost.push({name:t.name,inst:i&&i.name,n:c}); lostN+=c; } }
+  const need=end>0?mm.barAt(end-1e-6).i+1:0;
+  return {need,bars:P.bars,lost,lostN,secNeed:tm.sec(mm.total(Math.max(1,need))),secBars:tm.sec(total),spare:need?P.bars-need:0}; }
+function fitLength(){ const L=lenInfo(); if(!L.need||L.need===P.bars) return L.need===P.bars?0:null; pushUndo(); P.bars=clamp(L.need,1,256); $('bars').value=P.bars; layoutSpacer(); touch(); return 1; }
+function choose(title,lines,buttons){ return new Promise(res=>{ const m=el('div',{class:'modal show'}), done=v=>{ m.remove(); res(v); };
+  m.addEventListener('click',e=>{ if(e.target===m) done(null); });
+  const card=el('div',{class:'card',style:'max-width:560px'},el('h3',{text:title}),...lines.map(t=>el('p',{class:'desc',text:t})),
+    el('div',{style:'display:flex;flex-direction:column;gap:8px;margin-top:10px'},...buttons.map(b=>el('button',{class:b.cls||'',text:b.text,onclick:()=>done(b.v)})),el('button',{text:'Cancelar',onclick:()=>done(null)})));
+  m.append(card); document.body.append(m); }); }
+const lostText=L=>L.lost.slice(0,6).map(x=>'«'+x.name+'»'+(x.inst&&x.inst!==x.name?' ('+x.inst+')':'')+': '+x.n).join(' · ')+(L.lost.length>6?' · y '+(L.lost.length-6)+' pistas más':'');
+// Pregunta qué exportar cuando el largo del proyecto no coincide con las notas (solo si fuera hay notas, o sobra más de 1 compás).
+// Devuelve {mode:'asis'|'trim'|'grow', bars} o null si cancela. 'trim' y 'grow' no tocan el proyecto; 'fit' sí lo ajusta antes.
+async function exportScope(){ const L=lenInfo(); if(!L.need) return {mode:'asis',bars:P.bars};
+  if(L.lostN>0){ const v=await choose('Hay notas fuera del largo del proyecto',
+      ['El proyecto dura '+L.bars+' compases ('+fmtT(L.secBars)+') y hay '+L.lostN+' nota'+(L.lostN>1?'s':'')+' más allá del final. Si exportas tal cual, no sonarán.','Notas fuera → '+lostText(L)],
+      [{text:'Exportar solo el tiempo del proyecto (compás '+L.bars+'), sin esas notas',v:'asis'},{text:'Exportar todas las notas (hasta el compás '+L.need+', sin cambiar el proyecto)',v:'grow',cls:'pri'},{text:'Ajustar el proyecto a las notas y exportar',v:'fit'}]);
+    if(!v) return null; if(v==='fit'){ fitLength(); return {mode:'asis',bars:P.bars}; } return {mode:v,bars:v==='grow'?L.need:P.bars}; }
+  if(L.spare>1){ const v=await choose('El proyecto es más largo que la música',
+      ['La última nota termina en el compás '+L.need+' ('+fmtT(L.secNeed)+') y el proyecto dura '+L.bars+' compases ('+fmtT(L.secBars)+'): sobran '+L.spare+' compases vacíos.'],
+      [{text:'Exportar todo el proyecto ('+fmtT(L.secBars)+')',v:'asis'},{text:'Exportar solo hasta la última nota ('+fmtT(L.secNeed)+', sin cambiar el proyecto)',v:'trim',cls:'pri'},{text:'Ajustar el proyecto a la última nota y exportar',v:'fit'}]);
+    if(!v) return null; if(v==='fit'){ fitLength(); return {mode:'asis',bars:P.bars}; } return {mode:v,bars:v==='trim'?L.need:P.bars}; }
+  return {mode:'asis',bars:P.bars}; }
+const scopeProj=sc=>sc.bars===P.bars?P:Object.assign({},P,{bars:sc.bars});
+// recorte de lo renderizado: hasta el final del compás pedido + la cola (reverb, release) de siempre
+function trimOut(L,R,sc){ if(sc.mode!=='trim') return [L,R]; const n=Math.min(L.length,Math.ceil((tmap(P).sec(meter(P).total(sc.bars))+TAIL)*SR)); return [L.subarray(0,n),R.subarray(0,n)]; }
+
+// ───────────── instrumentos monofónicos: notas que se pisan ─────────────
+// Un instrumento es monofónico si lo declara (mono:true en su definición) o canta letra (lyrics). Se marca la nota que la siguiente pisa.
+const isMono=inst=>!!inst&&(inst.mono===true||!!inst.lyrics);
+function monoOverlaps(tr){ const out={set:new Set(),same:0}; if(!tr||!isMono(INSTRUMENTS[tr.inst])) return out;
+  const S=tr.notes.slice().sort((a,b)=>a.b-b.b); for(let i=0;i+1<S.length;i++){ const a=S[i],b=S[i+1]; if(a.b+(a.l||.25)>b.b+1e-6){ out.set.add(a); if(b.b-a.b<1e-6) out.same++; } } return out; }
+function refreshOverlapUI(){ const tr=P.tracks[sel], ov=monoOverlaps(tr), box=$('ovAct'), b=$('bTrimOv'); if(!box) return; box.hidden=!ov.set.size;
+  if(ov.set.size) b.textContent='⚠ '+ov.set.size+' nota'+(ov.set.size>1?'s':'')+' se pisan · recortar'; }
+async function trimOverlaps(){ const tr=P.tracks[sel], ov=monoOverlaps(tr); if(!ov.set.size) return;
+  const S=tr.notes.slice().sort((a,b)=>a.b-b.b), todo=[]; let same=0;
+  for(let i=0;i+1<S.length;i++){ const a=S[i],b=S[i+1]; if(a.b+(a.l||.25)>b.b+1e-6){ if(b.b-a.b<1e-6) same++; else todo.push([a,b]); } }
+  if(!todo.length){ toast('Las '+same+' nota'+(same>1?'s':'')+' que se pisan empiezan justo al mismo tiempo que otra: no hay qué recortar, borra una de cada par a mano.','err'); return; }
+  const pl=(n,w)=>n+' '+w+(n>1?'s':'');
+  const v1=await choose('Recortar las notas que se pisan en «'+tr.name+'»',['Esta pista es monofónica: hay '+pl(ov.set.size,'nota')+' cuya cola pisa a la siguiente. Se acortará cada una para que termine donde empieza la siguiente ('+pl(todo.length,'nota')+')'+(same?'. Otras '+same+' empiezan justo al mismo tiempo que otra y no se pueden recortar (hay que borrar una a mano)':'')+'. Se puede deshacer con Ctrl+Z.'],[{text:'Sí, recortar '+pl(todo.length,'nota'),v:1,cls:'pri'}]);
+  if(!v1) return;
+  const v2=await choose('¿Seguro?',['Vas a acortar '+pl(todo.length,'nota')+' de «'+tr.name+'». Si el empalme era a propósito, el sonido cambia.'],[{text:'Sí, estoy seguro: recortar',v:1,cls:'danger'}]);
+  if(!v2) return;
+  pushUndo(); for(const [a,b] of todo) a.l=Math.max(.0625,r6(b.b-a.b)); touch(); renderSelInfo(); toast('Recortadas '+pl(todo.length,'nota')+'. Ctrl+Z las devuelve.','ok'); }
+
 // ───────────── piano roll ─────────────
 function trackInfo(tr){
   const inst=INSTRUMENTS[tr.inst];
@@ -1960,6 +2010,7 @@ function draw(ph){
   if(!info.perc){ P.tracks.forEach((o,i)=>{ if(i===sel||o.mute) return; const oi=INSTRUMENTS[o.inst]; if(!oi||oi.kind==='perc') return;
     g.fillStyle=trackColor(i,.16); for(const n of o.notes){ const x=KW+n.b*BW-sx,w=Math.max(2,(n.l||.25)*BW); if(x+w<KW||x>W) continue; const y=RUL+(info.hi-n.m)*RH-sy; if(y+RH<RUL||y>H) continue; g.fillRect(x,y+3,w-1,RH-6); } }); }
   // notas de la pista activa
+  const OV=monoOverlaps(tr).set;
   for(const n of tr.notes){
     const x=KW+n.b*BW-sx, w=Math.max(4,visLen(inst,n)*BW); if(x+w<KW||x>W) continue;
     const ri=info.perc?Math.round(n.m):(info.hi-n.m); if(ri<0||ri>info.rows) continue; const y=RUL+ri*RH-sy; if(y+RH<RUL||y>H) continue;
@@ -1968,6 +2019,7 @@ function draw(ph){
     if(n.o&&Object.keys(n.o).some(k=>k!=='cid')){ g.fillStyle='#ffffffaa'; g.fillRect(x+w-6,y+3,3,3); }
     if(inst.lyrics&&n.w&&w>8){ g.save(); g.beginPath(); g.rect(Math.max(x,KW),y,w-1,RH); g.clip(); g.fillStyle='#0b0d14'; g.font='600 '+clamp(RH-5,9,13)+'px system-ui'; g.fillText(n.w,x+3,y+RH-Math.max(3,(RH-9)/2)); g.restore(); }
     else if(!info.perc&&w>30&&RH>=14){ g.fillStyle='#0b0d14'; g.font='10px system-ui'; g.fillText(midiName(n.m),x+3,y+RH-4); }
+    if(OV.has(n)){ g.strokeStyle='#ff5d6c'; g.lineWidth=2; g.strokeRect(x+1,y+1,w-3,RH-2); g.fillStyle='#ff5d6c'; g.fillRect(x+w-5,y+1,4,RH-2); }
     if(LE&&LE.n===n){ g.strokeStyle='#ffd76a'; g.lineWidth=2; g.strokeRect(x+1,y+1,w-3,RH-2); }
   }
   if(drag&&drag.kind==='rubber'){ g.strokeStyle='#8fa8ff'; g.fillStyle='#8fa8ff22'; const x=Math.min(drag.x0,drag.x1),y=Math.min(drag.y0,drag.y1),w=Math.abs(drag.x1-drag.x0),h=Math.abs(drag.y1-drag.y0); g.fillRect(x,y,w,h); g.strokeRect(x+.5,y+.5,w,h); }
@@ -2176,7 +2228,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='F1'){ e.preventDefault(); o
 
 // ───────────── pistas ─────────────
 function selectTrack(i){ if(i===sel||!P.tracks[i]) return; recCloseAll(); sel=i; selNotes.clear(); for(const [j,r] of [...$('tlist').children].entries()) r.classList.toggle('sel',j===i); renderInspector(); renderSelInfo(); centerTrack(); invalidate(); }
-function refreshCounts(){ [...$('tlist').children].forEach((r,i)=>{ const c=r.querySelector('.cnt'); if(c&&P.tracks[i]) c.textContent=P.tracks[i].notes.length+' notas'; }); }
+function refreshCounts(){ [...$('tlist').children].forEach((r,i)=>{ const c=r.querySelector('.cnt'); if(c&&P.tracks[i]) { const o=monoOverlaps(P.tracks[i]).set.size; c.textContent=P.tracks[i].notes.length+' notas'+(o?' · ⚠'+o:''); c.title=o?o+' notas se pisan (instrumento monofónico)':''; } }); refreshOverlapUI(); }
 function renameTrack(i,span){      // el teclado del teléfono solo se abre al tocar ✎
   const tr=P.tracks[i]; if(!tr) return; const inp=el('input',{class:'tname',value:tr.name,maxLength:40,'aria-label':'Nombre de la pista'}); span.replaceWith(inp); inp.focus(); inp.select(); let done=false;
   const fin=ok=>{ if(done) return; done=true; const v=inp.value.trim(); if(ok&&v&&v!==tr.name){ pushUndo(); tr.name=v; touch(); } renderTracks(); renderInspector(); };
@@ -2191,7 +2243,7 @@ function renderTracks(){
       el('span',{class:'btns'},
         el('button',{class:'sm mu'+(tr.mute?' act':''),text:'M',title:'Silenciar',onclick:e=>{ tr.mute=!tr.mute; e.target.classList.toggle('act',tr.mute); touch(); }}),
         el('button',{class:'sm sw'+(tr.solo?' act':''),text:'S',title:'Solo',onclick:e=>{ tr.solo=!tr.solo; e.target.classList.toggle('act',tr.solo); touch(); }})),
-      el('span',{class:'mini'},el('span',{class:'cnt',text:tr.notes.length+' notas'}),
+      el('span',{class:'mini'},el('span',{class:'cnt',text:tr.notes.length+' notas'+(()=>{ const o=monoOverlaps(tr).set.size; return o?' · ⚠'+o:''; })()}),
         el('input',{type:'range',min:0,max:1.5,step:.01,value:tr.vol,title:'Volumen',oninput:e=>{ tr.vol=+e.target.value; touch(); }})));
     if(!inst) row.title='Instrumento no disponible: '+tr.inst;
     box.append(row);
@@ -2219,7 +2271,7 @@ function sliderRow(label,get,set,min,max,step,def,fmt){
   if(def!=null) inp.addEventListener('dblclick',()=>{ inp.value=def; set(def); show(); previewTrack(); });
   show(); return el('div',{class:'row'},el('label',{text:label,title:label}),inp,out);
 }
-function renderSelInfo(){ const sa=$('selAct'); if(sa) sa.hidden=!selNotes.size; const sl=$('sLyric'); if(sl) sl.hidden=!lyricInst(); const e=$('selInfo'); if(!e) return; const tr=P.tracks[sel]; e.textContent=tr?(tr.notes.length+' notas · '+selNotes.size+' seleccionadas'):''; const v=$('selVel'); if(v){ v.disabled=!selNotes.size; if(selNotes.size){ const x=[...selNotes][0].v; v.value=x==null?1:x; if(v.nextElementSibling) v.nextElementSibling.textContent=fmtNum(+v.value); } } }
+function renderSelInfo(){ refreshOverlapUI(); const sa=$('selAct'); if(sa) sa.hidden=!selNotes.size; const sl=$('sLyric'); if(sl) sl.hidden=!lyricInst(); const e=$('selInfo'); if(!e) return; const tr=P.tracks[sel]; e.textContent=tr?(tr.notes.length+' notas · '+selNotes.size+' seleccionadas'):''; const v=$('selVel'); if(v){ v.disabled=!selNotes.size; if(selNotes.size){ const x=[...selNotes][0].v; v.value=x==null?1:x; if(v.nextElementSibling) v.nextElementSibling.textContent=fmtNum(+v.value); } } }
 function setFx(tr,g,k,v){ tr.fx=tr.fx||{}; tr.fx[g]=Object.assign({},FX_DEF[g],tr.fx[g]); tr.fx[g][k]=v; touch(); }
 const FX_PRESETS={
   'Voz':{eq:{low:-3,mid:2.5,midF:3000,midQ:1,high:2},comp:{thr:-20,ratio:3,atk:8,rel:120,knee:6,makeup:3,mix:1}},
@@ -2912,10 +2964,11 @@ async function makeZip(files){      // files: [{name, blob}]
 }
 async function exportStems(){
   if(!P.tracks.some(t=>t.notes.length)){ toast('No hay notas que exportar.','err'); return; }
+  const sc=await exportScope(); if(!sc) return;
   if(rendering) return; rendering=true; stop(); $('stat').textContent='Renderizando stems…'; $('stat').className=''; const t0=performance.now();
   try{
-    const r=await renderStems(P,prog); const used=new Set(), files=[];
-    r.files.forEach((f,i)=>{ let nm=String(i+1).padStart(2,'0')+'_'+(f.name.replace(/[^\w\-áéíóúüñÁÉÍÓÚÜÑ ]+/g,'').trim().replace(/\s+/g,'_')||'pista'); while(used.has(nm)) nm+='_'; used.add(nm); files.push({name:nm+'.wav',blob:encodeWav(f.L,f.R,SR)}); });
+    const r=await renderStems(scopeProj(sc),prog); const used=new Set(), files=[];
+    r.files.forEach((f,i)=>{ let nm=String(i+1).padStart(2,'0')+'_'+(f.name.replace(/[^\w\-áéíóúüñÁÉÍÓÚÜÑ ]+/g,'').trim().replace(/\s+/g,'_')||'pista'); while(used.has(nm)) nm+='_'; used.add(nm); { const [a,b]=trimOut(f.L,f.R,sc); files.push({name:nm+'.wav',blob:encodeWav(a,b,SR)}); } });
     const zip=await makeZip(files); download(zip,(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'_'+kitTag()+'_stems.zip');
     if(r.errors.length) toast('Aviso en «'+r.errors[0].track+'»: '+r.errors[0].msg,'err');
     toast('Stems listos: '+files.length+' WAV en un ZIP ('+((performance.now()-t0)/1000).toFixed(1)+' s).','ok');
@@ -2930,6 +2983,8 @@ $('wake').onchange=e=>{ if(playing){ if(e.target.checked) acquireWake(); else re
 $('pname').onchange=e=>{ P.name=e.target.value||'Sin título'; touch(); };
 $('bpm').onchange=e=>{ P.bpm=clamp(+e.target.value||120,40,260); e.target.value=P.bpm; touch(); prewarm(); };
 $('sig').onchange=e=>{ const [a,b]=e.target.value.split('/').map(Number); P.sig=[a,b]; layoutSpacer(); invalidate(); touch(); refreshTempoUI(); };
+$('bFitLen').onclick=()=>{ const L=lenInfo(); if(!L.need){ toast('El proyecto no tiene notas','err'); return; } const r=fitLength(); toast(r===0?'El largo ya coincide con la última nota ('+L.need+' compases)':'Proyecto ajustado: '+L.bars+' → '+L.need+' compases ('+fmtT(L.secNeed)+'). Ctrl+Z lo deshace.','ok'); };
+$('bTrimOv').onclick=trimOverlaps;
 $('bars').onchange=e=>{ P.bars=clamp(Math.round(+e.target.value)||8,1,256); e.target.value=P.bars; layoutSpacer(); touch(); };
 // ───────────── Nuevo desde género ─────────────
 for(const o of GENRE_BUILTIN){ try{ registerGenre(o); }catch(e){ console.warn('género',o.id,e); } }
@@ -2984,14 +3039,17 @@ async function genRepoSync(){          // géneros sueltos en genres/ del reposi
 }
 $('bGen').onclick=()=>{ renderGenre(); openModal('genModal'); genRepoSync(); };
 $('bNew').onclick=()=>{ if(P.tracks.some(t=>t.notes.length)&&!confirm('¿Empezar un proyecto vacío? Se pierde lo no guardado.')) return; loadProject(newProject('Sin título',120,8)); };
-$('bMidiOut').onclick=()=>{ try{ download(new Blob([projectToMidi(P)],{type:'audio/midi'}),(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'.mid'); toast('MIDI exportado (el sonido no viaja: solo notas, tempo, compás, volumen y pan)','ok'); }catch(e){ console.error(e); toast('No pude exportar MIDI: '+e.message,'err'); } };
-$('bSave').onclick=()=>{ try{ download(new Blob([JSON.stringify(projectToJSON(P))],{type:'application/json'}),(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'.demokit.json'); }catch(e){ toast('No pude guardar: '+e.message,'err'); } };
+$('bMidiOut').onclick=async()=>{ const sc=await exportScope(); if(!sc) return; try{ download(new Blob([projectToMidi(scopeProj(sc))],{type:'audio/midi'}),(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'.mid'); toast('MIDI exportado (el sonido no viaja: solo notas, tempo, compás, volumen y pan)','ok'); }catch(e){ console.error(e); toast('No pude exportar MIDI: '+e.message,'err'); } };
+$('bSave').onclick=()=>{ try{ const nm=(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'.demokit.json'; download(new Blob([JSON.stringify(projectToJSON(P))],{type:'application/json'}),nm); toast('Proyecto guardado: «'+nm+'»','ok'); }catch(e){ toast('No pude guardar: '+e.message,'err'); } };
 $('bOpen').onclick=()=>$('fileIn').click(); $('bPick').onclick=()=>$('fileIn').click();
 $('fileIn').onchange=async e=>{ await handleFiles([...e.target.files]); e.target.value=''; };
 $('bLib').onclick=()=>{ renderLib(); openModal('libModal'); };
 $('bExample').onclick=()=>{ loadProject(starterProject()); closeModal('libModal'); };
 $('bNewPlg').onclick=()=>openPlugin();
-$('bWav').onclick=async()=>{ if(dirty||!cache){ if(!(await doRender())) return; } download(encodeWav(cache.L,cache.R,SR),(P.name||'cancion').replace(/[^\w\-]+/g,'_')+'_'+kitTag()+'.wav'); };
+$('bWav').onclick=async()=>{ const sc=await exportScope(); if(!sc) return; let L,R;
+  if(sc.mode==='grow'){ if(rendering) return; rendering=true; stop(); $('stat').textContent='Renderizando…'; $('stat').className=''; try{ const o=await renderProject(scopeProj(sc),prog); L=o.L; R=o.R; }catch(e){ console.error(e); toast('Error al renderizar: '+e.message,'err'); return; } finally{ prog(0); rendering=false; updateStat(); } }
+  else { if(dirty||!cache){ if(!(await doRender())) return; } [L,R]=trimOut(cache.L,cache.R,sc); }
+  const nm=(P.name||'cancion').replace(/[^\w\-]+/g,'_')+'_'+kitTag()+'.wav'; download(encodeWav(L,R,SR),nm); toast('WAV exportado: «'+nm+'» ('+fmtT(L.length/SR)+')','ok'); };
 $('bAdd').onclick=()=>addTrack($('addInst').value);
 $('mDraw').onclick=()=>setMode('draw'); $('mNav').onclick=()=>setMode('nav'); $('mErase').onclick=()=>setMode('erase'); $('mSel').onclick=()=>setMode('select');
 $('zIn').onclick=()=>zoom(1.25); $('zOut').onclick=()=>zoom(1/1.25);

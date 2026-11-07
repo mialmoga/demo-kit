@@ -72,7 +72,7 @@ aside{background:var(--p);overflow:auto;min-height:0}
 .rtool{padding:6px 8px;background:var(--p);border-bottom:1px solid var(--b);position:sticky;top:0;z-index:6}
 .rbar,#rmore{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
 #rmore{margin-top:6px;padding-top:6px;border-top:1px solid var(--b)}
-#rmore[hidden],#selAct[hidden],#kitChar[hidden]{display:none}
+#rmore[hidden],#selAct[hidden],#kitChar[hidden],#ovAct[hidden]{display:none}
 #rMoreBtn.on{background:#26304f;border-color:var(--a)}
 .rbar button i{font-style:normal}
 .rbar .nm{max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -490,6 +490,7 @@ html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *:
     <input type="text" class="hx" id="pname" value="Sin título" aria-label="Nombre del proyecto">
     <label>BPM <input type="number" id="bpm" min="40" max="260" step="1" value="120"></label>
     <label class="hx">Compases <input type="number" id="bars" min="1" max="256" step="1" value="8"></label>
+    <button id="bFitLen" class="sm hx" title="Ajustar el largo del proyecto a la última nota (en compases completos). Puede acortar o alargar.">Ajustar</button>
     <button id="tempoOn" class="sm hx" title="Pista de tempo: cambios de tempo y rampas (acelerando / ritardando)">♩ Tempo</button>
     <label class="hx" title="Compás: cuántos pulsos tiene cada compás. El pulso del proyecto es la negra (6/8 = 3 pulsos por compás)">Compás <select id="sig"></select></label>
   </div>
@@ -529,6 +530,7 @@ html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *:
         </span>
         <span class="grp"><button id="bUndo" class="sm" title="Deshacer (Ctrl+Z)" disabled>↶</button><button id="bRedo" class="sm" title="Rehacer (Ctrl+Shift+Z o Ctrl+Y)" disabled>↷</button></span>
         <span class="grp"><button id="zOut" class="sm" title="Alejar">−</button><button id="zIn" class="sm" title="Acercar">＋</button></span>
+        <span class="grp" id="ovAct" hidden><button id="bTrimOv" class="sm danger" title="Esta pista es monofónica (una nota a la vez) y hay notas que se pisan. Pulsa para recortar cada nota donde empieza la siguiente."></button></span>
         <span class="grp" id="selAct" hidden>
           <button id="sDup" class="sm" title="Duplicar la selección justo después (Ctrl+D)">⧉<span class="lb"> Duplicar</span></button>
           <button id="sLyric" class="sm" hidden title="Escribir la letra sobre las notas (doble toque, mantener pulsada la nota o Intro)">✎<span class="lb"> Letra</span></button>
