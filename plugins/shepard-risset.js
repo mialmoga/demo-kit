@@ -8,7 +8,7 @@
 //     con la misma razón que el mapa de tempo, el glissando acelera exactamente con el pulso
 registerInstrument({
   id: 'shepard_risset',
-  name: 'Shepard–Risset',
+  name: '🪜 Shepard–Risset',
   kind: 'melodic',
   desc: 'Glissando infinito: parciales a octavas con ventana en frecuencia. Velocidad creciente (aceleración) y recorrido en octavas enteras.',
   params: [

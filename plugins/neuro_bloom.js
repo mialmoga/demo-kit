@@ -3,7 +3,7 @@
 // Arrastra este archivo al Studio o usa «Demos y plugins» → plugin.
 registerInstrument({
   id: 'neuro_bloom',
-  name: 'Neuro Bloom',
+  name: '🧠 Neuro Bloom',
   kind: 'melodic',
   desc: 'Bajo neuro procedural con unísono, modulación FM, filtro wobble y saturación.',
   params: [

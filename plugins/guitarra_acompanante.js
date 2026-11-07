@@ -1,4 +1,4 @@
-// ── Guitarra acompañante · plugin de instrumento para Demo Kit ──
+// ──🎶 Guitarra acompañante · plugin de instrumento para Demo Kit ──
 // Una NOTA larga en el piano roll = un PASAJE: la guitarra acompaña ese tiempo siguiendo un círculo de acordes y un patrón de rasgueo.
 //   · La altura de la nota solo elige la tónica (do, re, mi…); el registro lo decide la guitarra, como lo haría una mano.
 //   · El largo de la nota es cuánto acompaña. Dibuja una nota por sección (Verso, Coro…) y cambia de círculo, patrón o intérprete por pista.

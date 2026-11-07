@@ -1,4 +1,4 @@
-// ── Voz cantada (Autómata Vocal) · plugin de instrumento para Demo Kit ──
+// ──🎙️ Voz cantada (Autómata Vocal) · plugin de instrumento para Demo Kit ──
 // Sintetizador de formantes en español portado a JavaScript puro (sin Web Audio) para que corra dentro del render del estudio.
 // Cada nota canta el TEXTO que le escribas encima (doble toque, mantener pulsada la nota o Intro en el piano roll): las sílabas se reparten dentro de la duración de la nota
 // y el tono es el de la nota. Sin texto canta «a». Energía, Sorpresa y Cansancio se pueden cambiar nota por nota (panel «Notas») o con una curva.

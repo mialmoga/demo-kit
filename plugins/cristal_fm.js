@@ -3,7 +3,7 @@
 // (curva de parámetros) y también ajustar nota por nota con su propio slider (noteParams).
 registerInstrument({
   id: 'cristalfm',
-  name: 'Cristal FM',
+  name: '💎 Cristal FM',
   kind: 'melodic',
   desc: 'FM brillante de vidrio: modulador con razón ajustable, índice que decae y vibrato suave. El índice se ajusta por nota.',
   noteParams: ['index'],

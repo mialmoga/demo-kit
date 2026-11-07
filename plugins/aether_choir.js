@@ -3,7 +3,7 @@
 // Arrastra este archivo al Studio o usa «Demos y plugins» → plugin.
 registerInstrument({
   id: 'aether_choir',
-  name: 'Aether Choir',
+  name: '♾️ Aether Choir',
   kind: 'melodic',
   desc: 'Coro sintético de tres voces: formantes móviles, aire, detune y halo armónico.',
   params: [
