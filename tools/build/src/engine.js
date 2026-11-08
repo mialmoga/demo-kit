@@ -158,12 +158,26 @@ function evalPlugin(code){
   if(!def) throw new Error('El código no registró ningún instrumento: usa registerInstrument({ … })');
   return def;
 }
-function persistPlugins(){ try{ if(typeof localStorage!=='undefined') localStorage.setItem('demokit-studio-plugins',JSON.stringify(USER_PLUGINS)); }catch(e){} }
-function installPlugin(code){
+// Versiones de plugin: «version:'1.2'» (mayor.menor) en la definición. Mismo mayor = compatible hacia atrás (solo se añaden parámetros y opciones).
+// Sin campo cuenta como 1.0, así los plugins anteriores a esto siguen valiendo.
+const parseVer=v=>{ const m=/^\s*(\d+)(?:\.(\d+))?/.exec(String(v==null?'':v)); return m?[+m[1],+(m[2]||0)]:[1,0]; };
+const cmpVer=(a,b)=>a[0]-b[0]||a[1]-b[1];
+const verStr=a=>a[0]+'.'+a[1];
+function codeVersion(code){ const m=/version\s*:\s*['"]([\d.]+)['"]/.exec(code||''); return parseVer(m&&m[1]); }   // leída del texto, sin ejecutar nada
+// Los plugins temporales (de un proyecto) viven solo mientras ese proyecto está abierto: no se guardan en el navegador y, si pisan a uno instalado, lo guardan en «shadow» para devolverlo.
+function persistPlugins(){ try{ if(typeof localStorage!=='undefined') localStorage.setItem('demokit-studio-plugins',JSON.stringify(USER_PLUGINS.map(u=>u.temp?u.shadow:u).filter(Boolean).map(u=>({id:u.id,name:u.name,code:u.code})))); }catch(e){} }
+function installPlugin(code,opts){
   const def=evalPlugin(code); registerInstrument(def,{user:true});
-  const rec={id:def.id,name:def.name,code}; const i=USER_PLUGINS.findIndex(u=>u.id===def.id);
+  const rec={id:def.id,name:def.name,code,version:verStr(parseVer(def.version))}; const i=USER_PLUGINS.findIndex(u=>u.id===def.id), prev=i>=0?USER_PLUGINS[i]:null;
+  if(opts&&opts.temp){ rec.temp=true; rec.from=opts.from||''; rec.shadow=prev?(prev.temp?prev.shadow:prev):null; }
   if(i>=0) USER_PLUGINS[i]=rec; else USER_PLUGINS.push(rec); persistPlugins(); return def;
 }
+// devuelve el estado de antes de abrir el proyecto: quita los temporales y repone los instalados que habían pisado
+function restoreTemps(){ let n=0;
+  for(const u of USER_PLUGINS.slice()){ if(!u.temp) continue; n++; const i=USER_PLUGINS.indexOf(u);
+    if(u.shadow){ try{ registerInstrument(evalPlugin(u.shadow.code),{user:true}); USER_PLUGINS[i]=u.shadow; continue; }catch(e){ console.warn('plugin',u.id,e); } }
+    USER_PLUGINS.splice(i,1); delete INSTRUMENTS[u.id]; const k=INST_ORDER.indexOf(u.id); if(k>=0) INST_ORDER.splice(k,1); }
+  return n; }
 function removePlugin(id){ USER_PLUGINS=USER_PLUGINS.filter(u=>u.id!==id); persistPlugins(); }
 
 // ───────────────────────── proyecto ─────────────────────────
@@ -519,7 +533,7 @@ function projectToJSON(P,opts){
   if(P.sc.table){ const T=P.sc.table,u=new Uint8Array(T.length); for(let i=0;i<T.length;i++) u[i]=Math.round(clamp(T[i],0,1)*255); o.sc.table=u8ToB64(u); }
   if(typeof pruneBakedClips==='function') pruneBakedClips(P);
   for(const cid in P.clips){ const d=P.clips[cid],q=new Int16Array(d.length); for(let i=0;i<d.length;i++) q[i]=clamp(Math.round(d[i]*16384),-32768,32767); o.clips[cid]=u8ToB64(new Uint8Array(q.buffer)); }
-  const used=new Set(P.tracks.map(t=>t.inst)); for(const u of USER_PLUGINS) if(used.has(u.id)) o.plugins.push(u);
+  const used=new Set(P.tracks.map(t=>t.inst)); for(const u of USER_PLUGINS) if(used.has(u.id)) o.plugins.push({id:u.id,name:u.name,code:u.code});
   return o;
 }
 // peso de cada parte del archivo compacto (para avisar de lo que lo infla)
@@ -529,11 +543,11 @@ function projectReport(P){
 }
 // opts.allowPlugins===false: no se ejecuta el código de los plugins incluidos (por defecto sí, para compatibilidad; el estudio pregunta antes)
 function projectFromJSON(o,opts){
-  const errs=[], skipped=[]; for(const u of o.plugins||[]){ if(opts&&opts.allowPlugins===false){ skipped.push(u.name||u.id); continue; } try{ installPlugin(u.code); }catch(e){ errs.push(u.id+': '+e.message); } }
+  const errs=[], skipped=[], notes=[]; for(const u of o.plugins||[]){ const md=opts&&opts.pluginMode&&opts.pluginMode[u.id]; if(md==='installed') continue; if(md==='skip'||(opts&&opts.allowPlugins===false)){ skipped.push(u.name||u.id); continue; } try{ installPlugin(u.code,md==='temp'?{temp:true,from:o.name}:undefined); if(md==='temp') notes.push('«'+(u.name||u.id)+'» v'+verStr(codeVersion(u.code))+' se cargó como copia temporal: no toca tu plugin instalado.'); }catch(e){ errs.push(u.id+': '+e.message); } }
   const P=newProject(o.name,o.bpm,o.bars); if(Array.isArray(o.tempo)) P.tempo=tempoPts({bpm:o.bpm,tempo:o.tempo}); if(Array.isArray(o.sig)&&o.sig[0]>0&&o.sig[1]>0) P.sig=[+o.sig[0],+o.sig[1]]; if(Array.isArray(o.sigs)&&o.sigs.length) P.sigs=o.sigs.map(x=>({bar:x.bar,sig:[+x.sig[0],+x.sig[1]]})); if(Array.isArray(o.marks)&&o.marks.length) P.marks=markPts({marks:o.marks}); if(typeof o.genre==='string'&&o.genre) P.genre=o.genre.slice(0,60); if(o.engine&&typeof o.engine.id==='string'){ P.engine={id:o.engine.id.slice(0,40),v:String(o.engine.v||'').slice(0,20)}; if(typeof o.engine.c==='string') P.engine.c=o.engine.c.slice(0,20); } P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key);
   if(o.sc&&o.sc.table){ const u=b64ToU8(o.sc.table),T=new Float32Array(u.length); for(let i=0;i<u.length;i++) T[i]=u[i]/255; P.sc.table=T; }
   for(const cid in o.clips||{}){ const u=b64ToU8(o.clips[cid]),q=new Int16Array(u.buffer,u.byteOffset,u.length>>1),d=new Float32Array(q.length); for(let i=0;i<q.length;i++) d[i]=q[i]/16384; P.clips[cid]=d; }
-  P.tracks=(o.tracks||[]).map(t=>fixTrack(expandTrack(t))); P.loadErrors=errs; P.loadWarnings=[]; if(skipped.length) P.loadWarnings.push('Plugins sin ejecutar: '+skipped.join(', ')+'. Las pistas que los usan quedan sin instrumento.'); if(o.kit!=null&&o.kit!==KIT_FORMAT) P.loadWarnings.push('Este proyecto se guardó con la versión '+o.kit+' del kit y esta es la '+KIT_FORMAT+(o.kit>KIT_FORMAT?': puede sonar distinto o faltar instrumentos. Actualiza la librería.':': puede sonar un poco distinto.')); return P;
+  P.tracks=(o.tracks||[]).map(t=>fixTrack(expandTrack(t))); P.loadErrors=errs; P.loadNotes=notes; P.loadWarnings=[]; if(skipped.length) P.loadWarnings.push('Plugins sin ejecutar: '+skipped.join(', ')+'. Las pistas que los usan quedan sin instrumento.'); if(o.kit!=null&&o.kit!==KIT_FORMAT) P.loadWarnings.push('Este proyecto se guardó con la versión '+o.kit+' del kit y esta es la '+KIT_FORMAT+(o.kit>KIT_FORMAT?': puede sonar distinto o faltar instrumentos. Actualiza la librería.':': puede sonar un poco distinto.')); return P;
 }
 
 // makeKit (make_kit.js) → adaptador sobre demoKit.metric (salida idéntica muestra a muestra a la original)

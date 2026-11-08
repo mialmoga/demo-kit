@@ -919,12 +919,26 @@ function evalPlugin(code){
   if(!def) throw new Error('El código no registró ningún instrumento: usa registerInstrument({ … })');
   return def;
 }
-function persistPlugins(){ try{ if(typeof localStorage!=='undefined') localStorage.setItem('demokit-studio-plugins',JSON.stringify(USER_PLUGINS)); }catch(e){} }
-function installPlugin(code){
+// Versiones de plugin: «version:'1.2'» (mayor.menor) en la definición. Mismo mayor = compatible hacia atrás (solo se añaden parámetros y opciones).
+// Sin campo cuenta como 1.0, así los plugins anteriores a esto siguen valiendo.
+const parseVer=v=>{ const m=/^\s*(\d+)(?:\.(\d+))?/.exec(String(v==null?'':v)); return m?[+m[1],+(m[2]||0)]:[1,0]; };
+const cmpVer=(a,b)=>a[0]-b[0]||a[1]-b[1];
+const verStr=a=>a[0]+'.'+a[1];
+function codeVersion(code){ const m=/version\s*:\s*['"]([\d.]+)['"]/.exec(code||''); return parseVer(m&&m[1]); }   // leída del texto, sin ejecutar nada
+// Los plugins temporales (de un proyecto) viven solo mientras ese proyecto está abierto: no se guardan en el navegador y, si pisan a uno instalado, lo guardan en «shadow» para devolverlo.
+function persistPlugins(){ try{ if(typeof localStorage!=='undefined') localStorage.setItem('demokit-studio-plugins',JSON.stringify(USER_PLUGINS.map(u=>u.temp?u.shadow:u).filter(Boolean).map(u=>({id:u.id,name:u.name,code:u.code})))); }catch(e){} }
+function installPlugin(code,opts){
   const def=evalPlugin(code); registerInstrument(def,{user:true});
-  const rec={id:def.id,name:def.name,code}; const i=USER_PLUGINS.findIndex(u=>u.id===def.id);
+  const rec={id:def.id,name:def.name,code,version:verStr(parseVer(def.version))}; const i=USER_PLUGINS.findIndex(u=>u.id===def.id), prev=i>=0?USER_PLUGINS[i]:null;
+  if(opts&&opts.temp){ rec.temp=true; rec.from=opts.from||''; rec.shadow=prev?(prev.temp?prev.shadow:prev):null; }
   if(i>=0) USER_PLUGINS[i]=rec; else USER_PLUGINS.push(rec); persistPlugins(); return def;
 }
+// devuelve el estado de antes de abrir el proyecto: quita los temporales y repone los instalados que habían pisado
+function restoreTemps(){ let n=0;
+  for(const u of USER_PLUGINS.slice()){ if(!u.temp) continue; n++; const i=USER_PLUGINS.indexOf(u);
+    if(u.shadow){ try{ registerInstrument(evalPlugin(u.shadow.code),{user:true}); USER_PLUGINS[i]=u.shadow; continue; }catch(e){ console.warn('plugin',u.id,e); } }
+    USER_PLUGINS.splice(i,1); delete INSTRUMENTS[u.id]; const k=INST_ORDER.indexOf(u.id); if(k>=0) INST_ORDER.splice(k,1); }
+  return n; }
 function removePlugin(id){ USER_PLUGINS=USER_PLUGINS.filter(u=>u.id!==id); persistPlugins(); }
 
 // ───────────────────────── proyecto ─────────────────────────
@@ -1280,7 +1294,7 @@ function projectToJSON(P,opts){
   if(P.sc.table){ const T=P.sc.table,u=new Uint8Array(T.length); for(let i=0;i<T.length;i++) u[i]=Math.round(clamp(T[i],0,1)*255); o.sc.table=u8ToB64(u); }
   if(typeof pruneBakedClips==='function') pruneBakedClips(P);
   for(const cid in P.clips){ const d=P.clips[cid],q=new Int16Array(d.length); for(let i=0;i<d.length;i++) q[i]=clamp(Math.round(d[i]*16384),-32768,32767); o.clips[cid]=u8ToB64(new Uint8Array(q.buffer)); }
-  const used=new Set(P.tracks.map(t=>t.inst)); for(const u of USER_PLUGINS) if(used.has(u.id)) o.plugins.push(u);
+  const used=new Set(P.tracks.map(t=>t.inst)); for(const u of USER_PLUGINS) if(used.has(u.id)) o.plugins.push({id:u.id,name:u.name,code:u.code});
   return o;
 }
 // peso de cada parte del archivo compacto (para avisar de lo que lo infla)
@@ -1290,11 +1304,11 @@ function projectReport(P){
 }
 // opts.allowPlugins===false: no se ejecuta el código de los plugins incluidos (por defecto sí, para compatibilidad; el estudio pregunta antes)
 function projectFromJSON(o,opts){
-  const errs=[], skipped=[]; for(const u of o.plugins||[]){ if(opts&&opts.allowPlugins===false){ skipped.push(u.name||u.id); continue; } try{ installPlugin(u.code); }catch(e){ errs.push(u.id+': '+e.message); } }
+  const errs=[], skipped=[], notes=[]; for(const u of o.plugins||[]){ const md=opts&&opts.pluginMode&&opts.pluginMode[u.id]; if(md==='installed') continue; if(md==='skip'||(opts&&opts.allowPlugins===false)){ skipped.push(u.name||u.id); continue; } try{ installPlugin(u.code,md==='temp'?{temp:true,from:o.name}:undefined); if(md==='temp') notes.push('«'+(u.name||u.id)+'» v'+verStr(codeVersion(u.code))+' se cargó como copia temporal: no toca tu plugin instalado.'); }catch(e){ errs.push(u.id+': '+e.message); } }
   const P=newProject(o.name,o.bpm,o.bars); if(Array.isArray(o.tempo)) P.tempo=tempoPts({bpm:o.bpm,tempo:o.tempo}); if(Array.isArray(o.sig)&&o.sig[0]>0&&o.sig[1]>0) P.sig=[+o.sig[0],+o.sig[1]]; if(Array.isArray(o.sigs)&&o.sigs.length) P.sigs=o.sigs.map(x=>({bar:x.bar,sig:[+x.sig[0],+x.sig[1]]})); if(Array.isArray(o.marks)&&o.marks.length) P.marks=markPts({marks:o.marks}); if(typeof o.genre==='string'&&o.genre) P.genre=o.genre.slice(0,60); if(o.engine&&typeof o.engine.id==='string'){ P.engine={id:o.engine.id.slice(0,40),v:String(o.engine.v||'').slice(0,20)}; if(typeof o.engine.c==='string') P.engine.c=o.engine.c.slice(0,20); } P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key);
   if(o.sc&&o.sc.table){ const u=b64ToU8(o.sc.table),T=new Float32Array(u.length); for(let i=0;i<u.length;i++) T[i]=u[i]/255; P.sc.table=T; }
   for(const cid in o.clips||{}){ const u=b64ToU8(o.clips[cid]),q=new Int16Array(u.buffer,u.byteOffset,u.length>>1),d=new Float32Array(q.length); for(let i=0;i<q.length;i++) d[i]=q[i]/16384; P.clips[cid]=d; }
-  P.tracks=(o.tracks||[]).map(t=>fixTrack(expandTrack(t))); P.loadErrors=errs; P.loadWarnings=[]; if(skipped.length) P.loadWarnings.push('Plugins sin ejecutar: '+skipped.join(', ')+'. Las pistas que los usan quedan sin instrumento.'); if(o.kit!=null&&o.kit!==KIT_FORMAT) P.loadWarnings.push('Este proyecto se guardó con la versión '+o.kit+' del kit y esta es la '+KIT_FORMAT+(o.kit>KIT_FORMAT?': puede sonar distinto o faltar instrumentos. Actualiza la librería.':': puede sonar un poco distinto.')); return P;
+  P.tracks=(o.tracks||[]).map(t=>fixTrack(expandTrack(t))); P.loadErrors=errs; P.loadNotes=notes; P.loadWarnings=[]; if(skipped.length) P.loadWarnings.push('Plugins sin ejecutar: '+skipped.join(', ')+'. Las pistas que los usan quedan sin instrumento.'); if(o.kit!=null&&o.kit!==KIT_FORMAT) P.loadWarnings.push('Este proyecto se guardó con la versión '+o.kit+' del kit y esta es la '+KIT_FORMAT+(o.kit>KIT_FORMAT?': puede sonar distinto o faltar instrumentos. Actualiza la librería.':': puede sonar un poco distinto.')); return P;
 }
 
 // makeKit (make_kit.js) → adaptador sobre demoKit.metric (salida idéntica muestra a muestra a la original)
@@ -1897,7 +1911,7 @@ function loadProject(proj){
   stop(); P=proj; sel=0; selNotes.clear(); tSel=null; tDrag=null; cursorBeat=0; cache=null; dirty=true; version++;
   $('pname').value=P.name; $('bpm').value=P.bpm; $('bars').value=P.bars; $('sig').value=sigStr();
   renderTracks(); renderInspector(); layoutSpacer(); centerTrack(); updateStat(); invalidate(); histReset(); refreshTempoUI(); populateAddInst();
-  if(P.loadErrors&&P.loadErrors.length) toast('Plugins con error: '+P.loadErrors.join('; '),'err');
+  if(P.loadErrors&&P.loadErrors.length) toast('Plugins con error: '+P.loadErrors.join('; '),'err'); else if(P.loadNotes&&P.loadNotes.length) toast(P.loadNotes.join(' '),'ok');
   if(P.loadWarnings&&P.loadWarnings.length) toast(P.loadWarnings.join(' '),'err');
   { const ki=kitInfo(), same=P.engine&&ki&&ki.id===P.engine.id;
     if(same&&(P.engine.c||'')!==(ki.c||'')){
@@ -2622,10 +2636,53 @@ $('kitReset').onclick=()=>{ Kit.make=BUILTIN_KIT; bumpKit(); kitName='incluido';
 // ───────────── seguridad: el código ajeno solo se ejecuta si lo confirmas ─────────────
 // Un plugin, un kit o un proyecto con plugins es JavaScript que corre con los mismos permisos que esta página.
 function trustCode(titulo,detalle){ return confirm('⚠ '+titulo+'\n\n'+detalle+'\n\nEl código se ejecuta en tu navegador con los mismos permisos que esta página. Continúa solo si confías en quien lo hizo.\n\n¿Ejecutarlo?'); }
-function projectFromFile(o,nombre){   // proyecto → pregunta por los plugins que aún no tienes instalados tal cual
-  const nuevos=(o.plugins||[]).filter(u=>{ const t=USER_PLUGINS.find(x=>x.id===u.id); return !t||t.code!==u.code; });
-  let allow=true; if(nuevos.length) allow=trustCode('«'+(nombre||o.name||'Proyecto')+'» trae '+nuevos.length+' plugin(s) con código propio',nuevos.map(u=>'• '+(u.name||u.id)+' ('+((u.code||'').length/1024).toFixed(1)+' KB)').join('\n'));
-  return projectFromJSON(o,{allowPlugins:allow||!nuevos.length});
+const installedOf=id=>{ const u=USER_PLUGINS.find(x=>x.id===id); return u?(u.temp?u.shadow:u):null; };
+// qué le falta al plugin instalado para los pistas del proyecto que lo usan (parámetros y opciones de lista que el proyecto guardó)
+function pluginGap(o,u,inst){
+  const gaps=[]; let def; try{ def=evalPlugin(inst.code); }catch(e){ return ['no se pudo cargar ('+e.message+')']; }
+  const emb=codeVersion(u.code), cur=codeVersion(inst.code); if(emb[0]!==cur[0]) gaps.push('es de otra versión mayor (v'+verStr(cur)+' contra v'+verStr(emb)+'): puede no ser compatible');
+  const ps=def.params||[], miss=new Set();
+  for(const t of (o.tracks||[])){ if(t.inst!==u.id) continue;
+    for(const k in (t.params||{})){ const d=ps.find(x=>x.k===k); if(!d){ miss.add('el parámetro «'+k+'»'); continue; }
+      if(d.type==='choice'){ const vals=d.vals||d.opts||[]; if(!vals.includes(t.params[k])) miss.add('la opción «'+t.params[k]+'» de «'+k+'»'); } } }
+  miss.forEach(m=>gaps.push('le falta '+m)); return gaps; }
+// decide, plugin por plugin, qué hacer con los que trae un proyecto → {id:'installed'|'temp'|'update'|'skip'} o null si se cancela
+async function decidePlugins(o,nombre){
+  const modes={}, aEjecutar=[], pend=[];
+  for(const u of (o.plugins||[])){ const inst=installedOf(u.id);
+    if(inst&&inst.code===u.code){ modes[u.id]='installed'; continue; }
+    if(!inst){ modes[u.id]='temp'; aEjecutar.push(u); continue; }
+    pend.push([u,inst]); }
+  for(const [u,inst] of pend){
+    const vi=codeVersion(inst.code), ve=codeVersion(u.code), gaps=pluginGap(o,u,inst), nm=u.name||u.id;
+    let rec; if(gaps.length) rec='temp'; else if(cmpVer(ve,vi)>0) rec='temp'; else rec='installed';
+    const lines=['«'+(nombre||o.name||'Proyecto')+'» trae su propia copia de «'+nm+'» (v'+verStr(ve)+') y ya tienes instalada la v'+verStr(vi)+', con código distinto.'];
+    if(gaps.length) lines.push('Al instalado '+gaps.join('; ')+'. Recomiendo usar la copia del proyecto, temporalmente, para que suene como se hizo.');
+    else if(cmpVer(ve,vi)>0) lines.push('La del proyecto es más nueva y la tuya conserva todo lo que usan sus pistas. Recomiendo usar la del proyecto como copia temporal (y la instalas luego si te gusta).');
+    else if(cmpVer(ve,vi)<0) lines.push('La tuya es más nueva y conserva todo lo que usan las pistas del proyecto. Recomiendo seguir con la instalada.');
+    else lines.push('Tienen el mismo número de versión pero el código cambió. Las pistas del proyecto no necesitan nada que le falte a la tuya: recomiendo la instalada.');
+    lines.push('La copia temporal no toca tu plugin instalado y desaparece al abrir otro proyecto.');
+    const B={ installed:{v:'installed',text:'Usar el instalado (v'+verStr(vi)+')'}, temp:{v:'temp',text:'Usar el del proyecto (v'+verStr(ve)+') como copia temporal'}, update:{v:'update',text:'Instalar el del proyecto (v'+verStr(ve)+') y reemplazar al instalado'} };
+    const order=rec==='temp'?['temp','installed']:['installed','temp']; if(cmpVer(ve,vi)>0) order.push('update');
+    const buttons=order.map((k,n)=>Object.assign({},B[k],{text:B[k].text+(n===0?' · recomendado':'')}));
+    const r=await choose('Plugin «'+nm+'»: ¿cuál usar?',lines,buttons); if(!r) return null;
+    modes[u.id]=r; if(r!=='installed') aEjecutar.push(u); }
+  if(aEjecutar.length&&!trustCode('«'+(nombre||o.name||'Proyecto')+'» trae '+aEjecutar.length+' plugin(s) con código propio que se ejecutará',aEjecutar.map(u=>'• '+(u.name||u.id)+' v'+verStr(codeVersion(u.code))+' ('+((u.code||'').length/1024).toFixed(1)+' KB)').join('\n'))){
+    for(const u of aEjecutar) modes[u.id]='skip'; }
+  return modes;
+}
+async function projectFromFile(o,nombre){
+  const modes=await decidePlugins(o,nombre); if(!modes) return null;
+  restoreTemps();   // el proyecto anterior se va: sus copias temporales también
+  return projectFromJSON(o,{pluginMode:modes});
+}
+// al guardar: si el proyecto usa copias temporales, recuerda que existen por si alguien quiere instalarlas (una vez por plugin y sesión)
+const _remindedTemps=new Set();
+async function remindTemps(){
+  const used=new Set(P.tracks.map(t=>t.inst)), tmp=USER_PLUGINS.filter(u=>u.temp&&used.has(u.id)&&!_remindedTemps.has(u.id+'|'+u.code.length)); if(!tmp.length) return;
+  for(const u of tmp) _remindedTemps.add(u.id+'|'+u.code.length);
+  const r=await choose('Este proyecto usa plugins temporales',['El archivo ya los lleva dentro y se abrirán bien. Pero no están instalados en tu navegador: '+tmp.map(u=>'«'+u.name+'» v'+verStr(codeVersion(u.code))).join(', ')+'.','Si quieres usarlos en otros proyectos, instálalos ahora; también puedes hacerlo luego desde Demos y plugins.'],[{v:1,text:'Instalar ahora'+(tmp.some(u=>installedOf(u.id))?' (reemplaza al instalado)':'')}]);
+  if(r){ for(const u of tmp){ try{ installPlugin(u.code); }catch(e){ toast('No pude instalar «'+u.name+'»: '+e.message,'err'); } } populateAddInst(); renderLib(); toast('Plugins instalados','ok'); }
 }
 // ───────────── archivos, demos y plugins ─────────────
 const demoName=(txt,fb)=>{ const m=/^\/\/\s*[─\-—–\s]*([^·\n]+?)\s*·/m.exec(txt); return m?m[1].trim():fb; };
@@ -2642,10 +2699,10 @@ async function ingest(file,opts){
   }
   const txt=await file.text();
   try{
-    if(/^\s*\{/.test(txt)){ const o=JSON.parse(txt); if(o.format==='demokit-genres'){ const r=addGenres(o,opts); toast(r.ok.length?'Géneros listos: '+r.ok.join(', ')+(r.bad.length?' · con avisos: '+r.bad.join(' · '):''):'No pude leer géneros: '+r.bad.join(' · '),r.ok.length?'ok':'err'); return; } if(o.format==='demokit-studio'){ loadProject(projectFromFile(o,name)); populateAddInst(); toast('Proyecto «'+o.name+'» cargado','ok'); return; } }
+    if(/^\s*\{/.test(txt)){ const o=JSON.parse(txt); if(o.format==='demokit-genres'){ const r=addGenres(o,opts); toast(r.ok.length?'Géneros listos: '+r.ok.join(', ')+(r.bad.length?' · con avisos: '+r.bad.join(' · '):''):'No pude leer géneros: '+r.bad.join(' · '),r.ok.length?'ok':'err'); return; } if(o.format==='demokit-studio'){ const pr=await projectFromFile(o,name); if(!pr){ toast('Proyecto no cargado','err'); return; } loadProject(pr); populateAddInst(); toast('Proyecto «'+o.name+'» cargado','ok'); return; } }
     if(/function\s+demoKit\s*\(/.test(txt)){ if(!trustCode('Kit «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código que reemplazará al kit incluido.')){ toast('Kit no cargado','err'); return; } const f=new Function(txt+'\nreturn demoKit;')(); const k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); const probs=kitCheck(f); if(probs.length&&!confirm('Revisé el kit «'+name+'» y encontré esto:\n\n• '+probs.join('\n• ')+'\n\n¿Cargarlo de todos modos?')){ toast('Kit no cargado','err'); return; } Kit.make=f; applyStoredChar(); bumpKit(); kitName=name; cache=null; dirty=true; const kept=rememberKit(name,txt); renderLib(); updateStat(); toast('Kit «'+name+'» cargado: los instrumentos y plugins lo usan desde ahora'+(kept?' y se recordará en este navegador':' (no pude guardarlo en este navegador: pesa demasiado; durará solo esta sesión)'),kept?'ok':'err'); return; }
     if(/async\s+function\s+render\w*\s*\(/.test(txt)){ const fn=/async\s+function\s+(render\w*)/.exec(txt)[1]; const d={name:demoName(txt,name.replace(/\.js$/,'')),fn,src:txt,out:null,trusted:!!(opts&&opts.trusted)}; const i=demos.findIndex(x=>x.name===d.name); if(i>=0) demos[i]=d; else demos.push(d); renderLib(); openModal('libModal'); toast('Demo «'+d.name+'» lista: reprodúcela o conviértela','ok'); return; }
-    if(/registerInstrument\s*\(/.test(txt)){ if(!trustCode('Plugin «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código. Empieza así:\n'+txt.slice(0,160).replace(/\s+/g,' ')+'…')){ toast('Plugin no instalado','err'); return; } const def=installPlugin(txt); populateAddInst(); renderLib(); toast('Plugin «'+def.name+'» registrado','ok'); return; }
+    if(/registerInstrument\s*\(/.test(txt)){ if(!trustCode('Plugin «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código. Empieza así:\n'+txt.slice(0,160).replace(/\s+/g,' ')+'…')){ toast('Plugin no instalado','err'); return; } const nd=evalPlugin(txt), cur=installedOf(nd.id); if(cur&&cur.code===txt){ toast('«'+nd.name+'» ya estaba instalado igual','ok'); return; } if(cur&&cmpVer(codeVersion(txt),codeVersion(cur.code))<0){ const r=await choose('«'+nd.name+'»: el archivo es más viejo',['Tienes instalada la v'+verStr(codeVersion(cur.code))+' y este archivo es la v'+verStr(codeVersion(txt))+'. Instalarlo la reemplazaría por una versión anterior.'],[{v:'keep',text:'Conservar la instalada · recomendado'},{v:'old',text:'Reemplazar por la versión anterior'}]); if(r!=='old'){ toast('Plugin no instalado: sigue la v'+verStr(codeVersion(cur.code)),'ok'); return; } } const def=installPlugin(txt); populateAddInst(); renderLib(); toast('Plugin «'+def.name+'» v'+verStr(codeVersion(txt))+' registrado','ok'); return; }
     toast('No reconocí «'+name+'» (¿demo, plugin, kit o proyecto?)','err');
   }catch(e){ console.error(e); toast('Error con «'+name+'»: '+e.message,'err'); }
 }
@@ -2739,7 +2796,7 @@ async function playDemo(d){
 async function demoWav(d){ if(!d.out){ if(!demoOk(d)) return; try{ const fn=compileDemo(d.src,d.fn,sleep); d.out=await fn(SR,p=>prog(p)); prog(0); }catch(e){ prog(0); toast('Error: '+e.message,'err'); return; } } download(encodeWav(d.out.L,d.out.R,SR),d.name.replace(/\W+/g,'_')+'_'+kitTag()+'.wav'); }
 async function convertDemo(d){
   if(P.tracks.some(t=>t.notes.length)&&!confirm('Esto reemplaza el proyecto actual. ¿Continuar?')) return;
-  const emb=embeddedProject(d.src); if(emb){ try{ loadProject(projectFromFile(emb,d.name)); populateAddInst(); closeModal('libModal'); toast('«'+d.name+'»: proyecto original recuperado sin pérdidas','ok'); }catch(e){ console.error(e); toast('No pude abrir el proyecto incrustado: '+e.message,'err'); } return; }
+  const emb=embeddedProject(d.src); if(emb){ try{ const pr=await projectFromFile(emb,d.name); if(!pr){ toast('Proyecto no cargado','err'); return; } loadProject(pr); populateAddInst(); closeModal('libModal'); toast('«'+d.name+'»: proyecto original recuperado sin pérdidas','ok'); }catch(e){ console.error(e); toast('No pude abrir el proyecto incrustado: '+e.message,'err'); } return; }
   if(!demoOk(d)) return;
   try{ toast('Convirtiendo «'+d.name+'»…'); await tick(); const {project,stats,warnings}=await recordDemo(d.src,{name:d.name}); loadProject(project); populateAddInst(); renderLib(); closeModal('libModal'); if(warnings&&warnings.length) setTimeout(()=>toast('⚠ '+warnings.join(' '),'err'),300);
     toast('«'+d.name+'» convertida: '+stats.tracks+' pistas, '+stats.notes+' notas'+(stats.auto&&stats.auto.length?' · '+stats.auto.length+' función(es) de la demo convertidas en plugins editables ('+stats.auto.map(a=>a.name).join(', ')+')':'')+(stats.autoFailed&&stats.autoFailed.length?' · se quedan como audio: '+stats.autoFailed.map(a=>a.name+' ('+a.reason+')').join('; '):'')+(stats.clips?(' y '+stats.clips+' clips horneados'+(stats.clipsTotal>stats.clips?' (de '+stats.clipsTotal+': los idénticos se guardan una sola vez)':'')+(stats.helpers&&stats.helpers.length?'. Salen de funciones de la demo: '+stats.helpers.slice(0,6).map(h=>h.name+' ×'+h.calls).join(', '):' (add() en línea que no se puede parametrizar)')):'')+'. Guarda el proyecto si quieres conservarlo.','ok'); }
@@ -2751,9 +2808,10 @@ function renderLib(){
     el('button',{class:'sm',text:'▶ Original',onclick:()=>playDemo(d)}),el('button',{class:'sm pri',text:'✎ Convertir en editable',onclick:()=>convertDemo(d)}),el('button',{class:'sm',text:'⬇ WAV',onclick:()=>demoWav(d)}),
     el('button',{class:'sm danger',text:'✕',onclick:()=>{ demos.splice(demos.indexOf(d),1); renderLib(); }})));
   const pl=$('plgList'); pl.innerHTML=''; if(!USER_PLUGINS.length) pl.append(el('div',{class:'hint',text:'Ninguno todavía.'}));
-  for(const u of USER_PLUGINS) pl.append(el('div',{class:'item'},el('div',{class:'nm'},el('b',{text:u.name}),el('small',{text:u.id})),
+  for(const u of USER_PLUGINS) pl.append(el('div',{class:'item'},el('div',{class:'nm'},el('b',{text:u.name}),el('small',{text:u.id+' · v'+verStr(codeVersion(u.code))+(u.temp?' · temporal'+(u.from?' (de «'+u.from+'»)':'')+(u.shadow?', tapa a la v'+verStr(codeVersion(u.shadow.code))+' instalada':''):'')})),
+    u.temp?el('button',{class:'sm',text:'Instalar',onclick:()=>{ try{ installPlugin(u.code); populateAddInst(); renderLib(); toast('Plugin «'+u.name+'» instalado','ok'); }catch(e){ toast('No pude instalarlo: '+e.message,'err'); } }}):null,
     el('button',{class:'sm',text:'Editar',onclick:()=>openPlugin(u.code)}),el('button',{class:'sm',text:'＋ Pista',onclick:()=>{ addTrack(u.id); closeModal('libModal'); }}),
-    el('button',{class:'sm danger',text:'Quitar',onclick:()=>{ removePlugin(u.id); delete INSTRUMENTS[u.id]; const i=INST_ORDER.indexOf(u.id); if(i>=0) INST_ORDER.splice(i,1); populateAddInst(); renderLib(); }})));
+    u.temp?null:el('button',{class:'sm danger',text:'Quitar',onclick:()=>{ removePlugin(u.id); delete INSTRUMENTS[u.id]; const i=INST_ORDER.indexOf(u.id); if(i>=0) INST_ORDER.splice(i,1); populateAddInst(); renderLib(); }})));
   syncKitChar(); $('kitInfo').textContent='Kit en uso: '+kitName+'. Puedes soltar un demo_kit.js propio (con funciones nuevas) para reemplazar el incluido: los plugins podrán usar sus funciones desde K. Se recuerda en este navegador hasta que pulses «Volver al kit incluido». Cómo escribir uno: README → «Extender el kit».'; $('kitReset').hidden=kitName==='incluido';
 }
 const openModal=id=>{ const was=$(id).classList.contains('show'); $(id).classList.add('show'); if(!was&&id==='libModal'&&typeof renderRepo==='function') renderRepo(false); }, closeModal=id=>$(id).classList.remove('show');
@@ -3036,13 +3094,13 @@ async function genRepoSync(){          // géneros sueltos en genres/ del reposi
   }catch(e){}
 }
 $('bGen').onclick=()=>{ renderGenre(); openModal('genModal'); genRepoSync(); };
-$('bNew').onclick=()=>{ if(P.tracks.some(t=>t.notes.length)&&!confirm('¿Empezar un proyecto vacío? Se pierde lo no guardado.')) return; loadProject(newProject('Sin título',120,8)); };
+$('bNew').onclick=()=>{ if(P.tracks.some(t=>t.notes.length)&&!confirm('¿Empezar un proyecto vacío? Se pierde lo no guardado.')) return; restoreTemps(); loadProject(newProject('Sin título',120,8)); };
 $('bMidiOut').onclick=async()=>{ const sc=await exportScope(); if(!sc) return; try{ download(new Blob([projectToMidi(scopeProj(sc))],{type:'audio/midi'}),(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'.mid'); toast('MIDI exportado (el sonido no viaja: solo notas, tempo, compás, volumen y pan)','ok'); }catch(e){ console.error(e); toast('No pude exportar MIDI: '+e.message,'err'); } };
-$('bSave').onclick=()=>{ try{ const nm=(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'.demokit.json'; download(new Blob([JSON.stringify(projectToJSON(P))],{type:'application/json'}),nm); toast('Proyecto guardado: «'+nm+'»','ok'); }catch(e){ toast('No pude guardar: '+e.message,'err'); } };
+$('bSave').onclick=()=>{ try{ const nm=(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'.demokit.json'; download(new Blob([JSON.stringify(projectToJSON(P))],{type:'application/json'}),nm); toast('Proyecto guardado: «'+nm+'»','ok'); remindTemps(); }catch(e){ toast('No pude guardar: '+e.message,'err'); } };
 $('bOpen').onclick=()=>$('fileIn').click(); $('bPick').onclick=()=>$('fileIn').click();
 $('fileIn').onchange=async e=>{ await handleFiles([...e.target.files]); e.target.value=''; };
 $('bLib').onclick=()=>{ renderLib(); openModal('libModal'); };
-$('bExample').onclick=()=>{ loadProject(starterProject()); closeModal('libModal'); };
+$('bExample').onclick=()=>{ restoreTemps(); loadProject(starterProject()); closeModal('libModal'); };
 $('bNewPlg').onclick=()=>openPlugin();
 $('bWav').onclick=async()=>{ const sc=await exportScope(); if(!sc) return; let L,R;
   if(sc.mode==='grow'){ if(rendering) return; rendering=true; stop(); $('stat').textContent='Renderizando…'; $('stat').className=''; try{ const o=await renderProject(scopeProj(sc),prog); L=o.L; R=o.R; }catch(e){ console.error(e); toast('Error al renderizar: '+e.message,'err'); return; } finally{ prog(0); rendering=false; updateStat(); } }
@@ -3077,9 +3135,9 @@ if (fsBtn) {
 
 // ───────────── arranque ─────────────
 (function init(){
-  try{ const raw=localStorage.getItem('demokit-studio-plugins'); if(raw){ for(const u of JSON.parse(raw)){ try{ const def=evalPlugin(u.code); registerInstrument(def,{user:true}); USER_PLUGINS.push({id:def.id,name:def.name,code:u.code}); }catch(e){ console.warn('plugin',u.id,e); } } } }catch(e){}
+  try{ const raw=localStorage.getItem('demokit-studio-plugins'); if(raw){ for(const u of JSON.parse(raw)){ try{ const def=evalPlugin(u.code); registerInstrument(def,{user:true}); USER_PLUGINS.push({id:def.id,name:def.name,code:u.code,version:verStr(codeVersion(u.code))}); }catch(e){ console.warn('plugin',u.id,e); } } } }catch(e){}
   restoreKit(); populateAddInst(); for(const [a,b] of SIGS){ $('sig').append(el('option',{value:a+'/'+b,text:a+'/'+b})); $('sSel').append(el('option',{value:a+'/'+b,text:a+'/'+b})); } $('sSel').value='3/4';
-  try{ const raw=localStorage.getItem('demokit-studio-autosave'); if(raw){ const o=JSON.parse(raw); if(o&&o.format==='demokit-studio'&&o.tracks&&o.tracks.length){ P=projectFromJSON(o); toast('Sesión anterior restaurada. «Nuevo» o «Cargar proyecto de ejemplo» en Demos y plugins para empezar de cero.'); } } }catch(e){ console.warn('autosave',e); }
+  try{ const raw=localStorage.getItem('demokit-studio-autosave'); if(raw){ const o=JSON.parse(raw); if(o&&o.format==='demokit-studio'&&o.tracks&&o.tracks.length){ const pm={}; for(const u of o.plugins||[]){ const c=installedOf(u.id); pm[u.id]=c&&c.code===u.code?'installed':'temp'; } P=projectFromJSON(o,{pluginMode:pm}); toast('Sesión anterior restaurada. «Nuevo» o «Cargar proyecto de ejemplo» en Demos y plugins para empezar de cero.'); } } }catch(e){ console.warn('autosave',e); }
   $('pname').value=P.name; $('bpm').value=P.bpm; $('bars').value=P.bars; $('sig').value=sigStr(); setMode('draw');
   renderTracks(); renderInspector(); renderLib(); layoutSpacer(); centerTrack(); updateStat(); invalidate(); histReset();
   $('bUndo').onclick=undo; $('bRedo').onclick=redo;
