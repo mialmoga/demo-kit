@@ -34,13 +34,18 @@ registerInstrument((() => {
 
   /* ---------- patrones de mano derecha: [pulso dentro del acorde, golpe, fuerza] ----------
      D rasgueo hacia abajo · U hacia arriba (solo las cuerdas agudas) · C golpe corto de acorde (4 cuerdas agudas) ·
-     B bajo (raíz) · B5 bajo (quinta) · A0…A5 una sola cuerda (arpegio) */
+     B bajo (raíz) · B5 bajo (quinta) · A0…A5 una sola cuerda (arpegio) ·
+   S golpe seco de 4 cuerdas en el registro de la mano (raíz, quinta, séptima, tercera; raíz entre si2 y la3) · Bs bajo corto (≈ 0.85 pulsos) */
   const PAT = {
     abajo:     { per: 4, ev: [[0, 'D', 1], [1, 'D', .8], [2, 'D', .9], [3, 'D', .8]] },
     balada:    { per: 4, ev: [[0, 'D', 1], [1, 'D', .75], [1.5, 'U', .6], [2.5, 'U', .65], [3, 'D', .8], [3.5, 'U', .6]] },
     idavuelta: { per: 4, ev: [[0, 'D', 1], [.5, 'U', .55], [1, 'D', .8], [1.5, 'U', .55], [2, 'D', .9], [2.5, 'U', .55], [3, 'D', .8], [3.5, 'U', .55]] },
     arpegio:   { per: 4, ev: [[0, 'A0', 1], [.5, 'A2', .7], [1, 'A3', .75], [1.5, 'A4', .7], [2, 'A1', .85], [2.5, 'A3', .7], [3, 'A4', .75], [3.5, 'A2', .65]] },
     bossa:     { per: 4, ev: [[0, 'B', 1], [1.5, 'C', .7], [2, 'B5', .85], [3, 'C', .7], [3.5, 'C', .6]] },
+    // clave de bossa de 2 compases, medida en GuitarSet (guitarristas 03 y 04): acordes en 1, 2, 3y, 4y | 1y, 3, 4 y el bajo (raíz) entre ellos.
+    // glob: la fase del patrón corre desde el inicio del pasaje (no se reinicia en cada acorde), así el compás B cae donde debe.
+    bossaclave: { per: 8, glob: true, ev: [[0, 'S', .8], [1, 'S', .8], [1.5, 'Bs', .85], [2, 'Bs', .85], [2.5, 'S', .9], [3.5, 'S', .8],
+                                            [4.5, 'S', .8], [5.5, 'Bs', .85], [6, 'S', .8], [7, 'S', .8], [7.5, 'Bs', .8]] },
     ranchera:  { per: 4, ev: [[0, 'B', 1], [1, 'C', .85], [2, 'B5', .9], [3, 'C', .85]] },
     vals:      { per: 3, ev: [[0, 'B', 1], [1, 'C', .8], [2, 'C', .75]] },
     flamenco:  { per: 4, ev: [[0, 'D', 1], [.75, 'U', .6], [1, 'D', .9], [1.5, 'U', .6], [2, 'D', 1], [2.5, 'D', .8], [2.75, 'U', .55], [3, 'D', .9], [3.5, 'U', .6]] }
@@ -54,6 +59,7 @@ registerInstrument((() => {
     infante:  { delay: .028,  s: .44, t60: 3.0, pos: .30, exLP: .80, click: .04, lp: 4200, sat: 0,  timing: .008, vel: .10 },
     flamenco: { delay: .0065, s: .20, t60: 2.2, pos: .12, exLP: .15, click: .55, lp: 9000, sat: .3, timing: .003, vel: .12 },
     bossa:    { delay: .016,  s: .38, t60: 2.6, pos: .24, exLP: .60, click: .12, lp: 5200, sat: 0,  timing: .006, vel: .08 },
+    bossa2:   { delay: .004,  s: .38, t60: 2.6, pos: .24, exLP: .60, click: .12, lp: 1300, sat: 0,  timing: .006, vel: .08, tc: .03, late: .018, lowb: 3.2, sring: .8, ssus: .5 },   // como bossa, pero con el rasgueo casi en bloque (≈ 4 ms entre cuerdas) y el color de la grabación: tope de agudos bajo (lp), graves de la caja más fuertes (lowb) y golpes que se apagan suave (sring, ssus); ajustado contra el micrófono del guitarrista 03 de GuitarSet (bandas de energía y caída del golpe)
     ranchera: { delay: .011,  s: .30, t60: 2.3, pos: .16, exLP: .35, click: .30, lp: 7000, sat: .1, timing: .005, vel: .10 },
     lofi:     { delay: .020,  s: .48, t60: 1.8, pos: .35, exLP: .90, click: .02, lp: 2600, sat: .12, timing: .010, vel: .12 }
   };
@@ -99,10 +105,10 @@ registerInstrument((() => {
     desc: 'Una nota larga = un pasaje: la guitarra acompaña ese tiempo con un círculo de acordes y un patrón de rasgueo, tocado por un intérprete (Pedro Infante, Flamenco, Bossa, Ranchera, Lo-fi). La altura de la nota elige la tónica; el largo, cuánto acompaña.',
     params: [
       { k: 'gain', label: 'Ganancia', min: 0, max: 1.5, step: .01, def: .5 },
-      choice('interprete', 'Intérprete', ['Pedro Infante (caricia)', 'Flamenco (aporreado)', 'Bossa (suave)', 'Ranchera (con uña)', 'Lo-fi (apagada)'], ['infante', 'flamenco', 'bossa', 'ranchera', 'lofi'], 'infante'),
+      choice('interprete', 'Intérprete', ['Pedro Infante (caricia)', 'Flamenco (aporreado)', 'Bossa (suave)', 'Ranchera (con uña)', 'Lo-fi (apagada)', 'Bossa (de disco, en bloque)'], ['infante', 'flamenco', 'bossa', 'ranchera', 'lofi', 'bossa2'], 'infante'),
       choice('circulo', 'Círculo de acordes', ['Lo-fi romántico (I–vi–ii–V)', 'Jazz 2-5-1', 'Bossa (I–#i°–ii–V)', 'Andaluza (i–VII–VI–V)', 'Menor (i–VI–III–VII)', 'Pop (I–V–vi–IV)', 'Ranchera (I–IV–V–I)', 'Círculo de quintas'], ['lofi', 'jazz', 'bossa', 'andaluza', 'menor', 'pop', 'ranchera', 'quintas'], 'lofi'),
       choice('ext', 'Acordes', ['Tríadas', 'Séptimas', 'Novenas'], [0, 1, 2], 1),
-      choice('patron', 'Patrón de la mano derecha', ['Abajo (negras)', 'Balada', 'Ida y vuelta', 'Arpegio', 'Bossa', 'Ranchera', 'Vals (3 pulsos)', 'Flamenco'], ['abajo', 'balada', 'idavuelta', 'arpegio', 'bossa', 'ranchera', 'vals', 'flamenco'], 'balada'),
+      choice('patron', 'Patrón de la mano derecha', ['Abajo (negras)', 'Balada', 'Ida y vuelta', 'Arpegio', 'Bossa', 'Ranchera', 'Vals (3 pulsos)', 'Flamenco', 'Bossa (clave de 2 compases)'], ['abajo', 'balada', 'idavuelta', 'arpegio', 'bossa', 'ranchera', 'vals', 'flamenco', 'bossaclave'], 'balada'),
       { k: 'pulsos', label: 'Pulsos por acorde', min: 1, max: 16, step: 1, def: 4 },
       { k: 'cuerdas', label: 'Cuerdas', min: 4, max: 6, step: 1, def: 6 },
       { k: 'humaniza', label: 'Humanización', min: 0, max: 1, step: .05, def: .5 },
@@ -114,7 +120,8 @@ registerInstrument((() => {
     presets: {
       'Pedro Infante': { interprete: 'infante', circulo: 'pop', ext: 1, patron: 'arpegio', pulsos: 4, humaniza: .55, velo: 1, brillo: 1, cuerpo: .65 },
       'Flamenco': { interprete: 'flamenco', circulo: 'andaluza', ext: 0, patron: 'flamenco', pulsos: 4, humaniza: .4, velo: 1, brillo: 1.1, cuerpo: .55 },
-      'Bossa nova': { interprete: 'bossa', circulo: 'bossa', ext: 2, patron: 'bossa', pulsos: 4, humaniza: .45, velo: 1, brillo: .9, cuerpo: .6 },
+      'Bossa nova': { interprete: 'bossa2', circulo: 'bossa', ext: 2, patron: 'bossaclave', pulsos: 4, humaniza: .45, velo: 1, brillo: 1, cuerpo: 1 },
+      'Bossa suave (antigua)': { interprete: 'bossa', circulo: 'bossa', ext: 2, patron: 'bossa', pulsos: 4, humaniza: .45, velo: 1, brillo: .9, cuerpo: .6 },
       'Ranchera': { interprete: 'ranchera', circulo: 'ranchera', ext: 0, patron: 'ranchera', pulsos: 4, humaniza: .5, velo: 1, brillo: 1, cuerpo: .6 },
       'Lo-fi nocturno': { interprete: 'lofi', circulo: 'lofi', ext: 2, patron: 'balada', pulsos: 4, humaniza: .7, velo: .9, brillo: .8, cuerpo: .7 }
     },
@@ -126,17 +133,22 @@ registerInstrument((() => {
       let ci = 0;
       for (let cs = 0; cs < n.len - 1e-6; cs += chordLen, ci++) {
         const ce = Math.min(n.len, cs + chordLen), last = ce >= n.len - 1e-6, ch = prog[ci % prog.length], notes = voicing(tonic, ch[0], ch[1], ext, ns), rel = last ? .9 : .05;
-        const hit = (idx, t, vol, ringMax, boost) => {         // una cuerda en el tiempo t (dentro del pasaje)
+        const hit = (idx, t, vol, ringMax, boost, shift, susx) => {         // una cuerda en el tiempo t (dentro del pasaje)
           const tt = t, ring = Math.floor(Math.min(ce - t + rel, ringMax) * sr); if (ring < 16 || tt < 0) return;
-          pluck(K, acc, Math.round(tt * sr), notes[idx], vol * (1 - .03 * idx) * (1 + hum * pf.vel * r()), ring, pf, sus, sr, boost);
+          pluck(K, acc, Math.round(tt * sr), notes[idx] + (shift || 0), vol * (1 - .03 * idx) * (1 + hum * pf.vel * r()), ring, pf, sus * (susx || 1), sr, boost);
         };
-        for (let rep = 0; cs + rep * pat.per * beat < ce - 1e-6; rep++) {
+        const gl = !!pat.glob, rep0 = gl ? Math.floor(cs / (pat.per * beat) + 1e-9) : 0;
+        for (let rep = rep0; (gl ? 0 : cs) + rep * pat.per * beat < ce - 1e-6; rep++) {
           for (const [pos, kind, fz] of pat.ev) {
-            const t0 = cs + (rep * pat.per + pos) * beat + hum * pf.timing * r(); if (t0 >= ce - 1e-6 || t0 < 0) continue;
+            const tn = (gl ? 0 : cs) + (rep * pat.per + pos) * beat; if (gl && tn < cs - 1e-6) continue;
+            // tc: desvío centrado (± tc·humaniza s) y un poco detrás del pulso (late·humaniza s), como los guitarristas de GuitarSet; sin tc, el de siempre (0 … timing·humaniza)
+            const t0 = tn + (pf.tc ? hum * (pf.late + pf.tc * (2 * r() - 1)) : hum * pf.timing * r()); if (t0 >= ce - 1e-6 || t0 < 0) continue;
             const d = pf.delay * speed * (1 + hum * .25 * r());
             if (kind === 'D') { for (let i = 0; i < ns; i++) hit(i, t0 + i * d, fz, 8, fz); }
             else if (kind === 'U') { const m = Math.ceil(ns * .65); for (let j = 0; j < m; j++) hit(ns - 1 - j, t0 + j * d * .85, fz * .72, 6, fz * .7); }
             else if (kind === 'C') { const m = Math.min(4, ns); for (let j = 0; j < m; j++) hit(ns - m + j, t0 + j * d, fz * .85, .24, fz); }
+            else if (kind === 'S') { const m = Math.min(4, notes.length), sh = 47 + (((notes[0] - 47) % 12) + 12) % 12 - notes[0]; for (let j = 0; j < m; j++) hit(j, t0 + j * d, fz * .85, beat * (pf.sring || .5), fz, sh, pf.ssus); }
+            else if (kind === 'Bs') hit(0, t0, fz, beat * .85, fz * .6);
             else if (kind === 'B') hit(0, t0, fz, 8, fz * .6);
             else if (kind === 'B5') hit(Math.min(1, ns - 1), t0, fz, 8, fz * .6);
             else if (kind[0] === 'A') hit(Math.min(+kind[1], ns - 1), t0, fz, 8, fz);
@@ -144,7 +156,7 @@ registerInstrument((() => {
         }
       }
       // caja de resonancia (aire ~100 Hz, tapa ~200 Hz, madera ~400 Hz, presencia ~2.4 kHz), tope de agudos y madera al límite
-      const body = clamp(p.cuerpo == null ? .6 : p.cuerpo, 0, 1), R = [[98, 5, .55], [205, 4, .45], [395, 3, .22], [2400, 1.2, .12]].map(([fc, Q, g]) => ({ q: bpf(fc, Q, sr), g: g * body }));
+      const body = clamp(p.cuerpo == null ? .6 : p.cuerpo, 0, 1), R = [[98, 5, .55], [205, 4, .45], [395, 3, .22], [2400, 1.2, .12]].map(([fc, Q, g], k) => ({ q: bpf(fc, Q, sr), g: g * body * (k < 2 ? (pf.lowb || 1) : 1) }));
       const lpc = 1 - Math.exp(-TWO_PI * clamp(pf.lp * (p.brillo || 1), 800, sr * .45) / sr); let ylp = 0; const sat = pf.sat;
       for (let i = 0; i < total; i++) {
         const x = acc[i]; let y = x; for (const b of R) y += runBq(b.q, x) * b.g;
