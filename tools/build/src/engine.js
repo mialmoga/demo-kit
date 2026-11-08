@@ -203,6 +203,66 @@ function meter(P){
   mmCache.set(P,{key,mm}); return mm;
 }
 const SIGS=[[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[3,8],[5,8],[6,8],[7,8],[9,8],[12,8]];
+// ── progresión de acordes del proyecto: P.prog = {text}. Texto tipo «Am7 | Dm7 G7 | Cmaj7 %»; «|» separa compases, varios acordes en un compás lo reparten por igual,
+// «%» solo en un compás (o un compás vacío) repite el compás anterior; «%» o «.» junto a otros acordes sostienen el anterior. La progresión se repite si el proyecto es más largo.
+// Lo leen los instrumentos con progAt(P,beat) y el botón «Generar pista de acordes»; los proyectos sin P.prog no cambian en nada.
+const PC_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'], PC_FLAT=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const PC_OF={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+function parseChord(sym){
+  let m=/^([A-G])([#b♯♭]?)(.*?)(?:\/([A-G])([#b♯♭]?))?$/.exec(String(sym).trim()); if(!m) return null;
+  const acc=a=>a==='#'||a==='♯'?1:a==='b'||a==='♭'?-1:0, root=((PC_OF[m[1]]+acc(m[2]))%12+12)%12, bass=m[4]?((PC_OF[m[4]]+acc(m[5]))%12+12)%12:null;
+  let rest=m[3].replace(/[()\s,]/g,''), third=4, fifth=7, seventh=null, sixth=false, ext=[], adds=[], maj=false, dim=false, power=false, alt=false;
+  const T=[ // [regex, acción]; el orden importa (los más largos primero)
+    [/^(maj|Maj|MAJ|Δ|∆|M)(?=\d)/,()=>{ maj=true; }], [/^(maj|Maj|MAJ|Δ|∆)/,()=>{}],
+    [/^(min|mi|m|-)/,()=>{ third=3; }], [/^(dim|°|o)/,()=>{ third=3; fifth=6; dim=true; }], [/^(ø|half)/,()=>{ third=3; fifth=6; seventh=10; }],
+    [/^(aug|\+)/,()=>{ fifth=8; }], [/^sus(2|4)?/,(x)=>{ third=x[1]==='2'?2:5; }], [/^add(2|4|6|9|11|13)/,(x)=>{ adds.push({2:2,4:5,6:9,9:14,11:17,13:21}[x[1]]); }],
+    [/^(b5|♭5|-5)/,()=>{ fifth=6; }], [/^(#5|♯5|\+5)/,()=>{ fifth=8; }], [/^(b9|♭9)/,()=>{ ext.push(13); }], [/^(#9|♯9)/,()=>{ ext.push(15); }],
+    [/^(#11|♯11)/,()=>{ ext.push(18); }], [/^(b13|♭13)/,()=>{ ext.push(20); }], [/^alt/,()=>{ alt=true; }],
+    [/^69/,()=>{ sixth=true; ext.push(14); }], [/^6/,()=>{ sixth=true; }],
+    [/^(13|11|9|7)/,(x)=>{ const n=+x[1]; seventh=maj?11:dim&&n===7?9:10; if(n>=9) ext.push(14); if(n===11) ext.push(17); if(n===13) ext.push(21); }],
+    [/^5/,()=>{ power=true; }] ];
+  while(rest){ let ok=false; for(const [re,fn] of T){ const x=re.exec(rest); if(x){ fn(x); rest=rest.slice(x[0].length); ok=true; break; } } if(!ok) return null; }
+  if(alt){ seventh=10; ext.push(13,15); fifth=6; }
+  const ivs=new Set([0]); if(!power) ivs.add(third); ivs.add(fifth); if(seventh!=null) ivs.add(seventh); if(sixth) ivs.add(9); for(const e of ext) ivs.add(e); for(const a of adds) ivs.add(a);
+  const arr=[...ivs].sort((a,b)=>a-b); return {sym:String(sym).trim(),root,bass,ivs:arr,pcs:[...new Set(arr.map(i=>(root+i)%12))]};
+}
+const progCache=new WeakMap();
+function progChords(P){
+  const text=(P.prog&&P.prog.text)||''; const mm=meter(P), key=text+'|'+P.bars+'|'+(P.sig||'')+'|'+JSON.stringify(sigPts(P)), c=progCache.get(P); if(c&&c.key===key) return c.res;
+  const res={chords:[],errors:[],cycleBars:0}; progCache.set(P,{key,res});
+  const bars=text.split('|').map(x=>x.trim()); while(bars.length&&bars[bars.length-1]==='') bars.pop();       // un «|» final no añade un compás vacío
+  if(bars[0]==='') bars.shift();                                                                              // ni uno inicial
+  if(!bars.length) return res;
+  const slots=[]; let prev=null;   // por compás: lista de {sym,ch|null}
+  bars.forEach((b,bi)=>{
+    if(b===''||b==='%'){ slots.push(prev?prev.map(x=>Object.assign({},x)):[]); return; }
+    const toks=b.split(/\s+/).filter(Boolean), row=[]; let last=null;
+    for(const tk of toks){ if(tk==='.'||tk==='_'||tk==='%'){ row.push({hold:true}); continue; }
+      const ch=parseChord(tk); if(!ch) res.errors.push({bar:bi+1,tok:tk,msg:'no entiendo «'+tk+'» (compás '+(bi+1)+')'}); row.push({sym:tk,ch:ch}); }
+    slots.push(row); prev=row; });
+  const n=slots.length; res.cycleBars=n;
+  let cur=null;
+  for(let bar=0;bar<P.bars;bar++){ const row=slots[bar%n], cyc=Math.floor(bar/n), b0=mm.beatOfBar(bar), len=mm.lenAt(bar), k=row.length; if(!k) continue;
+    row.forEach((x,i)=>{ const t0=b0+len*i/k, t1=b0+len*(i+1)/k;
+      if(x.hold){ if(cur) cur.b1=t1; return; }
+      const e={b0:t0,b1:t1,bar,cyc,sym:x.sym,ok:!!x.ch}; if(x.ch){ e.root=x.ch.root; e.bass=x.ch.bass; e.ivs=x.ch.ivs; e.pcs=x.ch.pcs; }
+      res.chords.push(e); cur=e; }); }
+  return res;
+}
+function progAt(P,beat){ let r=null; for(const c of progChords(P).chords){ if(c.b0<=beat+1e-9) r=c; else break; } return r&&r.ok?r:null; }   // acorde que suena en ese pulso (null si no hay o no se entendió)
+// Acordes cerrados con la conducción de voces más suave: de cada acorde elige la inversión y octava cuyo centro queda más cerca del acorde anterior (el primero, cerca de do central).
+// Con más de 4 notas quita primero la quinta y luego la oncena, para que 9/11/13 no queden empastados. Devuelve {chords:[{b,l,ms:[midi…]}], bass:[{b,l,m}]}.
+function progToNotes(P,opts){
+  const L=progChords(P).chords.filter(c=>c.ok), o=Object.assign({center:62,gap:.02},opts||{}), out={chords:[],bass:[]}; let prev=o.center;
+  for(const c of L){
+    let iv=c.ivs.slice(); if(iv.length>4){ const k=iv.findIndex(x=>x===7||x===6||x===8); if(k>0&&iv.length>4) iv.splice(k,1); } if(iv.length>5){ const k=iv.indexOf(17); if(k>0) iv.splice(k,1); }
+    const cands=[]; for(let r=0;r<iv.length;r++){ const v=iv.map((x,i)=>c.root+x+(i<r?12:0)).sort((a,b)=>a-b); const mean=v.reduce((a,b)=>a+b,0)/v.length, sh=Math.round((prev-mean)/12)*12; const ms=v.map(m=>m+sh); const mn=ms.reduce((a,b)=>a+b,0)/ms.length; cands.push({ms,d:Math.abs(mn-prev)}); }
+    cands.sort((a,b)=>a.d-b.d); let ms=cands[0].ms; while(Math.min(...ms)<48) ms=ms.map(m=>m+12); while(Math.max(...ms)>84) ms=ms.map(m=>m-12);
+    prev=ms.reduce((a,b)=>a+b,0)/ms.length; const len=Math.max(.05,c.b1-c.b0-o.gap);
+    out.chords.push({b:r6(c.b0),l:r6(len),ms});
+    const bp=c.bass!=null?c.bass:c.root; out.bass.push({b:r6(c.b0),l:r6(len),m:36+(((bp-36)%12)+12)%12}); }
+  return out;
+}
 function newProject(name,bpm,bars){return {name:name||'Sin título',bpm:bpm||120,bars:bars||8,sig:[4,4],seed:KIT_SEED,sc:{mode:'param',depth:.7,rel:.12,table:null,rate:800},master:Object.assign({},MASTER_DEF),tracks:[],clips:{}};}
 function newTrack(instId,name){
   const inst=INSTRUMENTS[instId];
@@ -260,7 +320,16 @@ function tmap(P){
 function noteArgs(K,P,tr,nt,beat,t0,nb){
   const p=nt.o?Object.assign({},tr.params,nt.o):tr.params, tm=t0!=null?null:tmap(P), vb=!!tm&&!tm.constant, bpmN=vb?tm.bpmAt(nt.b):P.bpm, bt=vb?60/bpmN:beat;
   return {t:t0!=null?t0:(vb?tm.sec(nt.b):nt.b*beat),len:Math.max(.01,vb?tm.span(nt.b,nt.l||.25):(nt.l||.25)*beat),midi:nt.m,hz:K.hz(nt.m),lane:nt.m,a:(nt.v==null?1:nt.v)*(tr.vol==null?1:tr.vol),
-    pan:clamp((tr.pan||0)+(nt.pan||0),-1,1),p,buf:tr.ducked?K.mu:K.dr,sr:SR,bpm:bpmN,beat:bt,bar:bt*meter(P).lenAt(nt.b),note:nt,clips:P.clips,link:nb&&!(t0!=null)?linkOf(P,nt,nb):null};
+    pan:clamp((tr.pan||0)+(nt.pan||0),-1,1),p,buf:tr.ducked?K.mu:K.dr,sr:SR,bpm:bpmN,beat:bt,bar:bt*meter(P).lenAt(nt.b),note:nt,clips:P.clips,link:nb&&!(t0!=null)?linkOf(P,nt,nb):null,chords:chordsFor(P,nt,tm,vb,beat)};
+}
+// acordes de la progresión del proyecto que caen dentro de la nota, con inicio y fin en segundos RELATIVOS al inicio de la nota (el primero empieza en 0 aunque el acorde venga de antes).
+// null si el proyecto no tiene progresión: los instrumentos que no la usan ni lo notan.
+function chordsFor(P,nt,tm,vb,beat){
+  if(!P.prog||!P.prog.text) return null; const L=progChords(P).chords; if(!L.length) return null;
+  const b0=nt.b||0, b1=b0+(nt.l||.25), sec=vb?(b=>tm.sec(b)):(b=>b*beat), s0=sec(b0), len=sec(b1)-s0, out=[];
+  for(const c of L){ if(c.b1<=b0+1e-9) continue; if(c.b0>=b1-1e-9) break; if(!c.ok) continue;
+    out.push({t0:Math.max(0,sec(c.b0)-s0),t1:Math.min(len,sec(c.b1)-s0),sym:c.sym,root:c.root,bass:c.bass,ivs:c.ivs,pcs:c.pcs}); }
+  return out.length?out:null;
 }
 // vecinas de una nota (para instrumentos que enlazan notas, como la voz): holgura en segundos hasta el final de la anterior / el inicio de la siguiente (≤0 = se tocan o se pisan) y su nota MIDI
 function linkOf(P,nt,nb){ const tm=tmap(P), beat=60/P.bpm, sec=b=>tm.constant?b*beat:tm.sec(b), r={prevGap:null,prevMidi:null,nextGap:null,nextMidi:null}, s0=sec(nt.b), e0=sec(nt.b+(nt.l||.25));
@@ -404,7 +473,9 @@ const stemBytes=c=>c.stems.reduce((a,st)=>a+st.q[0].length*4,0)+(c.fxStems?c.fxS
 function stemMemory(){ let m=0; for(const c of stemCache.values()) m+=stemBytes(c); return m; }
 function trimStems(keep){ let m=stemMemory(); if(m<=STEM_BUDGET) return; for(const [id,c] of stemCache){ if(keep.has(id)) continue; m-=stemBytes(c); stemCache.delete(id); if(m<=STEM_BUDGET) break; } }
 function bumpKit(){ KIT_REV++; stemCache.clear(); }
-function trackKey(P,tr,total){ const inst=INSTRUMENTS[tr.inst]; return hash2(JSON.stringify([tr.inst,inst?inst.rev:0,KIT_REV,tr.params,tr.pan,tr.ducked?1:0,P.bpm,tempoPts(P),P.seed,total,tr.notes,(l=>l.length?[tr.alv===16?16:8,l.map(x=>[x.k,x.pts])]:0)(paramLanes(tr,inst))])); }
+function trackKey(P,tr,total){ const inst=INSTRUMENTS[tr.inst], k=[tr.inst,inst?inst.rev:0,KIT_REV,tr.params,tr.pan,tr.ducked?1:0,P.bpm,tempoPts(P),P.seed,total,tr.notes,(l=>l.length?[tr.alv===16?16:8,l.map(x=>[x.k,x.pts])]:0)(paramLanes(tr,inst))];
+  if(inst&&inst.usesProg) k.push([(P.prog&&P.prog.text)||'',P.sig||0,sigPts(P),P.bars]);   // solo los instrumentos que leen la progresión se re-renderizan al editarla
+  return hash2(JSON.stringify(k)); }
 const trackSeed=(P,tr)=>(((P.seed||KIT_SEED)^parseInt(hash2(String(tr.id)).split('-')[0],36))>>>0)||1;
 function extractStems(K){
   const out=[];
@@ -529,7 +600,7 @@ function compactTrack(t){
 function expandTrack(t){ if(!Array.isArray(t.n)) return t; t.notes=t.n.map(a=>{ if(!Array.isArray(a)) return a; const n={b:a[0],l:a[1],m:a[2],v:a[3]==null?1:a[3]}; if(a[4]) n.pan=a[4]; if(a[5]) n.o=a[5]; if(a[6]) n.w=a[6]; return n; }); delete t.n; return t; }
 function projectToJSON(P,opts){
   const compact=!!(opts&&opts.compact);
-  const o={format:'demokit-studio',v:compact?2:1,kit:KIT_FORMAT,name:P.name,bpm:P.bpm,bars:P.bars,tempo:(P.tempo&&P.tempo.length)?P.tempo:undefined,sig:barBeats(P)===4&&(!P.sig||P.sig[1]===4)?undefined:P.sig,sigs:sigPts(P).length?sigPts(P):undefined,marks:markPts(P).length?markPts(P):undefined,genre:P.genre||undefined,engine:kitInfo()||P.engine||undefined,seed:P.seed,sc:{mode:P.sc.mode,depth:P.sc.depth,rel:P.sc.rel,rate:P.sc.rate},master:masterOf(P),key:P.key||undefined,tracks:compact?P.tracks.map(compactTrack):P.tracks,clips:{},plugins:[]};
+  const o={format:'demokit-studio',v:compact?2:1,kit:KIT_FORMAT,name:P.name,bpm:P.bpm,bars:P.bars,tempo:(P.tempo&&P.tempo.length)?P.tempo:undefined,sig:barBeats(P)===4&&(!P.sig||P.sig[1]===4)?undefined:P.sig,sigs:sigPts(P).length?sigPts(P):undefined,marks:markPts(P).length?markPts(P):undefined,genre:P.genre||undefined,engine:kitInfo()||P.engine||undefined,seed:P.seed,sc:{mode:P.sc.mode,depth:P.sc.depth,rel:P.sc.rel,rate:P.sc.rate},master:masterOf(P),key:P.key||undefined,prog:(P.prog&&P.prog.text&&P.prog.text.trim())?{text:P.prog.text}:undefined,tracks:compact?P.tracks.map(compactTrack):P.tracks,clips:{},plugins:[]};
   if(P.sc.table){ const T=P.sc.table,u=new Uint8Array(T.length); for(let i=0;i<T.length;i++) u[i]=Math.round(clamp(T[i],0,1)*255); o.sc.table=u8ToB64(u); }
   if(typeof pruneBakedClips==='function') pruneBakedClips(P);
   for(const cid in P.clips){ const d=P.clips[cid],q=new Int16Array(d.length); for(let i=0;i<d.length;i++) q[i]=clamp(Math.round(d[i]*16384),-32768,32767); o.clips[cid]=u8ToB64(new Uint8Array(q.buffer)); }
@@ -544,7 +615,7 @@ function projectReport(P){
 // opts.allowPlugins===false: no se ejecuta el código de los plugins incluidos (por defecto sí, para compatibilidad; el estudio pregunta antes)
 function projectFromJSON(o,opts){
   const errs=[], skipped=[], notes=[]; for(const u of o.plugins||[]){ const md=opts&&opts.pluginMode&&opts.pluginMode[u.id]; if(md==='installed') continue; if(md==='skip'||(opts&&opts.allowPlugins===false)){ skipped.push(u.name||u.id); continue; } try{ installPlugin(u.code,md==='temp'?{temp:true,from:o.name}:undefined); if(md==='temp') notes.push('«'+(u.name||u.id)+'» v'+verStr(codeVersion(u.code))+' se cargó como copia temporal: no toca tu plugin instalado.'); }catch(e){ errs.push(u.id+': '+e.message); } }
-  const P=newProject(o.name,o.bpm,o.bars); if(Array.isArray(o.tempo)) P.tempo=tempoPts({bpm:o.bpm,tempo:o.tempo}); if(Array.isArray(o.sig)&&o.sig[0]>0&&o.sig[1]>0) P.sig=[+o.sig[0],+o.sig[1]]; if(Array.isArray(o.sigs)&&o.sigs.length) P.sigs=o.sigs.map(x=>({bar:x.bar,sig:[+x.sig[0],+x.sig[1]]})); if(Array.isArray(o.marks)&&o.marks.length) P.marks=markPts({marks:o.marks}); if(typeof o.genre==='string'&&o.genre) P.genre=o.genre.slice(0,60); if(o.engine&&typeof o.engine.id==='string'){ P.engine={id:o.engine.id.slice(0,40),v:String(o.engine.v||'').slice(0,20)}; if(typeof o.engine.c==='string') P.engine.c=o.engine.c.slice(0,20); } P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key);
+  const P=newProject(o.name,o.bpm,o.bars); if(Array.isArray(o.tempo)) P.tempo=tempoPts({bpm:o.bpm,tempo:o.tempo}); if(Array.isArray(o.sig)&&o.sig[0]>0&&o.sig[1]>0) P.sig=[+o.sig[0],+o.sig[1]]; if(Array.isArray(o.sigs)&&o.sigs.length) P.sigs=o.sigs.map(x=>({bar:x.bar,sig:[+x.sig[0],+x.sig[1]]})); if(Array.isArray(o.marks)&&o.marks.length) P.marks=markPts({marks:o.marks}); if(typeof o.genre==='string'&&o.genre) P.genre=o.genre.slice(0,60); if(o.engine&&typeof o.engine.id==='string'){ P.engine={id:o.engine.id.slice(0,40),v:String(o.engine.v||'').slice(0,20)}; if(typeof o.engine.c==='string') P.engine.c=o.engine.c.slice(0,20); } P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key); if(o.prog&&typeof o.prog.text==='string'&&o.prog.text.trim()) P.prog={text:o.prog.text.slice(0,4000)};
   if(o.sc&&o.sc.table){ const u=b64ToU8(o.sc.table),T=new Float32Array(u.length); for(let i=0;i<u.length;i++) T[i]=u[i]/255; P.sc.table=T; }
   for(const cid in o.clips||{}){ const u=b64ToU8(o.clips[cid]),q=new Int16Array(u.buffer,u.byteOffset,u.length>>1),d=new Float32Array(q.length); for(let i=0;i<q.length;i++) d[i]=q[i]/16384; P.clips[cid]=d; }
   P.tracks=(o.tracks||[]).map(t=>fixTrack(expandTrack(t))); P.loadErrors=errs; P.loadNotes=notes; P.loadWarnings=[]; if(skipped.length) P.loadWarnings.push('Plugins sin ejecutar: '+skipped.join(', ')+'. Las pistas que los usan quedan sin instrumento.'); if(o.kit!=null&&o.kit!==KIT_FORMAT) P.loadWarnings.push('Este proyecto se guardó con la versión '+o.kit+' del kit y esta es la '+KIT_FORMAT+(o.kit>KIT_FORMAT?': puede sonar distinto o faltar instrumentos. Actualiza la librería.':': puede sonar un poco distinto.')); return P;
@@ -571,10 +642,11 @@ function bakeNoteClip(P,tr,nt,lanes){
   const inst=INSTRUMENTS[tr.inst], tm=tmap(P), beatN=60/tm.bpmAt(nt.b), lenB=nt.l||.25, lenSec=Math.max(.01,tm.span(nt.b,lenB)), dur=lenSec+TAIL;
   const KN=Math.max(3,Math.min(16,Math.round(lenSec*6)+2)), an=[];
   for(let i=0;i<KN;i++){ const f=i/(KN-1), o={}; for(const ln of lanes){ if(nt.o&&nt.o[ln.k]!=null) continue; const dd=ln.d, st=dd.step>0?dd.step:.01; o[ln.k]=+(Math.round(clamp(autoValue(ln.pts,nt.b+lenB*f),dd.min,dd.max)/st)*st).toFixed(5); } an.push({s:tm.sec(nt.b+lenB*f)-tm.sec(nt.b),o}); }
-  const cid='bk-'+hash2(JSON.stringify([tr.inst,inst.rev,KIT_REV,tr.params,nt.m,lenSec,nt.v,nt.pan,nt.o,tr.pan,tr.ducked?1:0,beatN,P.seed,trackSeed(P,tr),an.map(x=>[+x.s.toFixed(4),x.o])]));
+  const chs=inst.usesProg?chordsFor(P,nt,tm,true,60/P.bpm):null;   // los acordes que caen en la nota (con su posición real) entran al hash y al render
+  const cid='bk-'+hash2(JSON.stringify([tr.inst,inst.rev,KIT_REV,tr.params,nt.m,lenSec,nt.v,nt.pan,nt.o,tr.pan,tr.ducked?1:0,beatN,P.seed,trackSeed(P,tr),an.map(x=>[+x.s.toFixed(4),x.o])].concat(chs?[chs]:[])));
   if(P.clips[cid]) return {cid,shared:true,bytes:0};
   const t=Object.assign({},tr,{vol:1}), n2=Object.assign({},nt,{b:0,l:lenSec/beatN}), R=[]; let N=Infinity;
-  for(const x of an){ const K=Kit.make(SR,dur,trackSeed(P,tr)); K.sr=SR; inst.play(K,noteArgs(K,P,t,Object.assign({},n2,{o:Object.assign({},nt.o,x.o)}),beatN,0)); const bus=tr.ducked?K.mu:K.dr; R.push(bus); N=Math.min(N,bus[0].length); }
+  for(const x of an){ const K=Kit.make(SR,dur,trackSeed(P,tr)); K.sr=SR; const na=noteArgs(K,P,t,Object.assign({},n2,{o:Object.assign({},nt.o,x.o)}),beatN,0); na.chords=chs; inst.play(K,na); const bus=tr.ducked?K.mu:K.dr; R.push(bus); N=Math.min(N,bus[0].length); }
   const L=new Float32Array(N), Rr=new Float32Array(N); let j=0, end=0;
   for(let i=0;i<N;i++){ const ts=i/SR; while(j<KN-2&&an[j+1].s<=ts) j++; let w=0, A=R[j], B=R[Math.min(j+1,KN-1)];
     if(KN>1&&ts>=an[j].s&&an[j+1]){ const d=an[j+1].s-an[j].s; w=d>0?Math.min(1,(ts-an[j].s)/d):1; }

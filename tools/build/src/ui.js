@@ -719,9 +719,10 @@ const tList=create=>{ if(!P.tempo){ if(!create) return []; P.tempo=[]; } return 
 const tRange=()=>{ const v=[P.bpm,...tList(false).map(p=>p.bpm)], mn=Math.min(...v), mx=Math.max(...v); return {lo:Math.max(20,Math.min(60,Math.floor(mn/10)*10-10)),hi:Math.min(400,Math.max(180,Math.ceil(mx/10)*10+10))}; };
 const tY=(bpm,R)=>TP+(1-(bpm-R.lo)/(R.hi-R.lo))*(TH-2*TP);
 const tBpmAt=(y,R)=>Math.round(clamp(R.lo+(1-(y-TP)/(TH-2*TP))*(R.hi-R.lo),20,400));
-function refreshTempoUI(){ $('tbar').hidden=!tempoShow; $('twrap').hidden=!tempoShow; $('tempoOn').classList.toggle('on',tempoShow||tList(false).length>0||sigPts(P).length>0||(P.marks||[]).length>0);
+function refreshTempoUI(){ $('tbar').hidden=!tempoShow; $('twrap').hidden=!tempoShow; $('tempoOn').classList.toggle('on',tempoShow||tList(false).length>0||sigPts(P).length>0||(P.marks||[]).length>0||!!(P.prog&&P.prog.text));
   const L=tList(false); if(tSel&&tSel!=='init'&&!L.includes(tSel)) tSel=null; if(sS&&sS!=='init'&&!(P.sigs||[]).includes(sS)) sS=null; if(mS&&!(P.marks||[]).includes(mS)) mS=null;
-  $('tabBpm').classList.toggle('on',tMode==='bpm'); $('tabSig').classList.toggle('on',tMode==='sig'); $('tabMark').classList.toggle('on',tMode==='mark'); $('tHint').hidden=tMode!=='bpm'; $('sHint').hidden=tMode!=='sig'; $('sCtl').hidden=tMode!=='sig'; $('mHint').hidden=tMode!=='mark'; $('mCtl').hidden=tMode!=='mark';
+  $('tabBpm').classList.toggle('on',tMode==='bpm'); $('tabSig').classList.toggle('on',tMode==='sig'); $('tabMark').classList.toggle('on',tMode==='mark'); $('tHint').hidden=tMode!=='bpm'; $('sHint').hidden=tMode!=='sig'; $('sCtl').hidden=tMode!=='sig'; $('mHint').hidden=tMode!=='mark'; $('mCtl').hidden=tMode!=='mark'; $('tabChord').classList.toggle('on',tMode==='chord'); $('cCtl').hidden=tMode!=='chord'; $('cHint').hidden=tMode!=='chord';
+  if(tMode==='chord') refreshChordInfo();
   if(tMode==='mark'){ if(mS&&document.activeElement!==$('mName')) $('mName').value=mS.name; $('mInfo').textContent=mS?'desde el compás '+(mS.bar+1)+' · ':'elige una marca o haz clic en la pista para poner una · '; $('mDelBtn').disabled=!mS; }
   if(tMode==='sig'){ if(sS){ const sg=sS==='init'?P.sig:sS.sig; $('sSel').value=sg[0]+'/'+sg[1]; } $('sInfo').textContent=sS?(sS==='init'?'inicial · ':'desde el compás '+(sS.bar+1)+' · '):'elige un compás y haz clic en la pista para ponerlo · '; $('sDelSig').disabled=!sS||sS==='init'; }
   $('tCtl').hidden=!tSel||tMode!=='bpm';
@@ -734,8 +735,8 @@ function drawTempo(ph){
   for(let i=Math.floor(b0/sub);i<=Math.ceil(b1/sub);i++){ const bt=i*sub,x=Math.round(KW+bt*BW-sx)+.5; if(x<KW) continue; const bar=Math.abs(bt-meter(P).barAt(bt).start)<1e-9, beat=Math.abs(bt-Math.round(bt))<1e-9; g.fillStyle=bar?'#4a5378':beat?'#2c3246':'#1f2433'; g.fillRect(x,0,1,H); }
   const endX=KW+meter(P).total(P.bars)*BW-sx; if(endX<W){ g.fillStyle='#00000066'; g.fillRect(Math.max(KW,endX),0,W,H); }
   for(let v=Math.ceil(R.lo/20)*20;v<=R.hi;v+=20){ const y=Math.round(tY(v,R))+.5; g.fillStyle='#1c202c'; g.fillRect(KW,y,W-KW,1); }
-  g.fillStyle='#12141b'; g.fillRect(0,0,KW,H); g.fillStyle='#aab3c9'; g.font='10px system-ui'; if(tMode==='bpm'){ g.fillText('Tempo',6,14); g.fillText(R.hi+' BPM',6,TP+10); g.fillText(R.lo+' BPM',6,H-TP+10); } else g.fillText(tMode==='sig'?'Compás':'Sección',6,14);
-  drawMarkLane(g,W,H,sx);
+  g.fillStyle='#12141b'; g.fillRect(0,0,KW,H); g.fillStyle='#aab3c9'; g.font='10px system-ui'; if(tMode==='bpm'){ g.fillText('Tempo',6,14); g.fillText(R.hi+' BPM',6,TP+10); g.fillText(R.lo+' BPM',6,H-TP+10); } else g.fillText(tMode==='sig'?'Compás':tMode==='chord'?'Acordes':'Sección',6,14);
+  drawMarkLane(g,W,H,sx); if(tMode==='chord') drawChordLane(g,W,H,sx);
   g.save(); g.beginPath(); g.rect(KW,0,W-KW,H); g.clip(); g.globalAlpha=tMode==='bpm'?1:.22;
   g.strokeStyle='#ffb86b'; g.lineWidth=2; g.beginPath(); for(let x=KW;x<=W;x++){ const y=tY(tm.bpmAt((x-KW+sx)/BW),R); if(x===KW) g.moveTo(x,y); else g.lineTo(x,y); } g.stroke(); g.lineWidth=1;
   const pts=[{init:true,b:0,bpm:P.bpm},...tList(false)];
@@ -761,19 +762,41 @@ function drawMarkLane(g,W,H,sx){
     const tw=Math.min(g.measureText(m.name).width+10,Math.max(0,x1-x0-4)); if(tw>14){ g.fillRect(Math.round(x0)+2,H-19,tw,15); g.fillStyle='#0d0f14'; g.save(); g.beginPath(); g.rect(x0+2,H-19,tw,15); g.clip(); g.fillText(m.name,x0+7,H-8); g.restore(); } }
   g.restore();
 }
+// ── pestaña Acordes: la progresión del proyecto (texto) dibujada compás a compás; las repeticiones del ciclo se ven más tenues ──
+function drawChordLane(g,W,H,sx){
+  const L=progChords(P).chords; g.save(); g.beginPath(); g.rect(KW,0,W-KW,H); g.clip(); g.font='600 13px system-ui';
+  for(const c of L){ const x0=KW+c.b0*BW-sx, x1=KW+c.b1*BW-sx; if(x1<KW||x0>W) continue; const w=Math.max(1,x1-x0-2);
+    g.globalAlpha=c.cyc?.55:1; g.fillStyle=c.ok?'#2a3350':'#5a2230'; g.fillRect(Math.round(x0)+1,H/2-18,w,36); g.fillStyle=c.ok?'#8fa8ff':'#ff7a8a'; g.fillRect(Math.round(x0)+1,H/2-18,2,36);
+    g.fillStyle=c.ok?'#e8eaf0':'#ffb0ba'; g.save(); g.beginPath(); g.rect(x0+1,H/2-18,w,36); g.clip(); g.fillText(c.sym||'?',x0+8,H/2+5); g.restore(); }
+  g.globalAlpha=1; g.restore();
+}
+function refreshChordInfo(){
+  const t=(P.prog&&P.prog.text)||''; if(document.activeElement!==$('cText')) $('cText').value=t;
+  const r=progChords(P); let msg; if(!t.trim()) msg='escribe una progresión para verla aquí'; else if(r.errors.length) msg='⚠ '+r.errors.slice(0,3).map(e=>e.msg).join(' · ')+(r.errors.length>3?' · …':''); else msg=r.cycleBars+(r.cycleBars>1?' compases':' compás')+(r.cycleBars<P.bars?' · se repite cada '+r.cycleBars+' hasta el compás '+P.bars:'')+(r.cycleBars>P.bars?' · el proyecto solo tiene '+P.bars+' compases: se corta':'');
+  $('cInfo').textContent=msg; $('cGen').disabled=!r.chords.some(c=>c.ok); $('cInfo').style.color=r.errors.length?'#ff9aa6':''; }
+$('cGen').onclick=()=>{
+  const r=progToNotes(P); if(!r.chords.length){ toast('Escribe primero una progresión con acordes válidos','err'); return; }
+  pushUndo(); const mk=(inst,name,notes)=>{ const t=newTrack(inst,name); const base=t.name; let k=1; while(P.tracks.some(x=>x.name===t.name)) t.name=base+' '+(++k); t.notes=notes; P.tracks.push(t); return t; };
+  const tc=mk('pad','Acordes (progresión)',r.chords.flatMap(c=>c.ms.map(m=>({b:c.b,l:c.l,m,v:.8})))); let nb=0;
+  if($('cBass').checked){ mk('subfall','Bajo (progresión)',r.bass.map(x=>({b:x.b,l:x.l,m:x.m,v:.9}))); nb=r.bass.length; }
+  sel=P.tracks.indexOf(tc); selNotes.clear(); renderTracks(); renderInspector(); layoutSpacer(); centerTrack(); touch(); populateAddInst(); invalidate();
+  toast('Pista de acordes creada: '+r.chords.length+' acordes'+(nb?' y bajo':'')+'. Cambia el instrumento de la pista si quieres otro sonido','ok'); };
+let cUndone=false;
+$('cText').onfocus=()=>{ cUndone=false; }; $('cText').onblur=()=>{ cUndone=false; };
+$('cText').oninput=e=>{ if(!cUndone){ pushUndo(); cUndone=true; } const v=e.target.value.slice(0,4000); if(v.trim()) P.prog={text:v}; else delete P.prog; touch(); refreshChordInfo(); invalidate(); refreshTempoUI(); };
 function tNear(e){ const r=tcv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top, R=tDrag?tDrag.R:tRange(); let best=null,bd=1e9;
   for(const p of [{init:true,b:0,bpm:P.bpm},...tList(false)]){ const dd=Math.hypot(KW+p.b*BW-wrap.scrollLeft-px,tY(p.bpm,R)-py); if(dd<11&&dd<bd){ best=p; bd=dd; } } return {p:best,px,py,R}; }
-tcv.addEventListener('pointerdown',e=>{ if(e.button!==0) return; if(tMode==='sig') return sigDown(e); if(tMode==='mark') return markDown(e); const h=tNear(e); if(h.px<KW) return; try{ tcv.setPointerCapture(e.pointerId); }catch(_){}
+tcv.addEventListener('pointerdown',e=>{ if(e.button!==0||tMode==='chord') return; if(tMode==='sig') return sigDown(e); if(tMode==='mark') return markDown(e); const h=tNear(e); if(h.px<KW) return; try{ tcv.setPointerCapture(e.pointerId); }catch(_){}
   pushUndo(); let p=h.p;
   if(!p){ const b=Math.max(0,snapB(pxToBeat(h.px))); if(b<=1e-9){ tcv.releasePointerCapture&&0; return; } p={b:r6(b),bpm:tBpmAt(h.py,h.R),ramp:false}; tList(true).push(p); }
   tSel=p.init?'init':p; tDrag={p,R:h.R}; touch(); refreshTempoUI(); });
-tcv.addEventListener('pointermove',e=>{ if(tMode==='sig') return sigMove(e); if(tMode==='mark') return markMove(e); const h=tNear(e); if(!tDrag){ tcv.style.cursor=h.p?'grab':'crosshair'; return; }
+tcv.addEventListener('pointermove',e=>{ if(tMode==='chord') return; if(tMode==='sig') return sigMove(e); if(tMode==='mark') return markMove(e); const h=tNear(e); if(!tDrag){ tcv.style.cursor=h.p?'grab':'crosshair'; return; }
   const d=tDrag.p, bpm=tBpmAt(h.py,tDrag.R); if(d.init){ P.bpm=clamp(bpm,40,260); $('bpm').value=P.bpm; } else { d.bpm=bpm; d.b=Math.max(.25,r6(snapB(pxToBeat(h.px)))); }
   touch(); refreshTempoUI(); });
 const tEnd=()=>{ if(mDrag){ mDrag=null; if(P.marks) P.marks.sort((a,b)=>a.bar-b.bar); invalidate(); return; } if(sDrag){ sDrag=null; layoutSpacer(); invalidate(); prewarm(); return; } if(!tDrag) return; tDrag=null; if(P.tempo) P.tempo.sort((a,b)=>a.b-b.b); invalidate(); prewarm(); };
 tcv.addEventListener('pointerup',tEnd); tcv.addEventListener('pointercancel',tEnd);
 function tDelete(p){ const L=tList(false), i=L.indexOf(p); if(i<0) return; pushUndo(); L.splice(i,1); if(!L.length) delete P.tempo; if(tSel===p) tSel=null; touch(); refreshTempoUI(); }
-const tDel2=e=>{ e.preventDefault(); if(tMode==='mark'){ const h=mNear(e); if(h.p) mDelete(h.p); return; } if(tMode==='sig'){ const h=sNear(e); if(h.p&&h.p!=='init') sDelete(h.p); return; } const h=tNear(e); if(h.p&&!h.p.init) tDelete(h.p); }; tcv.addEventListener('dblclick',tDel2); tcv.addEventListener('contextmenu',tDel2);
+const tDel2=e=>{ e.preventDefault(); if(tMode==='chord') return; if(tMode==='mark'){ const h=mNear(e); if(h.p) mDelete(h.p); return; } if(tMode==='sig'){ const h=sNear(e); if(h.p&&h.p!=='init') sDelete(h.p); return; } const h=tNear(e); if(h.p&&!h.p.init) tDelete(h.p); }; tcv.addEventListener('dblclick',tDel2); tcv.addEventListener('contextmenu',tDel2);
 // ── pestaña Compás: cambios de compás (solo en límites de compás) ──
 let sDrag=null;
 function sNear(e){ const r=tcv.getBoundingClientRect(), px=e.clientX-r.left, mm=meter(P); let best=null,bd=1e9; for(const p of ['init',...(P.sigs||[])]){ const bar=p==='init'?0:p.bar; const dd=Math.abs(KW+mm.beatOfBar(bar)*BW-wrap.scrollLeft-px); if(dd<12&&dd<bd){ best=p; bd=dd; } } return {p:best,px}; }
@@ -801,7 +824,7 @@ $('mName').onchange=e=>{ if(mS) mRename(e.target.value); else if(!e.target.value
 $('mName').onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); e.target.blur(); } e.stopPropagation(); };
 for(const q of MARK_QUICK) $('mQuick').append(el('button',{class:'sm',text:q,onclick:()=>{ $('mName').value=q; if(mS) mRename(q); }}));
 $('mDelBtn').onclick=()=>{ if(mS) mDelete(mS); };
-$('tabBpm').onclick=()=>{ tMode='bpm'; refreshTempoUI(); invalidate(); }; $('tabSig').onclick=()=>{ tMode='sig'; refreshTempoUI(); invalidate(); }; $('tabMark').onclick=()=>{ tMode='mark'; refreshTempoUI(); invalidate(); };
+$('tabBpm').onclick=()=>{ tMode='bpm'; refreshTempoUI(); invalidate(); }; $('tabSig').onclick=()=>{ tMode='sig'; refreshTempoUI(); invalidate(); }; $('tabMark').onclick=()=>{ tMode='mark'; refreshTempoUI(); invalidate(); }; $('tabChord').onclick=()=>{ tMode='chord'; refreshTempoUI(); invalidate(); };
 $('tempoOn').onclick=()=>{ tempoShow=!tempoShow; refreshTempoUI(); invalidate(); };
 $('tBpm').onchange=e=>{ if(!tSel) return; pushUndo(); const v=clamp(Math.round(+e.target.value)||120,tSel==='init'?40:20,tSel==='init'?260:400); if(tSel==='init'){ P.bpm=v; $('bpm').value=v; } else tSel.bpm=v; touch(); refreshTempoUI(); prewarm(); };
 $('tRamp').onchange=e=>{ if(!tSel||tSel==='init') return; pushUndo(); tSel.ramp=e.target.checked; touch(); refreshTempoUI(); };

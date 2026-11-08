@@ -47,6 +47,9 @@ registerInstrument((() => {
     bossaclave: { per: 8, glob: true, ev: [[0, 'S', .8], [1, 'S', .8], [1.5, 'Bs', .85], [2, 'Bs', .85], [2.5, 'S', .9], [3.5, 'S', .8],
                                             [4.5, 'S', .8], [5.5, 'Bs', .85], [6, 'S', .8], [7, 'S', .8], [7.5, 'Bs', .8]] },
     ranchera:  { per: 4, ev: [[0, 'B', 1], [1, 'C', .85], [2, 'B5', .9], [3, 'C', .85]] },
+    // percusivos: M = muteo (la palma apaga las cuerdas: «chk» seco con el acorde ahogado) · X = golpe en la tapa (grave y seco). Ver «Muteo» en los parámetros.
+    ranchachk: { per: 4, ev: [[0, 'B', 1], [1, 'C', .85], [1.5, 'M', .6], [2, 'B5', .9], [3, 'C', .85], [3.5, 'M', .6]] },
+    baladaperc: { per: 4, ev: [[0, 'D', 1], [1, 'D', .75], [1.5, 'U', .6], [2, 'X', .6], [2.5, 'U', .65], [3, 'D', .8], [3.5, 'U', .6]] },
     vals:      { per: 3, ev: [[0, 'B', 1], [1, 'C', .8], [2, 'C', .75]] },
     flamenco:  { per: 4, ev: [[0, 'D', 1], [.75, 'U', .6], [1, 'D', .9], [1.5, 'U', .6], [2, 'D', 1], [2.5, 'D', .8], [2.75, 'U', .55], [3, 'D', .9], [3.5, 'U', .6]] }
   };
@@ -75,6 +78,24 @@ registerInstrument((() => {
     const name = (EXT[fn] || EXT.maj)[ext], iv = CH[name]; return iv.slice(0, strings).map(i => root + i);
   }
 
+  // acorde de la progresión del proyecto ({root,bass,ivs}) → notas de las cuerdas, de grave a aguda, armado como lo haría la guitarra:
+  // bajo en MI2–RE#3 (el bajo alterado si lo hay), luego la quinta, las tonalidades (séptima, sexta, novenas…), la tercera, y si sobran cuerdas se sigue subiendo por los tonos del acorde.
+  // Aquí manda el acorde tal como está escrito: «Acordes» (tríadas/séptimas/novenas) y «Pulsos por acorde» no cuentan.
+  function voicingChord(c, strings) {
+    const place = pc => { let m = 40 + ((((pc) % 12) - 40) % 12 + 12) % 12; return m > 51 ? m - 12 : m; };
+    const above = (pc, cur) => { let m = cur + 1; while (((m % 12) + 12) % 12 !== pc) m++; return m; };
+    const iv = c.ivs, third = iv.find(i => i >= 2 && i <= 5), fifth = iv.find(i => i === 6 || i === 7 || i === 8);
+    const rest = iv.filter(i => i !== 0 && i !== third && i !== fifth), pcOf = i => (c.root + i) % 12;
+    const bass = place(c.bass != null ? c.bass : c.root), out = [bass]; let cur = bass;
+    const push = pc => { cur = above(pc, cur); out.push(cur); };
+    if (fifth != null) push(pcOf(fifth));
+    if (rest.length) rest.forEach(i => push(pcOf(i))); else push(c.root);
+    if (third != null) push(pcOf(third));
+    const all = [0, third, fifth, ...rest].filter(i => i != null).map(pcOf);
+    for (let k = 0; out.length < strings && k < 12; k++) push(all[k % all.length]);
+    return out.filter((m, i) => m <= 82 || i === 0).slice(0, strings);
+  }
+
   // una cuerda pulsada: escribe en acc (mono) desde la muestra i0 durante ring muestras
   function pluck(K, acc, i0, midi, amp, ring, pf, sustain, sr, pickBoost) {
     if (i0 >= acc.length || ring < 16) return; ring = Math.min(ring, acc.length - i0);
@@ -101,14 +122,15 @@ registerInstrument((() => {
 
   const choice = (k, label, opts, vals, def) => ({ k, label, type: 'choice', opts, vals, def });
   return {
-    id: 'guitarra_acomp', name: 'Guitarra acompañante', version: '1.1', kind: 'melodic', cat: 'acomp',
+    id: 'guitarra_acomp', name: 'Guitarra acompañante', version: '1.3', usesProg: true, kind: 'melodic', cat: 'acomp',
     desc: 'Una nota larga = un pasaje: la guitarra acompaña ese tiempo con un círculo de acordes y un patrón de rasgueo, tocado por un intérprete (Pedro Infante, Flamenco, Bossa, Ranchera, Lo-fi). La altura de la nota elige la tónica; el largo, cuánto acompaña.',
     params: [
       { k: 'gain', label: 'Ganancia', min: 0, max: 1.5, step: .01, def: .5 },
       choice('interprete', 'Intérprete', ['Pedro Infante (caricia)', 'Flamenco (aporreado)', 'Bossa (suave)', 'Ranchera (con uña)', 'Lo-fi (apagada)', 'Bossa (de disco, en bloque)'], ['infante', 'flamenco', 'bossa', 'ranchera', 'lofi', 'bossa2'], 'infante'),
-      choice('circulo', 'Círculo de acordes', ['Lo-fi romántico (I–vi–ii–V)', 'Jazz 2-5-1', 'Bossa (I–#i°–ii–V)', 'Andaluza (i–VII–VI–V)', 'Menor (i–VI–III–VII)', 'Pop (I–V–vi–IV)', 'Ranchera (I–IV–V–I)', 'Círculo de quintas'], ['lofi', 'jazz', 'bossa', 'andaluza', 'menor', 'pop', 'ranchera', 'quintas'], 'lofi'),
+      choice('circulo', 'Círculo de acordes', ['Lo-fi romántico (I–vi–ii–V)', 'Jazz 2-5-1', 'Bossa (I–#i°–ii–V)', 'Andaluza (i–VII–VI–V)', 'Menor (i–VI–III–VII)', 'Pop (I–V–vi–IV)', 'Ranchera (I–IV–V–I)', 'Círculo de quintas', 'Del proyecto (la progresión de la pestaña Acordes)'], ['lofi', 'jazz', 'bossa', 'andaluza', 'menor', 'pop', 'ranchera', 'quintas', 'proyecto'], 'lofi'),
       choice('ext', 'Acordes', ['Tríadas', 'Séptimas', 'Novenas'], [0, 1, 2], 1),
-      choice('patron', 'Patrón de la mano derecha', ['Abajo (negras)', 'Balada', 'Ida y vuelta', 'Arpegio', 'Bossa', 'Ranchera', 'Vals (3 pulsos)', 'Flamenco', 'Bossa (clave de 2 compases)'], ['abajo', 'balada', 'idavuelta', 'arpegio', 'bossa', 'ranchera', 'vals', 'flamenco', 'bossaclave'], 'balada'),
+      choice('patron', 'Patrón de la mano derecha', ['Abajo (negras)', 'Balada', 'Ida y vuelta', 'Arpegio', 'Bossa', 'Ranchera', 'Vals (3 pulsos)', 'Flamenco', 'Bossa (clave de 2 compases)', 'Ranchera (chuntata, con muteo)', 'Balada (con golpe en la tapa)'], ['abajo', 'balada', 'idavuelta', 'arpegio', 'bossa', 'ranchera', 'vals', 'flamenco', 'bossaclave', 'ranchachk', 'baladaperc'], 'balada'),
+      { k: 'muteo', label: 'Muteo y golpes (cuánto pesan)', min: 0, max: 1.5, step: .05, def: 1 },
       { k: 'pulsos', label: 'Pulsos por acorde', min: 1, max: 16, step: 1, def: 4 },
       { k: 'cuerdas', label: 'Cuerdas', min: 4, max: 6, step: 1, def: 6 },
       { k: 'humaniza', label: 'Humanización', min: 0, max: 1, step: .05, def: .5 },
@@ -129,10 +151,17 @@ registerInstrument((() => {
       const p = n.p, sr = n.sr, beat = n.beat, pf = PERF[p.interprete] || PERF.infante, pat = PAT[p.patron] || PAT.balada, prog = PROG[p.circulo] || PROG.lofi;
       const hum = clamp(p.humaniza == null ? .5 : p.humaniza, 0, 1), ext = clamp(Math.round(p.ext == null ? 1 : p.ext), 0, 2), ns = clamp(Math.round(p.cuerdas || 6), 4, 6);
       const speed = 1 / clamp(p.velo || 1, .3, 3), sus = clamp(p.sustain || 1, .3, 3), tonic = ((n.midi % 12) + 12) % 12, chordLen = Math.max(1, Math.round(p.pulsos || 4)) * beat;
+      const mut = clamp(p.muteo == null ? 1 : p.muteo, 0, 1.5);
       const tail = 1.2, total = Math.ceil((n.len + tail) * sr), acc = new Float32Array(total), r = () => K.rnd();
-      let ci = 0;
-      for (let cs = 0; cs < n.len - 1e-6; cs += chordLen, ci++) {
-        const ce = Math.min(n.len, cs + chordLen), last = ce >= n.len - 1e-6, ch = prog[ci % prog.length], notes = voicing(tonic, ch[0], ch[1], ext, ns), rel = last ? .9 : .05;
+      // ruido de banda en el tiempo t (s): base del «chk» del muteo y del golpe en la tapa; pasa por la caja y el filtro como todo lo demás
+      const burst = (t, amp, fc, Q, dur, tau) => { const i0 = Math.round(t * sr), n = Math.floor(dur * sr), q = bpf(fc, Q, sr); if (amp < .001) return; for (let k = 0; k < n && i0 + k < total; k++) acc[i0 + k] += runBq(q, (r() * 2 - 1) * Math.exp(-k / (tau * sr))) * amp; };
+      const thump = (t, amp, f0, f1, dur, tau) => { const i0 = Math.round(t * sr), n = Math.floor(dur * sr); if (amp < .001) return; let ph = 0; for (let k = 0; k < n && i0 + k < total; k++) { const tt = k / sr; ph += TWO_PI * (f1 + (f0 - f1) * Math.exp(-tt / .018)) / sr; acc[i0 + k] += Math.sin(ph) * Math.exp(-tt / tau) * amp; } };
+      // los tramos de acorde: de la progresión del proyecto (cada acorde dura lo suyo) o del círculo elegido (cada `pulsos`). Sin progresión, «Del proyecto» cae al círculo Lo-fi.
+      const segs = [];
+      if (p.circulo === 'proyecto' && n.chords && n.chords.length) { for (const c of n.chords) { const cs = c.t0, ce = Math.min(n.len, c.t1); if (ce - cs > .02) segs.push({ cs, ce, notes: voicingChord(c, ns) }); } }
+      else { for (let cs = 0, ci = 0; cs < n.len - 1e-6; cs += chordLen, ci++) { const ch = prog[ci % prog.length]; segs.push({ cs, ce: Math.min(n.len, cs + chordLen), notes: voicing(tonic, ch[0], ch[1], ext, ns) }); } }
+      for (const { cs, ce, notes } of segs) {
+        const last = ce >= n.len - 1e-6, rel = last ? .9 : .05;
         const hit = (idx, t, vol, ringMax, boost, shift, susx) => {         // una cuerda en el tiempo t (dentro del pasaje)
           const tt = t, ring = Math.floor(Math.min((gl && !last ? ringMax : ce - t + rel), ringMax) * sr); if (ring < 16 || tt < 0) return;
           pluck(K, acc, Math.round(tt * sr), notes[idx] + (shift || 0), vol * (1 - .03 * idx) * (1 + hum * pf.vel * r()), ring, pf, sus * (susx || 1), sr, boost);
@@ -148,6 +177,8 @@ registerInstrument((() => {
             else if (kind === 'U') { const m = Math.ceil(ns * .65); for (let j = 0; j < m; j++) hit(ns - 1 - j, t0 + j * d * .85, fz * .72, 6, fz * .7); }
             else if (kind === 'C') { const m = Math.min(4, ns); for (let j = 0; j < m; j++) hit(ns - m + j, t0 + j * d, fz * .85, .24, fz); }
             else if (kind === 'S') { const m = Math.min(4, notes.length), sh = 47 + (((notes[0] - 47) % 12) + 12) % 12 - notes[0]; for (let j = 0; j < m; j++) hit(j, t0 + j * d, fz * .85, beat * (pf.sring || .5), fz, sh, pf.ssus); }
+            else if (kind === 'M') { const m = Math.min(4, ns - 1); burst(t0, .55 * fz * mut, 2600, 1.1, .07, .016); for (let j = 0; j < m; j++) hit(ns - 1 - j, t0 + j * d * .5, fz * .3 * mut, .05, fz * .3, 0, .1); }
+            else if (kind === 'X') { thump(t0, 1.2 * fz * mut, 230, 120, .09, .022); burst(t0, .8 * fz * mut, 900, .9, .06, .014); }
             else if (kind === 'Bs') hit(0, t0, fz, beat * .85, fz * .6);
             else if (kind === 'B') hit(0, t0, fz, 8, fz * .6);
             else if (kind === 'B5') hit(Math.min(1, ns - 1), t0, fz, 8, fz * .6);
