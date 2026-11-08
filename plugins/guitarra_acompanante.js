@@ -59,7 +59,7 @@ registerInstrument((() => {
     infante:  { delay: .028,  s: .44, t60: 3.0, pos: .30, exLP: .80, click: .04, lp: 4200, sat: 0,  timing: .008, vel: .10 },
     flamenco: { delay: .0065, s: .20, t60: 2.2, pos: .12, exLP: .15, click: .55, lp: 9000, sat: .3, timing: .003, vel: .12 },
     bossa:    { delay: .016,  s: .38, t60: 2.6, pos: .24, exLP: .60, click: .12, lp: 5200, sat: 0,  timing: .006, vel: .08 },
-    bossa2:   { delay: .004,  s: .38, t60: 2.6, pos: .24, exLP: .60, click: .12, lp: 1300, sat: 0,  timing: .006, vel: .08, tc: .03, late: .018, lowb: 3.2, sring: .8, ssus: .5 },   // como bossa, pero con el rasgueo casi en bloque (≈ 4 ms entre cuerdas) y el color de la grabación: tope de agudos bajo (lp), graves de la caja más fuertes (lowb) y golpes que se apagan suave (sring, ssus); ajustado contra el micrófono del guitarrista 03 de GuitarSet (bandas de energía y caída del golpe)
+    bossa2:   { delay: .004,  s: .38, t60: 2.6, pos: .24, exLP: .60, click: .12, lp: 1300, sat: 0,  timing: .006, vel: .08, tc: .02, late: .018, lowb: 3.2, sring: 1.2, ssus: .5 },   // como bossa, pero con el rasgueo casi en bloque (≈ 4 ms entre cuerdas) y el color de la grabación: tope de agudos bajo (lp), graves de la caja más fuertes (lowb) y golpes que se apagan suave (sring, ssus); ajustado contra el micrófono del guitarrista 03 de GuitarSet (bandas de energía y caída del golpe)
     ranchera: { delay: .011,  s: .30, t60: 2.3, pos: .16, exLP: .35, click: .30, lp: 7000, sat: .1, timing: .005, vel: .10 },
     lofi:     { delay: .020,  s: .48, t60: 1.8, pos: .35, exLP: .90, click: .02, lp: 2600, sat: .12, timing: .010, vel: .12 }
   };
@@ -134,7 +134,7 @@ registerInstrument((() => {
       for (let cs = 0; cs < n.len - 1e-6; cs += chordLen, ci++) {
         const ce = Math.min(n.len, cs + chordLen), last = ce >= n.len - 1e-6, ch = prog[ci % prog.length], notes = voicing(tonic, ch[0], ch[1], ext, ns), rel = last ? .9 : .05;
         const hit = (idx, t, vol, ringMax, boost, shift, susx) => {         // una cuerda en el tiempo t (dentro del pasaje)
-          const tt = t, ring = Math.floor(Math.min(ce - t + rel, ringMax) * sr); if (ring < 16 || tt < 0) return;
+          const tt = t, ring = Math.floor(Math.min((gl && !last ? ringMax : ce - t + rel), ringMax) * sr); if (ring < 16 || tt < 0) return;
           pluck(K, acc, Math.round(tt * sr), notes[idx] + (shift || 0), vol * (1 - .03 * idx) * (1 + hum * pf.vel * r()), ring, pf, sus * (susx || 1), sr, boost);
         };
         const gl = !!pat.glob, rep0 = gl ? Math.floor(cs / (pat.per * beat) + 1e-9) : 0;
@@ -142,7 +142,7 @@ registerInstrument((() => {
           for (const [pos, kind, fz] of pat.ev) {
             const tn = (gl ? 0 : cs) + (rep * pat.per + pos) * beat; if (gl && tn < cs - 1e-6) continue;
             // tc: desvío centrado (± tc·humaniza s) y un poco detrás del pulso (late·humaniza s), como los guitarristas de GuitarSet; sin tc, el de siempre (0 … timing·humaniza)
-            const t0 = tn + (pf.tc ? hum * (pf.late + pf.tc * (2 * r() - 1)) : hum * pf.timing * r()); if (t0 >= ce - 1e-6 || t0 < 0) continue;
+            let t0 = tn + (pf.tc ? hum * (pf.late + pf.tc * (2 * r() - 1)) : hum * pf.timing * r()); if (pf.tc && t0 < 0) t0 = 0; if (t0 >= ce - 1e-6 || (t0 < 0 && !pf.tc)) continue;
             const d = pf.delay * speed * (1 + hum * .25 * r());
             if (kind === 'D') { for (let i = 0; i < ns; i++) hit(i, t0 + i * d, fz, 8, fz); }
             else if (kind === 'U') { const m = Math.ceil(ns * .65); for (let j = 0; j < m; j++) hit(ns - 1 - j, t0 + j * d * .85, fz * .72, 6, fz * .7); }
