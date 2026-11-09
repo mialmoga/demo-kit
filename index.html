@@ -95,7 +95,7 @@ aside{background:var(--p);overflow:auto;min-height:0}
 #awrap{height:124px;flex:none;position:relative;background:#0d0f14;border-top:1px solid var(--b)}
 #acv{display:block;width:100%;height:100%;touch-action:none}
 .abar[hidden]{display:none}
-.abar [hidden]{display:none!important}.tabs{display:inline-flex;gap:4px}.gchips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}.gstr{display:block;padding:6px 8px;margin:0 0 4px;border:1px solid var(--b);border-radius:8px;cursor:pointer}.gstr.on{border-color:var(--a);background:#26304f55}.gstr small{display:block;color:var(--m);font-size:11px;margin-top:2px}.gset{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}.gset label{display:inline-flex;align-items:center;gap:5px;color:var(--m)}.gcat{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin:0 0 4px;font-size:12px}.gcat b{font-weight:600}.tabs .sm.on{background:#26304f;border-color:var(--a)}
+.abar [hidden]{display:none!important}#chelp{flex-direction:column;align-items:stretch}.chrow{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}.chgrid{display:grid;grid-template-columns:64px repeat(7,minmax(0,1fr));gap:3px;margin-top:4px}.chgrid .chh{text-align:center;line-height:1.15}.chgrid .chh small{display:block;opacity:.7}.chgrid .chl{font-size:10px;letter-spacing:.06em;opacity:.7;align-self:center}.chgrid .chc{padding:5px 2px;font-weight:600}.chgrid .chn{text-align:center;opacity:.3;align-self:center}#chRoots .sm{min-width:34px}.tabs{display:inline-flex;gap:4px}.gchips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}.gstr{display:block;padding:6px 8px;margin:0 0 4px;border:1px solid var(--b);border-radius:8px;cursor:pointer}.gstr.on{border-color:var(--a);background:#26304f55}.gstr small{display:block;color:var(--m);font-size:11px;margin-top:2px}.gset{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}.gset label{display:inline-flex;align-items:center;gap:5px;color:var(--m)}.gcat{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin:0 0 4px;font-size:12px}.gcat b{font-weight:600}.tabs .sm.on{background:#26304f;border-color:var(--a)}
 #twrap{height:84px;flex:none;position:relative;background:#0d0f14;border-bottom:1px solid var(--b)}
 #tcv{display:block;width:100%;height:100%;touch-action:none}
 .abar input[type=number]{width:62px}
@@ -567,11 +567,16 @@ html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *:
         <button id="tDel" class="sm danger">Quitar punto</button></span>
       <span id="sCtl" hidden>Compás <select id="sSel" aria-label="Compás"></select> <span id="sInfo"></span><button id="sDelSig" class="sm danger">Quitar cambio</button></span>
       <span id="mCtl" hidden>Nombre <input id="mName" type="text" maxlength="40" value="Verso" size="12" aria-label="Nombre de la sección"> <span id="mQuick"></span> <span id="mInfo"></span><button id="mDelBtn" class="sm danger">Quitar marca</button></span>
-      <span id="cCtl" hidden><input id="cText" type="text" size="64" maxlength="4000" placeholder="Am7 | Dm7 G7 | Cmaj7 %" aria-label="Progresión de acordes" spellcheck="false"> <span id="cInfo"></span> <button id="cGen" class="sm" title="Convierte la progresión en notas normales: una pista de acordes cerrados (pad) y, si quieres, otra de bajo. Sirve con cualquier instrumento: luego cambias el sonido de la pista">Generar pista de acordes</button><label class="chk"><input type="checkbox" id="cBass" checked> con bajo</label></span>
-      <span id="cHint" class="hint" hidden>«|» separa compases · varios acordes en un compás se reparten el tiempo · «%» solo en un compás (o un compás vacío) repite el anterior · «%» o «.» junto a otros acordes sostienen el acorde · C/E = con bajo en E · se repite si el proyecto es más largo. Por ahora solo se ve: luego los instrumentos la leerán</span>
+      <span id="cCtl" hidden><input id="cText" type="text" size="64" maxlength="4000" placeholder="Am7 | Dm7 G7 | Cmaj7 %" aria-label="Progresión de acordes" spellcheck="false"> <span id="cInfo"></span> <button id="cGen" class="sm" title="Convierte la progresión en notas normales: una pista de acordes cerrados (pad) y, si quieres, otra de bajo. Sirve con cualquier instrumento: luego cambias el sonido de la pista">Generar pista de acordes</button><label class="chk"><input type="checkbox" id="cBass" checked> con bajo</label> <button id="cHelpBtn" class="sm" title="Elige raíz y escala y te muestra los acordes que encajan; un clic los añade a la progresión">🎼 Ayuda de acordes</button></span>
+      <span id="cHint" class="hint" hidden>«|» separa compases · varios acordes en un compás se reparten el tiempo · «%» solo en un compás (o un compás vacío) repite el anterior · «%» o «.» junto a otros acordes sostienen el acorde · C/E = con bajo en E · se repite si el proyecto es más largo · «Generar pista de acordes» la vuelve notas y la guitarra la lee con el círculo «Del proyecto»</span>
       <span id="mHint" class="hint" hidden>clic en un compás = marca nueva con ese nombre · elige una marca y cambia el nombre o toca un atajo para renombrarla · arrastra = mover de compás · doble clic o clic derecho = quitar. Solo organiza: no cambia el sonido</span>
       <span id="tHint" class="hint">inicial = el BPM de arriba · clic = punto nuevo · arrastra = mover (horizontal: pulso, vertical: BPM) · doble clic o clic derecho = quitar</span>
       <span id="sHint" class="hint" hidden>inicial = el compás de arriba · clic en un compás = cambio nuevo (con el compás elegido) · arrastra = mover de compás · doble clic o clic derecho = quitar. Las notas no se mueven: cambia dónde caen las barras</span>
+    </div>
+    <div id="chelp" class="abar" hidden>
+      <div id="chRoots" class="chrow" aria-label="Nota raíz"></div>
+      <div class="chrow"><select id="chScale" aria-label="Escala"></select> <b id="chTitle"></b> <button id="chUse" class="sm" title="Toma la raíz y la escala elegidas en el piano roll («Escala»)">Usar la del proyecto</button> <button id="chLast" class="sm" title="Quita el último acorde del texto">⌫ Quitar último</button> <button id="chClear" class="sm danger" title="Vacía el texto de la progresión (se puede deshacer)">Borrar progresión</button> <span class="hint">clic = acorde en un compás nuevo · Mayús+clic = en el mismo compás</span></div>
+      <div id="chTab"></div>
     </div>
     <div id="twrap" hidden><canvas id="tcv"></canvas></div>
     <div id="wrap"><canvas id="cv"></canvas><div id="sp"></div></div>
@@ -2448,7 +2453,7 @@ function renderInspector(){
 }
 
 // ───────────── escalas, acordes, teclado en pantalla y herramientas de notas ─────────────
-const SCALES={off:null,'Mayor':[0,2,4,5,7,9,11],'Menor natural':[0,2,3,5,7,8,10],'Menor armónica':[0,2,3,5,7,8,11],'Pentatónica mayor':[0,2,4,7,9],'Pentatónica menor':[0,3,5,7,10],'Dórica':[0,2,3,5,7,9,10],'Frigia':[0,1,3,5,7,8,10],'Mixolidia':[0,2,4,5,7,9,10],'Blues':[0,3,5,6,7,10]};
+const SCALES={off:null,'Mayor':[0,2,4,5,7,9,11],'Menor natural':[0,2,3,5,7,8,10],'Menor armónica':[0,2,3,5,7,8,11],'Pentatónica mayor':[0,2,4,7,9],'Pentatónica menor':[0,3,5,7,10],'Dórica':[0,2,3,5,7,9,10],'Frigia':[0,1,3,5,7,8,10],'Mixolidia':[0,2,4,5,7,9,10],'Blues':[0,3,5,6,7,10],'Menor melódica':[0,2,3,5,7,9,11],'Mayor armónica':[0,2,4,5,7,8,11],'Doble armónica mayor':[0,1,4,5,7,8,11],'Napolitana mayor':[0,1,3,5,7,9,11],'Napolitana menor':[0,1,3,5,7,8,11],'Lidia':[0,2,4,6,7,9,11],'Locria':[0,1,3,5,6,8,10]};
 const CHORDS={off:{n:'Ninguno'},tri:{n:'Tríada',deg:[0,2,4],chr:[0,4,7]},sep:{n:'Séptima',deg:[0,2,4,6],chr:[0,4,7,10]},pow:{n:'Quinta (power)',deg:[0,4],chr:[0,7]},sus:{n:'Sus4',deg:[0,3,4],chr:[0,5,7]},oct:{n:'Octava',deg:[0,5],chr:[0,12]}};
 let chordMode='off';
 const KEY=()=>P.key||(P.key={root:0,scale:'off',fit:false});
@@ -2573,7 +2578,7 @@ const tY=(bpm,R)=>TP+(1-(bpm-R.lo)/(R.hi-R.lo))*(TH-2*TP);
 const tBpmAt=(y,R)=>Math.round(clamp(R.lo+(1-(y-TP)/(TH-2*TP))*(R.hi-R.lo),20,400));
 function refreshTempoUI(){ $('tbar').hidden=!tempoShow; $('twrap').hidden=!tempoShow; $('tempoOn').classList.toggle('on',tempoShow||tList(false).length>0||sigPts(P).length>0||(P.marks||[]).length>0||!!(P.prog&&P.prog.text));
   const L=tList(false); if(tSel&&tSel!=='init'&&!L.includes(tSel)) tSel=null; if(sS&&sS!=='init'&&!(P.sigs||[]).includes(sS)) sS=null; if(mS&&!(P.marks||[]).includes(mS)) mS=null;
-  $('tabBpm').classList.toggle('on',tMode==='bpm'); $('tabSig').classList.toggle('on',tMode==='sig'); $('tabMark').classList.toggle('on',tMode==='mark'); $('tHint').hidden=tMode!=='bpm'; $('sHint').hidden=tMode!=='sig'; $('sCtl').hidden=tMode!=='sig'; $('mHint').hidden=tMode!=='mark'; $('mCtl').hidden=tMode!=='mark'; $('tabChord').classList.toggle('on',tMode==='chord'); $('cCtl').hidden=tMode!=='chord'; $('cHint').hidden=tMode!=='chord';
+  $('tabBpm').classList.toggle('on',tMode==='bpm'); $('tabSig').classList.toggle('on',tMode==='sig'); $('tabMark').classList.toggle('on',tMode==='mark'); $('tHint').hidden=tMode!=='bpm'; $('sHint').hidden=tMode!=='sig'; $('sCtl').hidden=tMode!=='sig'; $('mHint').hidden=tMode!=='mark'; $('mCtl').hidden=tMode!=='mark'; $('tabChord').classList.toggle('on',tMode==='chord'); $('cCtl').hidden=tMode!=='chord'; $('cHint').hidden=tMode!=='chord'; $('chelp').hidden=!(tMode==='chord'&&chOpen); $('cHelpBtn').classList.toggle('on',chOpen); if(tMode==='chord'&&chOpen) chRender();
   if(tMode==='chord') refreshChordInfo();
   if(tMode==='mark'){ if(mS&&document.activeElement!==$('mName')) $('mName').value=mS.name; $('mInfo').textContent=mS?'desde el compás '+(mS.bar+1)+' · ':'elige una marca o haz clic en la pista para poner una · '; $('mDelBtn').disabled=!mS; }
   if(tMode==='sig'){ if(sS){ const sg=sS==='init'?P.sig:sS.sig; $('sSel').value=sg[0]+'/'+sg[1]; } $('sInfo').textContent=sS?(sS==='init'?'inicial · ':'desde el compás '+(sS.bar+1)+' · '):'elige un compás y haz clic en la pista para ponerlo · '; $('sDelSig').disabled=!sS||sS==='init'; }
@@ -2633,6 +2638,47 @@ $('cGen').onclick=()=>{
   if($('cBass').checked){ mk('subfall','Bajo (progresión)',r.bass.map(x=>({b:x.b,l:x.l,m:x.m,v:.9}))); nb=r.bass.length; }
   sel=P.tracks.indexOf(tc); selNotes.clear(); renderTracks(); renderInspector(); layoutSpacer(); centerTrack(); touch(); populateAddInst(); invalidate();
   toast('Pista de acordes creada: '+r.chords.length+' acordes'+(nb?' y bajo':'')+'. Cambia el instrumento de la pista si quieres otro sonido','ok'); };
+// ── Ayuda de acordes: eliges raíz y escala y la tabla muestra los acordes que salen de apilar terceras sobre cada grado (sus2, tríada, sus4, séptima); un clic lo añade a la progresión ──
+const CH_GROUPS=[['Comunes',['Mayor','Menor natural']],['Extendidas',['Menor armónica','Menor melódica','Mayor armónica','Doble armónica mayor','Napolitana mayor','Napolitana menor']],['Modos',['Dórica','Frigia','Lidia','Mixolidia','Locria']]];
+const CH_LET=['C','D','E','F','G','A','B'], CH_LPC=[0,2,4,5,7,9,11], CH_NUM=['I','II','III','IV','V','VI','VII'];
+const CH_TRI={'4,7':'','3,7':'m','3,6':'dim','4,8':'aug','4,6':'maj(b5)','3,8':'m#5'};
+const CH_SEV={'4,7,11':'maj7','4,7,10':'7','3,7,10':'m7','3,7,11':'mMaj7','3,6,10':'m7b5','3,6,9':'dim7','4,8,11':'maj7#5','4,8,10':'7#5','4,6,10':'7b5','4,6,11':'maj7b5','3,6,11':'mMaj7b5'};
+// escritura correcta de las 7 notas (una letra por grado: en Fa mayor sale Sib y no La#). Prueba las grafías de la raíz y se queda con la de menos alteraciones; si nada cabe en un solo # o b, usa los nombres por sonido.
+function chSpell(rootPc,ivs){
+  let best=null;
+  for(let li=0;li<7;li++){ const ra=((rootPc-CH_LPC[li]+6+12)%12)-6; if(Math.abs(ra)>1) continue;
+    const names=[]; let ok=true,score=0;
+    for(let d=0;d<7;d++){ const L=(li+d)%7, pc=(rootPc+ivs[d])%12, a=((pc-CH_LPC[L]+6+12)%12)-6; if(Math.abs(a)>1){ ok=false; break; } score+=Math.abs(a); names.push(CH_LET[L]+(a>0?'#':a<0?'b':'')); }
+    if(ok&&(!best||score<best.score)) best={names,score}; }
+  return best?best.names:ivs.map(i=>NOTE_NAMES[(rootPc+i)%12]);
+}
+function chTable(rootPc,scaleName){
+  const ivs=SCALES[scaleName]; if(!ivs||ivs.length!==7) return null; const nm=chSpell(rootPc,ivs), cols=[];
+  for(let d=0;d<7;d++){ const i=k=>(ivs[(d+k)%7]-ivs[d]+12)%12, n=k=>nm[(d+k)%7], r=nm[d], th=i(2), fi=i(4), se=i(6), tq=CH_TRI[th+','+fi], sq=CH_SEV[th+','+fi+','+se];
+    const cell=(sym,ks)=>sym==null?null:{sym,notes:ks.map(n).join(' ')};
+    cols.push({num:CH_NUM[d]+(tq==='dim'?'°':tq==='aug'?'+':''),root:r,
+      sus2:i(1)===2&&fi===7?cell(r+'sus2',[0,1,4]):null, tri:tq!=null?cell(r+tq,[0,2,4]):null, sus4:i(3)===5&&fi===7?cell(r+'sus4',[0,3,4]):null, sev:sq!=null?cell(r+sq,[0,2,4,6]):null}); }
+  return {root:nm[0],cols};
+}
+let chOpen=false, chRoot=0, chScale='Mayor';
+function chSetProg(v,label){ pushUndo(); v=v.slice(0,4000); if(v.trim()) P.prog={text:v}; else delete P.prog; touch(); refreshChordInfo(); invalidate(); refreshTempoUI(); }
+function chAdd(sym,sameBar){ const t=((P.prog&&P.prog.text)||'').replace(/\s+$/,''); chSetProg(!t?sym:sameBar&&!/\|$/.test(t)?t+' '+sym:t+(/\|$/.test(t)?' ':' | ')+sym); }
+function chRender(){
+  const T=chTable(chRoot,chScale), box=$('chTab'); box.textContent=''; $('chTitle').textContent=T?T.root+' '+chScale.toLowerCase():'';
+  for(const b of $('chRoots').children) b.classList.toggle('on',+b.dataset.r===chRoot);
+  if(!T){ box.append(el('div',{class:'hint',text:'Esa escala no tiene 7 grados: elige otra.'})); return; }
+  const grid=el('div',{class:'chgrid'}); grid.append(el('div',{class:'chh'}));
+  for(const c of T.cols) grid.append(el('div',{class:'chh'},el('b',{text:c.num}),el('small',{text:c.root})));
+  for(const [k,lab] of [['sus2','SUS2'],['tri','TRÍADA'],['sus4','SUS4'],['sev','7ª']]){ grid.append(el('div',{class:'chl',text:lab}));
+    for(const c of T.cols){ const x=c[k]; grid.append(x?el('button',{class:'sm chc',text:x.sym,title:'Notas: '+x.notes+' · clic = compás nuevo · Mayús+clic = en el mismo compás',onclick:e=>chAdd(x.sym,e.shiftKey)}):el('div',{class:'chn',text:'—'})); } }
+  box.append(grid);
+}
+{ const rs=$('chRoots'); NOTE_NAMES.forEach((n,i)=>rs.append(el('button',{class:'sm',text:n,'data-r':i,onclick:()=>{ chRoot=i; chRender(); }})));
+  const sel=$('chScale'); for(const [g,list] of CH_GROUPS){ const og=el('optgroup',{label:g}); for(const k of list) og.append(el('option',{value:k,text:k})); sel.append(og); } sel.value=chScale; sel.onchange=()=>{ chScale=sel.value; chRender(); };
+  $('chUse').onclick=()=>{ const k=KEY(); if(!SCALES[k.scale]||SCALES[k.scale].length!==7){ toast(k.scale==='off'?'El proyecto no tiene escala elegida (se pone en «Escala», junto al piano roll)':'La escala del proyecto («'+k.scale+'») no tiene 7 grados: no da acordes por grado','err'); return; } chRoot=k.root; chScale=k.scale; sel.value=chScale; chRender(); };
+  $('chClear').onclick=()=>{ if((P.prog&&P.prog.text)||'') chSetProg(''); };
+  $('chLast').onclick=()=>{ const t=((P.prog&&P.prog.text)||'').replace(/\s+$/,''); if(!t) return; chSetProg(t.replace(/\s*\|\s*$/,'').replace(/(\s+|\s*\|\s*)?[^\s|]+$/,'')); };
+  $('cHelpBtn').onclick=()=>{ chOpen=!chOpen; refreshTempoUI(); }; }
 let cUndone=false;
 $('cText').onfocus=()=>{ cUndone=false; }; $('cText').onblur=()=>{ cUndone=false; };
 $('cText').oninput=e=>{ if(!cUndone){ pushUndo(); cUndone=true; } const v=e.target.value.slice(0,4000); if(v.trim()) P.prog={text:v}; else delete P.prog; touch(); refreshChordInfo(); invalidate(); refreshTempoUI(); };
