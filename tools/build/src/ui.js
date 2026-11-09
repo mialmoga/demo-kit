@@ -77,6 +77,12 @@ function previewNote(n,tr){
     const s=a.createBufferSource(); s.buffer=toAudioBuffer(out); s.connect(a.destination); s.start(); pvSrc=s; }
   catch(e){ console.error(e); toast('Error en la vista previa: '+e.message,'err'); }
 }
+// oír un acorde de la ayuda: con el instrumento de la pista seleccionada si es melódico; si es batería/kit o no hay pista, con un pad
+function previewChord(c){
+  let tr=P.tracks[sel]; const inst=tr&&INSTRUMENTS[tr.inst]; if(!tr||!inst||inst.kind==='perc'||inst.kind==='kit') tr=newTrack('pad','Vista previa');
+  try{ const out=previewChordBuffer(P,tr,c,1.6), a=ac(); if(pvSrc){try{pvSrc.stop();}catch(e){}}
+    const s=a.createBufferSource(); s.buffer=toAudioBuffer(out); s.connect(a.destination); s.start(); pvSrc=s; }
+  catch(e){ console.error(e); toast('Error en la vista previa: '+e.message,'err'); } }
 let pvTimer=0;
 function previewTrack(){ clearTimeout(pvTimer); pvTimer=setTimeout(()=>{ const tr=P.tracks[sel]; if(!tr) return; prewarm();
   const n=[...selNotes][0]||tr.notes[0]||{b:0,l:.5,m:INSTRUMENTS[tr.inst]&&INSTRUMENTS[tr.inst].kind==='perc'?0:60,v:1}; previewNote(n,tr); },160); }
@@ -596,7 +602,7 @@ function renderInspector(){
 }
 
 // ───────────── escalas, acordes, teclado en pantalla y herramientas de notas ─────────────
-const SCALES={off:null,'Mayor':[0,2,4,5,7,9,11],'Menor natural':[0,2,3,5,7,8,10],'Menor armónica':[0,2,3,5,7,8,11],'Pentatónica mayor':[0,2,4,7,9],'Pentatónica menor':[0,3,5,7,10],'Dórica':[0,2,3,5,7,9,10],'Frigia':[0,1,3,5,7,8,10],'Mixolidia':[0,2,4,5,7,9,10],'Blues':[0,3,5,6,7,10]};
+const SCALES={off:null,'Mayor':[0,2,4,5,7,9,11],'Menor natural':[0,2,3,5,7,8,10],'Menor armónica':[0,2,3,5,7,8,11],'Pentatónica mayor':[0,2,4,7,9],'Pentatónica menor':[0,3,5,7,10],'Dórica':[0,2,3,5,7,9,10],'Frigia':[0,1,3,5,7,8,10],'Mixolidia':[0,2,4,5,7,9,10],'Blues':[0,3,5,6,7,10],'Menor melódica':[0,2,3,5,7,9,11],'Mayor armónica':[0,2,4,5,7,8,11],'Doble armónica mayor':[0,1,4,5,7,8,11],'Napolitana mayor':[0,1,3,5,7,9,11],'Napolitana menor':[0,1,3,5,7,8,11],'Lidia':[0,2,4,6,7,9,11],'Locria':[0,1,3,5,6,8,10]};
 const CHORDS={off:{n:'Ninguno'},tri:{n:'Tríada',deg:[0,2,4],chr:[0,4,7]},sep:{n:'Séptima',deg:[0,2,4,6],chr:[0,4,7,10]},pow:{n:'Quinta (power)',deg:[0,4],chr:[0,7]},sus:{n:'Sus4',deg:[0,3,4],chr:[0,5,7]},oct:{n:'Octava',deg:[0,5],chr:[0,12]}};
 let chordMode='off';
 const KEY=()=>P.key||(P.key={root:0,scale:'off',fit:false});
@@ -721,7 +727,7 @@ const tY=(bpm,R)=>TP+(1-(bpm-R.lo)/(R.hi-R.lo))*(TH-2*TP);
 const tBpmAt=(y,R)=>Math.round(clamp(R.lo+(1-(y-TP)/(TH-2*TP))*(R.hi-R.lo),20,400));
 function refreshTempoUI(){ $('tbar').hidden=!tempoShow; $('twrap').hidden=!tempoShow; $('tempoOn').classList.toggle('on',tempoShow||tList(false).length>0||sigPts(P).length>0||(P.marks||[]).length>0||!!(P.prog&&P.prog.text));
   const L=tList(false); if(tSel&&tSel!=='init'&&!L.includes(tSel)) tSel=null; if(sS&&sS!=='init'&&!(P.sigs||[]).includes(sS)) sS=null; if(mS&&!(P.marks||[]).includes(mS)) mS=null;
-  $('tabBpm').classList.toggle('on',tMode==='bpm'); $('tabSig').classList.toggle('on',tMode==='sig'); $('tabMark').classList.toggle('on',tMode==='mark'); $('tHint').hidden=tMode!=='bpm'; $('sHint').hidden=tMode!=='sig'; $('sCtl').hidden=tMode!=='sig'; $('mHint').hidden=tMode!=='mark'; $('mCtl').hidden=tMode!=='mark'; $('tabChord').classList.toggle('on',tMode==='chord'); $('cCtl').hidden=tMode!=='chord'; $('cHint').hidden=tMode!=='chord';
+  $('tabBpm').classList.toggle('on',tMode==='bpm'); $('tabSig').classList.toggle('on',tMode==='sig'); $('tabMark').classList.toggle('on',tMode==='mark'); $('tHint').hidden=tMode!=='bpm'; $('sHint').hidden=tMode!=='sig'; $('sCtl').hidden=tMode!=='sig'; $('mHint').hidden=tMode!=='mark'; $('mCtl').hidden=tMode!=='mark'; $('tabChord').classList.toggle('on',tMode==='chord'); $('cCtl').hidden=tMode!=='chord'; $('cHint').hidden=tMode!=='chord'; $('chelp').hidden=!(tMode==='chord'&&chOpen); $('cHelpBtn').classList.toggle('on',chOpen); if(tMode==='chord'&&chOpen) chRender();
   if(tMode==='chord') refreshChordInfo();
   if(tMode==='mark'){ if(mS&&document.activeElement!==$('mName')) $('mName').value=mS.name; $('mInfo').textContent=mS?'desde el compás '+(mS.bar+1)+' · ':'elige una marca o haz clic en la pista para poner una · '; $('mDelBtn').disabled=!mS; }
   if(tMode==='sig'){ if(sS){ const sg=sS==='init'?P.sig:sS.sig; $('sSel').value=sg[0]+'/'+sg[1]; } $('sInfo').textContent=sS?(sS==='init'?'inicial · ':'desde el compás '+(sS.bar+1)+' · '):'elige un compás y haz clic en la pista para ponerlo · '; $('sDelSig').disabled=!sS||sS==='init'; }
@@ -781,6 +787,48 @@ $('cGen').onclick=()=>{
   if($('cBass').checked){ mk('subfall','Bajo (progresión)',r.bass.map(x=>({b:x.b,l:x.l,m:x.m,v:.9}))); nb=r.bass.length; }
   sel=P.tracks.indexOf(tc); selNotes.clear(); renderTracks(); renderInspector(); layoutSpacer(); centerTrack(); touch(); populateAddInst(); invalidate();
   toast('Pista de acordes creada: '+r.chords.length+' acordes'+(nb?' y bajo':'')+'. Cambia el instrumento de la pista si quieres otro sonido','ok'); };
+// ── Ayuda de acordes: eliges raíz y escala y la tabla muestra los acordes que salen de apilar terceras sobre cada grado (sus2, tríada, sus4, séptima); un clic lo añade a la progresión ──
+const CH_GROUPS=[['Comunes',['Mayor','Menor natural']],['Extendidas',['Menor armónica','Menor melódica','Mayor armónica','Doble armónica mayor','Napolitana mayor','Napolitana menor']],['Modos',['Dórica','Frigia','Lidia','Mixolidia','Locria']]];
+const CH_LET=['C','D','E','F','G','A','B'], CH_LPC=[0,2,4,5,7,9,11], CH_NUM=['I','II','III','IV','V','VI','VII'];
+const CH_TRI={'4,7':'','3,7':'m','3,6':'dim','4,8':'aug','4,6':'maj(b5)','3,8':'m#5'};
+const CH_SEV={'4,7,11':'maj7','4,7,10':'7','3,7,10':'m7','3,7,11':'mMaj7','3,6,10':'m7b5','3,6,9':'dim7','4,8,11':'maj7#5','4,8,10':'7#5','4,6,10':'7b5','4,6,11':'maj7b5','3,6,11':'mMaj7b5'};
+// escritura correcta de las 7 notas (una letra por grado: en Fa mayor sale Sib y no La#). Prueba las grafías de la raíz y se queda con la de menos alteraciones; si nada cabe en un solo # o b, usa los nombres por sonido.
+function chSpell(rootPc,ivs){
+  let best=null;
+  for(let li=0;li<7;li++){ const ra=((rootPc-CH_LPC[li]+6+12)%12)-6; if(Math.abs(ra)>1) continue;
+    const names=[]; let ok=true,score=0;
+    for(let d=0;d<7;d++){ const L=(li+d)%7, pc=(rootPc+ivs[d])%12, a=((pc-CH_LPC[L]+6+12)%12)-6; if(Math.abs(a)>1){ ok=false; break; } score+=Math.abs(a); names.push(CH_LET[L]+(a>0?'#':a<0?'b':'')); }
+    if(ok&&(!best||score<best.score)) best={names,score}; }
+  return best?best.names:ivs.map(i=>NOTE_NAMES[(rootPc+i)%12]);
+}
+function chTable(rootPc,scaleName){
+  const ivs=SCALES[scaleName]; if(!ivs||ivs.length!==7) return null; const nm=chSpell(rootPc,ivs), cols=[];
+  for(let d=0;d<7;d++){ const i=k=>(ivs[(d+k)%7]-ivs[d]+12)%12, n=k=>nm[(d+k)%7], r=nm[d], th=i(2), fi=i(4), se=i(6), tq=CH_TRI[th+','+fi], sq=CH_SEV[th+','+fi+','+se];
+    const cell=(sym,ks)=>sym==null?null:{sym,notes:ks.map(n).join(' '),ch:parseChord(sym)};
+    cols.push({num:CH_NUM[d]+(tq==='dim'?'°':tq==='aug'?'+':''),root:r,
+      sus2:i(1)===2&&fi===7?cell(r+'sus2',[0,1,4]):null, tri:tq!=null?cell(r+tq,[0,2,4]):null, sus4:i(3)===5&&fi===7?cell(r+'sus4',[0,3,4]):null, sev:sq!=null?cell(r+sq,[0,2,4,6]):null}); }
+  return {root:nm[0],cols};
+}
+let chOpen=false, chRoot=0, chScale='Mayor', chAddMode=false;
+function chSetProg(v,label){ pushUndo(); v=v.slice(0,4000); if(v.trim()) P.prog={text:v}; else delete P.prog; touch(); refreshChordInfo(); invalidate(); refreshTempoUI(); }
+function chAdd(sym,sameBar){ const t=((P.prog&&P.prog.text)||'').replace(/\s+$/,''); chSetProg(!t?sym:sameBar&&!/\|$/.test(t)?t+' '+sym:t+(/\|$/.test(t)?' ':' | ')+sym); }
+function chRender(){
+  const T=chTable(chRoot,chScale), box=$('chTab'); box.textContent=''; $('chTitle').textContent=T?T.root+' '+chScale.toLowerCase():''; $('chMode').textContent=chAddMode?'➕🔊 Modo: añadir y oír':'🔊 Modo: solo oír'; $('chMode').classList.toggle('on',chAddMode);
+  for(const b of $('chRoots').children) b.classList.toggle('on',+b.dataset.r===chRoot);
+  if(!T){ box.append(el('div',{class:'hint',text:'Esa escala no tiene 7 grados: elige otra.'})); return; }
+  const grid=el('div',{class:'chgrid'}); grid.append(el('div',{class:'chh'}));
+  for(const c of T.cols) grid.append(el('div',{class:'chh'},el('b',{text:c.num}),el('small',{text:c.root})));
+  for(const [k,lab] of [['sus2','SUS2'],['tri','TRÍADA'],['sus4','SUS4'],['sev','7ª']]){ grid.append(el('div',{class:'chl',text:lab}));
+    for(const c of T.cols){ const x=c[k]; grid.append(x?el('button',{class:'sm chc',text:x.sym,title:'Notas: '+x.notes+(chAddMode?' · clic = oír y añadir (Mayús+clic = en el mismo compás)':' · clic = oír'),onclick:e=>{ if(x.ch) previewChord(x.ch); if(chAddMode) chAdd(x.sym,e.shiftKey); }}):el('div',{class:'chn',text:'—'})); } }
+  box.append(grid);
+}
+{ const rs=$('chRoots'); NOTE_NAMES.forEach((n,i)=>rs.append(el('button',{class:'sm',text:n,'data-r':i,onclick:()=>{ chRoot=i; chRender(); }})));
+  const sel=$('chScale'); for(const [g,list] of CH_GROUPS){ const og=el('optgroup',{label:g}); for(const k of list) og.append(el('option',{value:k,text:k})); sel.append(og); } sel.value=chScale; sel.onchange=()=>{ chScale=sel.value; chRender(); };
+  $('chUse').onclick=()=>{ const k=KEY(); if(!SCALES[k.scale]||SCALES[k.scale].length!==7){ toast(k.scale==='off'?'El proyecto no tiene escala elegida (se pone en «Escala», junto al piano roll)':'La escala del proyecto («'+k.scale+'») no tiene 7 grados: no da acordes por grado','err'); return; } chRoot=k.root; chScale=k.scale; sel.value=chScale; chRender(); };
+  $('chClear').onclick=()=>{ if((P.prog&&P.prog.text)||'') chSetProg(''); };
+  $('chLast').onclick=()=>{ const t=((P.prog&&P.prog.text)||'').replace(/\s+$/,''); if(!t) return; chSetProg(t.replace(/\s*\|\s*$/,'').replace(/(\s+|\s*\|\s*)?[^\s|]+$/,'')); };
+  $('chMode').onclick=()=>{ chAddMode=!chAddMode; chRender(); };
+  $('cHelpBtn').onclick=()=>{ chOpen=!chOpen; refreshTempoUI(); }; }
 let cUndone=false;
 $('cText').onfocus=()=>{ cUndone=false; }; $('cText').onblur=()=>{ cUndone=false; };
 $('cText').oninput=e=>{ if(!cUndone){ pushUndo(); cUndone=true; } const v=e.target.value.slice(0,4000); if(v.trim()) P.prog={text:v}; else delete P.prog; touch(); refreshChordInfo(); invalidate(); refreshTempoUI(); };

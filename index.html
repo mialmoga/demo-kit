@@ -575,7 +575,11 @@ html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *:
     </div>
     <div id="chelp" class="abar" hidden>
       <div id="chRoots" class="chrow" aria-label="Nota raíz"></div>
+<<<<<<< Updated upstream
       <div class="chrow"><select id="chScale" aria-label="Escala"></select> <b id="chTitle"></b> <button id="chUse" class="sm" title="Toma la raíz y la escala elegidas en el piano roll («Escala»)">Usar la del proyecto</button> <button id="chLast" class="sm" title="Quita el último acorde del texto">⌫ Quitar último</button> <button id="chClear" class="sm danger" title="Vacía el texto de la progresión (se puede deshacer)">Borrar progresión</button> <span class="hint">clic = acorde en un compás nuevo · Mayús+clic = en el mismo compás</span></div>
+=======
+      <div class="chrow"><select id="chScale" aria-label="Escala"></select> <b id="chTitle"></b> <button id="chMode" class="sm" title="Solo oír: tocar un acorde de la tabla solo suena. Añadir y oír: además lo añade a la progresión">🔊 Modo: solo oír</button> <button id="chUse" class="sm" title="Toma la raíz y la escala elegidas en el piano roll («Escala»)">Usar la del proyecto</button> <button id="chLast" class="sm" title="Quita el último acorde del texto">⌫ Quitar último</button> <button id="chClear" class="sm danger" title="Vacía el texto de la progresión (se puede deshacer)">Borrar progresión</button> <span class="hint">clic = oír el acorde (con el instrumento de la pista seleccionada) · en modo «añadir» también lo añade en un compás nuevo; Mayús+clic = en el mismo compás</span></div>
+>>>>>>> Stashed changes
       <div id="chTab"></div>
     </div>
     <div id="twrap" hidden><canvas id="tcv"></canvas></div>
@@ -1022,16 +1026,29 @@ function progChords(P){
 function progAt(P,beat){ let r=null; for(const c of progChords(P).chords){ if(c.b0<=beat+1e-9) r=c; else break; } return r&&r.ok?r:null; }   // acorde que suena en ese pulso (null si no hay o no se entendió)
 // Acordes cerrados con la conducción de voces más suave: de cada acorde elige la inversión y octava cuyo centro queda más cerca del acorde anterior (el primero, cerca de do central).
 // Con más de 4 notas quita primero la quinta y luego la oncena, para que 9/11/13 no queden empastados. Devuelve {chords:[{b,l,ms:[midi…]}], bass:[{b,l,m}]}.
+// un acorde → notas MIDI cerradas cerca de `prev` (centro del acorde anterior): elige la inversión y octava de centro más cercano. Devuelve {ms, mean}.
+function voiceChord(c,prev){
+  let iv=c.ivs.slice(); if(iv.length>4){ const k=iv.findIndex(x=>x===7||x===6||x===8); if(k>0&&iv.length>4) iv.splice(k,1); } if(iv.length>5){ const k=iv.indexOf(17); if(k>0) iv.splice(k,1); }
+  const cands=[]; for(let r=0;r<iv.length;r++){ const v=iv.map((x,i)=>c.root+x+(i<r?12:0)).sort((a,b)=>a-b); const mean=v.reduce((a,b)=>a+b,0)/v.length, sh=Math.round((prev-mean)/12)*12; const ms=v.map(m=>m+sh); const mn=ms.reduce((a,b)=>a+b,0)/ms.length; cands.push({ms,d:Math.abs(mn-prev)}); }
+  cands.sort((a,b)=>a.d-b.d); let ms=cands[0].ms; while(Math.min(...ms)<48) ms=ms.map(m=>m+12); while(Math.max(...ms)>84) ms=ms.map(m=>m-12);
+  return {ms,mean:ms.reduce((a,b)=>a+b,0)/ms.length};
+}
 function progToNotes(P,opts){
   const L=progChords(P).chords.filter(c=>c.ok), o=Object.assign({center:62,gap:.02},opts||{}), out={chords:[],bass:[]}; let prev=o.center;
   for(const c of L){
-    let iv=c.ivs.slice(); if(iv.length>4){ const k=iv.findIndex(x=>x===7||x===6||x===8); if(k>0&&iv.length>4) iv.splice(k,1); } if(iv.length>5){ const k=iv.indexOf(17); if(k>0) iv.splice(k,1); }
-    const cands=[]; for(let r=0;r<iv.length;r++){ const v=iv.map((x,i)=>c.root+x+(i<r?12:0)).sort((a,b)=>a-b); const mean=v.reduce((a,b)=>a+b,0)/v.length, sh=Math.round((prev-mean)/12)*12; const ms=v.map(m=>m+sh); const mn=ms.reduce((a,b)=>a+b,0)/ms.length; cands.push({ms,d:Math.abs(mn-prev)}); }
-    cands.sort((a,b)=>a.d-b.d); let ms=cands[0].ms; while(Math.min(...ms)<48) ms=ms.map(m=>m+12); while(Math.max(...ms)>84) ms=ms.map(m=>m-12);
-    prev=ms.reduce((a,b)=>a+b,0)/ms.length; const len=Math.max(.05,c.b1-c.b0-o.gap);
-    out.chords.push({b:r6(c.b0),l:r6(len),ms});
+    const v=voiceChord(c,prev); prev=v.mean; const len=Math.max(.05,c.b1-c.b0-o.gap);
+    out.chords.push({b:r6(c.b0),l:r6(len),ms:v.ms});
     const bp=c.bass!=null?c.bass:c.root; out.bass.push({b:r6(c.b0),l:r6(len),m:36+(((bp-36)%12)+12)%12}); }
   return out;
+}
+// vista previa de un acorde con el instrumento de la pista: los instrumentos que leen la progresión (usesProg) reciben el acorde tal cual; los demás, sus notas cerradas juntas
+function previewChordBuffer(P,tr,c,sec){
+  const inst=INSTRUMENTS[tr.inst]; if(!inst) throw new Error('instrumento no disponible');
+  const beat=60/P.bpm, lenB=sec/beat, dur=Math.min(6,sec+2.6), K=Kit.make(SR,dur,7); K.sr=SR;
+  if(inst.usesProg){ const t2=Object.assign({},tr,{params:Object.assign({},tr.params,(inst.params||[]).some(x=>x.k==='circulo')?{circulo:'proyecto'}:{})});
+    const na=noteArgs(K,P,t2,{b:0,l:lenB,m:c.root+48,v:.9},beat,0); na.chords=[{t0:0,t1:sec,sym:c.sym,root:c.root,bass:c.bass,ivs:c.ivs,pcs:c.pcs}]; inst.play(K,na); }
+  else for(const m of voiceChord(c,62).ms) inst.play(K,noteArgs(K,P,tr,{b:0,l:lenB,m,v:.8},beat,0));
+  return withFx(P,tr,K.mix(()=>1));
 }
 function newProject(name,bpm,bars){return {name:name||'Sin título',bpm:bpm||120,bars:bars||8,sig:[4,4],seed:KIT_SEED,sc:{mode:'param',depth:.7,rel:.12,table:null,rate:800},master:Object.assign({},MASTER_DEF),tracks:[],clips:{}};}
 function newTrack(instId,name){
@@ -1934,6 +1951,12 @@ function previewNote(n,tr){
     const s=a.createBufferSource(); s.buffer=toAudioBuffer(out); s.connect(a.destination); s.start(); pvSrc=s; }
   catch(e){ console.error(e); toast('Error en la vista previa: '+e.message,'err'); }
 }
+// oír un acorde de la ayuda: con el instrumento de la pista seleccionada si es melódico; si es batería/kit o no hay pista, con un pad
+function previewChord(c){
+  let tr=P.tracks[sel]; const inst=tr&&INSTRUMENTS[tr.inst]; if(!tr||!inst||inst.kind==='perc'||inst.kind==='kit') tr=newTrack('pad','Vista previa');
+  try{ const out=previewChordBuffer(P,tr,c,1.6), a=ac(); if(pvSrc){try{pvSrc.stop();}catch(e){}}
+    const s=a.createBufferSource(); s.buffer=toAudioBuffer(out); s.connect(a.destination); s.start(); pvSrc=s; }
+  catch(e){ console.error(e); toast('Error en la vista previa: '+e.message,'err'); } }
 let pvTimer=0;
 function previewTrack(){ clearTimeout(pvTimer); pvTimer=setTimeout(()=>{ const tr=P.tracks[sel]; if(!tr) return; prewarm();
   const n=[...selNotes][0]||tr.notes[0]||{b:0,l:.5,m:INSTRUMENTS[tr.inst]&&INSTRUMENTS[tr.inst].kind==='perc'?0:60,v:1}; previewNote(n,tr); },160); }
@@ -2655,22 +2678,38 @@ function chSpell(rootPc,ivs){
 function chTable(rootPc,scaleName){
   const ivs=SCALES[scaleName]; if(!ivs||ivs.length!==7) return null; const nm=chSpell(rootPc,ivs), cols=[];
   for(let d=0;d<7;d++){ const i=k=>(ivs[(d+k)%7]-ivs[d]+12)%12, n=k=>nm[(d+k)%7], r=nm[d], th=i(2), fi=i(4), se=i(6), tq=CH_TRI[th+','+fi], sq=CH_SEV[th+','+fi+','+se];
+<<<<<<< Updated upstream
     const cell=(sym,ks)=>sym==null?null:{sym,notes:ks.map(n).join(' ')};
+=======
+    const cell=(sym,ks)=>sym==null?null:{sym,notes:ks.map(n).join(' '),ch:parseChord(sym)};
+>>>>>>> Stashed changes
     cols.push({num:CH_NUM[d]+(tq==='dim'?'°':tq==='aug'?'+':''),root:r,
       sus2:i(1)===2&&fi===7?cell(r+'sus2',[0,1,4]):null, tri:tq!=null?cell(r+tq,[0,2,4]):null, sus4:i(3)===5&&fi===7?cell(r+'sus4',[0,3,4]):null, sev:sq!=null?cell(r+sq,[0,2,4,6]):null}); }
   return {root:nm[0],cols};
 }
+<<<<<<< Updated upstream
 let chOpen=false, chRoot=0, chScale='Mayor';
 function chSetProg(v,label){ pushUndo(); v=v.slice(0,4000); if(v.trim()) P.prog={text:v}; else delete P.prog; touch(); refreshChordInfo(); invalidate(); refreshTempoUI(); }
 function chAdd(sym,sameBar){ const t=((P.prog&&P.prog.text)||'').replace(/\s+$/,''); chSetProg(!t?sym:sameBar&&!/\|$/.test(t)?t+' '+sym:t+(/\|$/.test(t)?' ':' | ')+sym); }
 function chRender(){
   const T=chTable(chRoot,chScale), box=$('chTab'); box.textContent=''; $('chTitle').textContent=T?T.root+' '+chScale.toLowerCase():'';
+=======
+let chOpen=false, chRoot=0, chScale='Mayor', chAddMode=false;
+function chSetProg(v,label){ pushUndo(); v=v.slice(0,4000); if(v.trim()) P.prog={text:v}; else delete P.prog; touch(); refreshChordInfo(); invalidate(); refreshTempoUI(); }
+function chAdd(sym,sameBar){ const t=((P.prog&&P.prog.text)||'').replace(/\s+$/,''); chSetProg(!t?sym:sameBar&&!/\|$/.test(t)?t+' '+sym:t+(/\|$/.test(t)?' ':' | ')+sym); }
+function chRender(){
+  const T=chTable(chRoot,chScale), box=$('chTab'); box.textContent=''; $('chTitle').textContent=T?T.root+' '+chScale.toLowerCase():''; $('chMode').textContent=chAddMode?'➕🔊 Modo: añadir y oír':'🔊 Modo: solo oír'; $('chMode').classList.toggle('on',chAddMode);
+>>>>>>> Stashed changes
   for(const b of $('chRoots').children) b.classList.toggle('on',+b.dataset.r===chRoot);
   if(!T){ box.append(el('div',{class:'hint',text:'Esa escala no tiene 7 grados: elige otra.'})); return; }
   const grid=el('div',{class:'chgrid'}); grid.append(el('div',{class:'chh'}));
   for(const c of T.cols) grid.append(el('div',{class:'chh'},el('b',{text:c.num}),el('small',{text:c.root})));
   for(const [k,lab] of [['sus2','SUS2'],['tri','TRÍADA'],['sus4','SUS4'],['sev','7ª']]){ grid.append(el('div',{class:'chl',text:lab}));
+<<<<<<< Updated upstream
     for(const c of T.cols){ const x=c[k]; grid.append(x?el('button',{class:'sm chc',text:x.sym,title:'Notas: '+x.notes+' · clic = compás nuevo · Mayús+clic = en el mismo compás',onclick:e=>chAdd(x.sym,e.shiftKey)}):el('div',{class:'chn',text:'—'})); } }
+=======
+    for(const c of T.cols){ const x=c[k]; grid.append(x?el('button',{class:'sm chc',text:x.sym,title:'Notas: '+x.notes+(chAddMode?' · clic = oír y añadir (Mayús+clic = en el mismo compás)':' · clic = oír'),onclick:e=>{ if(x.ch) previewChord(x.ch); if(chAddMode) chAdd(x.sym,e.shiftKey); }}):el('div',{class:'chn',text:'—'})); } }
+>>>>>>> Stashed changes
   box.append(grid);
 }
 { const rs=$('chRoots'); NOTE_NAMES.forEach((n,i)=>rs.append(el('button',{class:'sm',text:n,'data-r':i,onclick:()=>{ chRoot=i; chRender(); }})));
@@ -2678,6 +2717,10 @@ function chRender(){
   $('chUse').onclick=()=>{ const k=KEY(); if(!SCALES[k.scale]||SCALES[k.scale].length!==7){ toast(k.scale==='off'?'El proyecto no tiene escala elegida (se pone en «Escala», junto al piano roll)':'La escala del proyecto («'+k.scale+'») no tiene 7 grados: no da acordes por grado','err'); return; } chRoot=k.root; chScale=k.scale; sel.value=chScale; chRender(); };
   $('chClear').onclick=()=>{ if((P.prog&&P.prog.text)||'') chSetProg(''); };
   $('chLast').onclick=()=>{ const t=((P.prog&&P.prog.text)||'').replace(/\s+$/,''); if(!t) return; chSetProg(t.replace(/\s*\|\s*$/,'').replace(/(\s+|\s*\|\s*)?[^\s|]+$/,'')); };
+<<<<<<< Updated upstream
+=======
+  $('chMode').onclick=()=>{ chAddMode=!chAddMode; chRender(); };
+>>>>>>> Stashed changes
   $('cHelpBtn').onclick=()=>{ chOpen=!chOpen; refreshTempoUI(); }; }
 let cUndone=false;
 $('cText').onfocus=()=>{ cUndone=false; }; $('cText').onblur=()=>{ cUndone=false; };

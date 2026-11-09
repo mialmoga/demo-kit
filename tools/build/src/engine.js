@@ -252,16 +252,29 @@ function progChords(P){
 function progAt(P,beat){ let r=null; for(const c of progChords(P).chords){ if(c.b0<=beat+1e-9) r=c; else break; } return r&&r.ok?r:null; }   // acorde que suena en ese pulso (null si no hay o no se entendió)
 // Acordes cerrados con la conducción de voces más suave: de cada acorde elige la inversión y octava cuyo centro queda más cerca del acorde anterior (el primero, cerca de do central).
 // Con más de 4 notas quita primero la quinta y luego la oncena, para que 9/11/13 no queden empastados. Devuelve {chords:[{b,l,ms:[midi…]}], bass:[{b,l,m}]}.
+// un acorde → notas MIDI cerradas cerca de `prev` (centro del acorde anterior): elige la inversión y octava de centro más cercano. Devuelve {ms, mean}.
+function voiceChord(c,prev){
+  let iv=c.ivs.slice(); if(iv.length>4){ const k=iv.findIndex(x=>x===7||x===6||x===8); if(k>0&&iv.length>4) iv.splice(k,1); } if(iv.length>5){ const k=iv.indexOf(17); if(k>0) iv.splice(k,1); }
+  const cands=[]; for(let r=0;r<iv.length;r++){ const v=iv.map((x,i)=>c.root+x+(i<r?12:0)).sort((a,b)=>a-b); const mean=v.reduce((a,b)=>a+b,0)/v.length, sh=Math.round((prev-mean)/12)*12; const ms=v.map(m=>m+sh); const mn=ms.reduce((a,b)=>a+b,0)/ms.length; cands.push({ms,d:Math.abs(mn-prev)}); }
+  cands.sort((a,b)=>a.d-b.d); let ms=cands[0].ms; while(Math.min(...ms)<48) ms=ms.map(m=>m+12); while(Math.max(...ms)>84) ms=ms.map(m=>m-12);
+  return {ms,mean:ms.reduce((a,b)=>a+b,0)/ms.length};
+}
 function progToNotes(P,opts){
   const L=progChords(P).chords.filter(c=>c.ok), o=Object.assign({center:62,gap:.02},opts||{}), out={chords:[],bass:[]}; let prev=o.center;
   for(const c of L){
-    let iv=c.ivs.slice(); if(iv.length>4){ const k=iv.findIndex(x=>x===7||x===6||x===8); if(k>0&&iv.length>4) iv.splice(k,1); } if(iv.length>5){ const k=iv.indexOf(17); if(k>0) iv.splice(k,1); }
-    const cands=[]; for(let r=0;r<iv.length;r++){ const v=iv.map((x,i)=>c.root+x+(i<r?12:0)).sort((a,b)=>a-b); const mean=v.reduce((a,b)=>a+b,0)/v.length, sh=Math.round((prev-mean)/12)*12; const ms=v.map(m=>m+sh); const mn=ms.reduce((a,b)=>a+b,0)/ms.length; cands.push({ms,d:Math.abs(mn-prev)}); }
-    cands.sort((a,b)=>a.d-b.d); let ms=cands[0].ms; while(Math.min(...ms)<48) ms=ms.map(m=>m+12); while(Math.max(...ms)>84) ms=ms.map(m=>m-12);
-    prev=ms.reduce((a,b)=>a+b,0)/ms.length; const len=Math.max(.05,c.b1-c.b0-o.gap);
-    out.chords.push({b:r6(c.b0),l:r6(len),ms});
+    const v=voiceChord(c,prev); prev=v.mean; const len=Math.max(.05,c.b1-c.b0-o.gap);
+    out.chords.push({b:r6(c.b0),l:r6(len),ms:v.ms});
     const bp=c.bass!=null?c.bass:c.root; out.bass.push({b:r6(c.b0),l:r6(len),m:36+(((bp-36)%12)+12)%12}); }
   return out;
+}
+// vista previa de un acorde con el instrumento de la pista: los instrumentos que leen la progresión (usesProg) reciben el acorde tal cual; los demás, sus notas cerradas juntas
+function previewChordBuffer(P,tr,c,sec){
+  const inst=INSTRUMENTS[tr.inst]; if(!inst) throw new Error('instrumento no disponible');
+  const beat=60/P.bpm, lenB=sec/beat, dur=Math.min(6,sec+2.6), K=Kit.make(SR,dur,7); K.sr=SR;
+  if(inst.usesProg){ const t2=Object.assign({},tr,{params:Object.assign({},tr.params,(inst.params||[]).some(x=>x.k==='circulo')?{circulo:'proyecto'}:{})});
+    const na=noteArgs(K,P,t2,{b:0,l:lenB,m:c.root+48,v:.9},beat,0); na.chords=[{t0:0,t1:sec,sym:c.sym,root:c.root,bass:c.bass,ivs:c.ivs,pcs:c.pcs}]; inst.play(K,na); }
+  else for(const m of voiceChord(c,62).ms) inst.play(K,noteArgs(K,P,tr,{b:0,l:lenB,m,v:.8},beat,0));
+  return withFx(P,tr,K.mix(()=>1));
 }
 function newProject(name,bpm,bars){return {name:name||'Sin título',bpm:bpm||120,bars:bars||8,sig:[4,4],seed:KIT_SEED,sc:{mode:'param',depth:.7,rel:.12,table:null,rate:800},master:Object.assign({},MASTER_DEF),tracks:[],clips:{}};}
 function newTrack(instId,name){
