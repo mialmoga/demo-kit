@@ -1981,7 +1981,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 
 // ───────────── proyecto: cambios ─────────────
 let asTimer=0;
-function touch(){ histNote(); version++; dirty=true; updateStat(); refreshCounts(); invalidate();
+function touch(){ histNote(); version++; dirty=true; updateStat(); refreshCounts(); refreshOverlapUI(); invalidate();
   clearTimeout(asTimer); asTimer=setTimeout(()=>{ try{ if(Object.keys(P.clips).length) return; localStorage.setItem('demokit-studio-autosave',JSON.stringify(projectToJSON(P))); }catch(e){} },900); }
 // ───────────── historial global: deshacer / rehacer de TODO el proyecto ─────────────
 // Cada cambio guarda una foto del proyecto (JSON; los arreglos de audio —clips, tabla de sidechain— van por referencia).
@@ -2056,8 +2056,9 @@ function trimOut(L,R,sc){ if(sc.mode!=='trim') return [L,R]; const n=Math.min(L.
 
 // ───────────── instrumentos monofónicos: notas que se pisan ─────────────
 // Un instrumento es monofónico si lo declara (mono:true en su definición) o canta letra (lyrics). Se marca la nota que la siguiente pisa.
-const isMono=inst=>!!inst&&(inst.mono===true||!!inst.lyrics);
-function monoOverlaps(tr){ const out={set:new Set(),same:0}; if(!tr||!isMono(INSTRUMENTS[tr.inst])) return out;
+// monofónico: siempre (mono:true o con letra) o según los parámetros de la pista (monoWhen: p=>…, p. ej. la Forja con el legato activado)
+const isMono=(inst,tr)=>!!inst&&(inst.mono===true||!!inst.lyrics||(typeof inst.monoWhen==='function'&&!!tr&&!!inst.monoWhen(tr.params||{})));
+function monoOverlaps(tr){ const out={set:new Set(),same:0}; if(!tr||!isMono(INSTRUMENTS[tr.inst],tr)) return out;
   const S=tr.notes.slice().sort((a,b)=>a.b-b.b); for(let i=0;i+1<S.length;i++){ const a=S[i],b=S[i+1]; if(a.b+(a.l||.25)>b.b+1e-6){ out.set.add(a); if(b.b-a.b<1e-6) out.same++; } } return out; }
 function refreshOverlapUI(){ const tr=P.tracks[sel], ov=monoOverlaps(tr), box=$('ovAct'), b=$('bTrimOv'); if(!box) return; box.hidden=!ov.set.size;
   if(ov.set.size) b.textContent='⚠ '+ov.set.size+' nota'+(ov.set.size>1?'s':'')+' se pisan · recortar'; }
