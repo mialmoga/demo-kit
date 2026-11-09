@@ -37,10 +37,10 @@ function startPlayback(buf,offset,loop,isProject,delay){
   playLoopEnd=0; if(loop&&isProject){ s.loopStart=0; s.loopEnd=playLoopEnd=Math.min(buf.duration,tmap(P).sec(meter(P).total(P.bars))); if(offset>=playLoopEnd-.01) offset=0; }
   s.onended=()=>{ if(srcNode===s) stop(); };
   playStartCtx=a.currentTime+.02+(delay||0); playOffset=offset; playLoop=!!loop; playDur=buf.duration; playIsProject=!!isProject;
-  s.start(playStartCtx,offset); srcNode=s; playing=true; $('bPlay').textContent='■ Detener'; acquireWake(); invalidate(); if(isProject) startMetro();
+  s.start(playStartCtx,offset); srcNode=s; playing=true; $('bPlay').textContent='■ Detener'; $('bPlay2').textContent='■'; acquireWake(); invalidate(); if(isProject) startMetro();
 }
 function stopSource(){ if(srcNode){ srcNode.onended=null; try{srcNode.stop();}catch(e){} srcNode=null; } }
-function stop(){ stopMetro(); recFinish(); for(const o of clickNodes){ try{o.stop();}catch(e){} } clickNodes.length=0; stopSource(); playing=false; $('bPlay').textContent='▶ Play'; releaseWake(); invalidate(); }
+function stop(){ stopMetro(); recFinish(); for(const o of clickNodes){ try{o.stop();}catch(e){} } clickNodes.length=0; stopSource(); playing=false; $('bPlay').textContent='▶ Play'; $('bPlay2').textContent='▶'; releaseWake(); invalidate(); }
 function playheadBeat(){ if(!playing||!ctx||!playIsProject) return null; let pos=playOffset+Math.max(0,ctx.currentTime-playStartCtx); if(playLoop&&playDur>0) pos%=(playLoopEnd||playDur); return tmap(P).beat(pos); }
 async function togglePlay(){
   if(playing){ stop(); return; }
@@ -303,6 +303,7 @@ cv.addEventListener('pointerdown',e=>{
   if(px<KW){ if(!info.perc&&m>=0&&m<=127) previewNote({b:0,l:.5,m,v:1}); else if(info.perc&&m>=0&&m<info.rows) previewNote({b:0,l:.5,m,v:1}); return; }
   cv.setPointerCapture(e.pointerId); const h=hit(tr,info,inst,px,py);
   if(mode==='erase'){ if(h){ pushUndo(); tr.notes.splice(tr.notes.indexOf(h.n),1); selNotes.delete(h.n); touch(); } return; }
+  if(mode==='stretch'){ if(h){ if(!selNotes.has(h.n)) selNotes=new Set([h.n]); drag={kind:'resize',startBeat:bx,undone:false,orig:[...selNotes].map(n=>({n,b:n.b,m:n.m,l:n.l||.25}))}; renderSelInfo(); invalidate(); } return; }   // Estirar: solo cambia el largo, desde cualquier punto de la nota; nunca mueve ni crea
   if(h){
     let tap=null; if(mode==='select'){ if(!selNotes.has(h.n)) selNotes.add(h.n); else tap=h.n; } else if(e.shiftKey){ if(selNotes.has(h.n)) selNotes.delete(h.n); else selNotes.add(h.n); } else if(!selNotes.has(h.n)) selNotes=new Set([h.n]);
     drag={kind:h.edge?'resize':'move',tap,startBeat:bx,startM:m,undone:false,orig:[...selNotes].map(n=>({n,b:n.b,m:n.m,l:n.l||.25}))};
@@ -322,7 +323,7 @@ cv.addEventListener('pointerdown',e=>{
 });
 cv.addEventListener('pointermove',e=>{
   lastPX=e.clientX; lastPY=e.clientY; if(pan){ wrap.scrollLeft=pan.sx-(e.clientX-pan.x); wrap.scrollTop=pan.sy-(e.clientY-pan.y); return; } const tr=P.tracks[sel]; const r=cv.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
-  if(!drag){ if(mode==='draw'&&tr&&px>=KW&&py>=RUL){ const info=trackInfo(tr),inst=INSTRUMENTS[tr.inst]||{}; const h=hit(tr,info,inst,px,py); cv.style.cursor=h?(h.edge?'ew-resize':'pointer'):'crosshair'; } else cv.style.cursor=mode==='erase'?'not-allowed':(mode==='select'?'crosshair':(mode==='nav'?'grab':'default')); return; }
+  if(!drag){ if(mode==='draw'&&tr&&px>=KW&&py>=RUL){ const info=trackInfo(tr),inst=INSTRUMENTS[tr.inst]||{}; const h=hit(tr,info,inst,px,py); cv.style.cursor=h?(h.edge?'ew-resize':'pointer'):'crosshair'; } else cv.style.cursor=mode==='stretch'?'ew-resize':mode==='erase'?'not-allowed':(mode==='select'?'crosshair':(mode==='nav'?'grab':'default')); return; }
   const info=trackInfo(tr), bx=pxToBeat(px), m=pyToM(info,py), minL=snap>0?snap:.0625;
   const undoOnce=()=>{ if(!drag.undone){ pushUndo(); drag.undone=true; } };
   if(drag.kind==='move'){
@@ -386,7 +387,7 @@ wrap.addEventListener('scroll',invalidate);
 wrap.addEventListener('wheel',e=>{ if(e.ctrlKey||e.metaKey){ e.preventDefault(); zoom(e.deltaY<0?1.15:1/1.15); } },{passive:false});
 new ResizeObserver(()=>{ layoutSpacer(); invalidate(); }).observe(wrap);
 function zoom(f){ const c=(wrap.scrollLeft+wrap.clientWidth/2-KW)/BW; BW=clamp(BW*f,6,260); layoutSpacer(); wrap.scrollLeft=Math.max(0,c*BW-(wrap.clientWidth/2-KW)); invalidate(); }
-function setMode(m){ mode=m; for(const [id,k] of [['mDraw','draw'],['mNav','nav'],['mErase','erase'],['mSel','select']]) $(id).classList.toggle('on',k===m); cv.style.touchAction=m==='nav'?'auto':'none'; }
+function setMode(m){ mode=m; for(const [id,k] of [['mDraw','draw'],['mNav','nav'],['mErase','erase'],['mSel','select'],['mStretch','stretch']]) $(id).classList.toggle('on',k===m); cv.style.touchAction=m==='nav'?'auto':'none'; }
 
 // teclado
 document.addEventListener('keydown',e=>{
@@ -417,6 +418,10 @@ document.addEventListener('keydown',e=>{
 function delSel(){ const tr=P.tracks[sel]; if(!tr||!selNotes.size) return; pushUndo(); tr.notes=tr.notes.filter(n=>!selNotes.has(n)); selNotes.clear(); touch(); renderSelInfo(); }
 function dupSel(){ const tr=P.tracks[sel]; if(!tr||!selNotes.size) return; pushUndo(); const arr=[...selNotes]; let a=Infinity,b=0; for(const n of arr){ a=Math.min(a,n.b); b=Math.max(b,n.b+(n.l||.25)); }
   let sh=b-a; if(snap>0) sh=Math.ceil(sh/snap-1e-9)*snap; const copies=arr.map(n=>Object.assign(JSON.parse(JSON.stringify(n)),{b:r6(n.b+sh)})); tr.notes.push(...copies); selNotes=new Set(copies); fitBars(); touch(); renderSelInfo(); }
+// ◀ ▶ mueven la selección una unidad de la rejilla y − + le cambian el largo (como las flechas del teclado, pero con el dedo); varios toques seguidos son un solo paso de deshacer
+let nudgeT=0; const nudgeUndo=()=>{ const now=Date.now(); if(now-nudgeT>900) pushUndo(); nudgeT=now; };
+function nudgeSel(dir){ const tr=P.tracks[sel]; if(!tr||!selNotes.size) return; nudgeUndo(); const st=snap>0?snap:.25; for(const n of selNotes) n.b=Math.max(0,r6(n.b+dir*st)); fitBars(); touch(); renderSelInfo(); invalidate(); }
+function lenSel(dir){ const tr=P.tracks[sel]; if(!tr||!selNotes.size) return; nudgeUndo(); const st=snap>0?snap:.25, minL=snap>0?snap:.0625; for(const n of selNotes){ n.l=Math.max(minL,r6((n.l||.25)+dir*st)); lastLen=n.l; } fitBars(); touch(); renderSelInfo(); invalidate(); }
 function shiftSel(up){ const tr=P.tracks[sel]; if(!tr||!selNotes.size) return; const info=trackInfo(tr); pushUndo(); for(const n of selNotes) n.m=info.perc?clamp(n.m+(up?-1:1),0,info.rows-1):clamp(n.m+(up?1:-1),0,127); touch(); }
 $('sDup').onclick=dupSel; $('sDel').onclick=delSel; $('sUp').onclick=()=>shiftSel(true); $('sDn').onclick=()=>shiftSel(false);
 // la franja y la cabecera se pliegan; en pantallas chicas arrancan cerradas (el estado se recuerda en este navegador)
@@ -1402,7 +1407,8 @@ $('bWav').onclick=async()=>{ const sc=await exportScope(); if(!sc) return; let L
   else { if(dirty||!cache){ if(!(await doRender())) return; } [L,R]=trimOut(cache.L,cache.R,sc); }
   const nm=(P.name||'cancion').replace(/[^\w\-]+/g,'_')+'_'+kitTag()+'.wav'; download(encodeWav(L,R,SR),nm); toast('WAV exportado: «'+nm+'» ('+fmtT(L.length/SR)+')','ok'); };
 $('bAdd').onclick=()=>addTrack($('addInst').value);
-$('mDraw').onclick=()=>setMode('draw'); $('mNav').onclick=()=>setMode('nav'); $('mErase').onclick=()=>setMode('erase'); $('mSel').onclick=()=>setMode('select');
+$('mDraw').onclick=()=>setMode('draw'); $('mNav').onclick=()=>setMode('nav'); $('mErase').onclick=()=>setMode('erase'); $('mSel').onclick=()=>setMode('select'); $('mStretch').onclick=()=>setMode('stretch');
+$('sL').onclick=()=>nudgeSel(-1); $('sR').onclick=()=>nudgeSel(1); $('sShort').onclick=()=>lenSel(-1); $('sLong').onclick=()=>lenSel(1); $('bPlay2').onclick=togglePlay; $('bHome').onclick=()=>{ setCursor(0); wrap.scrollLeft=0; };
 $('zIn').onclick=()=>zoom(1.25); $('zOut').onclick=()=>zoom(1/1.25);
 { const s=$('snap'); for(const [v,l] of [[1,'1/4'],[.5,'1/8'],[.25,'1/16'],[.125,'1/32'],[1/3,'1/8 tresillo'],[1/6,'1/16 tresillo'],[0,'libre']]) s.append(el('option',{value:v,text:l})); s.value=.25; s.onchange=()=>{ snap=+s.value; invalidate(); }; }
 const drop=$('drop'); for(const ev of ['dragenter','dragover']) window.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add('over'); });

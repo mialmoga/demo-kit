@@ -527,13 +527,18 @@ html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *:
           <button id="mNav" class="sm" title="Desplazar con el dedo"><i>✋</i><span class="lb"> Navegar</span></button>
           <button id="mErase" class="sm" title="Tocar una nota la borra"><i>🧽</i><span class="lb"> Borrar</span></button>
           <button id="mSel" class="sm" title="Seleccionar: arrastra un rectángulo o toca notas para sumarlas o quitarlas"><i>⬚</i><span class="lb"> Seleccionar</span></button>
+          <button id="mStretch" class="sm" title="Estirar: arrastra sobre cualquier parte de una nota para cambiar su largo (nunca la mueve ni crea notas); con varias seleccionadas cambian todas"><i>↔</i><span class="lb"> Estirar</span></button>
         </span>
         <span class="grp"><button id="bUndo" class="sm" title="Deshacer (Ctrl+Z)" disabled>↶</button><button id="bRedo" class="sm" title="Rehacer (Ctrl+Shift+Z o Ctrl+Y)" disabled>↷</button></span>
-        <span class="grp"><button id="zOut" class="sm" title="Alejar">−</button><button id="zIn" class="sm" title="Acercar">＋</button></span>
+        <span class="grp"><button id="zOut" class="sm" title="Alejar">−</button><button id="zIn" class="sm" title="Acercar">＋</button><button id="bPlay2" class="sm" title="Reproducir / detener (igual que el de arriba)">▶</button></span>
         <span class="grp" id="ovAct" hidden><button id="bTrimOv" class="sm danger" title="Esta pista es monofónica (una nota a la vez) y hay notas que se pisan. Pulsa para recortar cada nota donde empieza la siguiente."></button></span>
         <span class="grp" id="selAct" hidden>
           <button id="sDup" class="sm" title="Duplicar la selección justo después (Ctrl+D)">⧉<span class="lb"> Duplicar</span></button>
           <button id="sLyric" class="sm" hidden title="Escribir la letra sobre las notas (doble toque, mantener pulsada la nota o Intro)">✎<span class="lb"> Letra</span></button>
+          <button id="sL" class="sm" title="Mover la selección una unidad de la rejilla hacia atrás (flecha ←)">←</button>
+          <button id="sR" class="sm" title="Mover la selección una unidad de la rejilla hacia adelante (flecha →)">→</button>
+          <button id="sShort" class="sm" title="Acortar la selección una unidad de la rejilla">⇤</button>
+          <button id="sLong" class="sm" title="Alargar la selección una unidad de la rejilla">⇥</button>
           <button id="sUp" class="sm" title="Subir la selección un semitono (en percusión, un carril)">▲</button>
           <button id="sDn" class="sm" title="Bajar la selección un semitono (en percusión, un carril)">▼</button>
           <button id="sDel" class="sm danger" title="Borrar la selección (Supr)">🗑<span class="lb"> Borrar</span></button>
@@ -541,7 +546,7 @@ html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *:
         <button id="rMoreBtn" class="sm" aria-expanded="false" title="Más controles: rejilla, tocar con teclado o MIDI, escala, acorde y teclado en pantalla">⋯<span class="lb"> Más</span></button>
       </div>
       <div id="rmore" hidden>
-      <span class="grp"><label>Rejilla <select id="snap"></select></label>
+      <span class="grp"><button id="bHome" class="sm" title="Cursor al inicio de la composición (tecla Inicio)">⏮ Inicio</button><label>Rejilla <select id="snap"></select></label>
         </span>
       <span class="grp live">
         <button id="bLive" class="sm on" title="Tocar la pista activa con el teclado de la compu (Z S X D C V… y Q 2 W 3 E R…)">⌨ Tocar</button>
