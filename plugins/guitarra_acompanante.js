@@ -54,6 +54,35 @@ registerInstrument((() => {
     flamenco:  { per: 4, ev: [[0, 'D', 1], [.75, 'U', .6], [1, 'D', .9], [1.5, 'U', .6], [2, 'D', 1], [2.5, 'D', .8], [2.75, 'U', .55], [3, 'D', .9], [3.5, 'U', .6]] }
   };
 
+  /* ---------- patrones escritos ----------
+     Texto con elementos separados por espacio (las barras | se ignoran):
+       1…6  cuerda (6 = la más grave); varias juntas («321») suenan casi a la vez · .  silencio
+       D U C S B B5 Bs M X  los golpes de mano de arriba · @nombre  un patrón que ya existe (@bossa, @abajo…)
+       sufijos de duración (lo que dura hasta el siguiente elemento): nada = negra · - = mitad · -- = cuarto · + = doble · ++ = cuádruple
+       sufijos de fuerza: > acento · ~ suave                                            Ejemplo: «6- 3- 2- 1- 2- 3- 2- 3-» · «D D- U- U- D- U-» */
+  const parsePat = (txt) => {
+    const ev = []; let pos = 0;
+    for (const raw of String(txt || '').split(/[\s|]+/)) {
+      const m = /^(@[a-z0-9_]+|B5|BS|[DUCSMXB]|[1-6]{1,6}|\.)([-+]*)([>~]?)$/i.exec(raw); if (!m) continue;
+      let dur = 1; for (const ch of m[2]) dur = ch === '-' ? dur / 2 : dur * 2; dur = clamp(dur, .125, 16);
+      const acc = m[3] === '>' ? 1.25 : m[3] === '~' ? .7 : 1, tk = m[1].toUpperCase(), on = pos % 1 < 1e-6;
+      if (tk[0] === '@') { const q = PAT[m[1].slice(1).toLowerCase()]; if (q) { for (const [p, k, v] of q.ev) ev.push([pos + p, k, v * acc]); pos += q.per; } continue; }
+      if (tk !== '.') {
+        if (/^[1-6]+$/.test(tk)) ev.push([pos, 'N' + [...new Set(tk)].sort((a, b) => b - a).join(''), (on ? .9 : .72) * acc]);
+        else { const k = tk === 'BS' ? 'Bs' : tk, base = { D: on ? .9 : .7, U: .6, C: .75, S: .8, B: 1, B5: .9, Bs: .85, M: .6, X: .6 }[k] || .8; ev.push([pos, k, base * acc]); }
+      }
+      pos += dur; if (ev.length > 160 || pos > 64) break;
+    }
+    return ev.length ? { per: Math.max(.25, pos), ev } : null;
+  };
+  Object.assign(PAT, {
+    arpasc:   parsePat('6- 3- 2- 1- 2- 3- 2- 3-'),
+    travis:   parsePat('6- 3- 4- 2- 5- 3- 4- 2-'),
+    arpvals:  parsePat('6- 3- 2- 1- 2- 3-'),
+    arppop:   parsePat('6- 2- 3- 2- 1- 2- 3- 2-'),
+    arpclas:  parsePat('6- 3- 2- 1- 5- 3- 2- 1-')
+  });
+
   /* ---------- intérpretes: cómo toca la mano ----------
      delay = segundos entre cuerda y cuerda del rasgueo · s = pérdida del lazo (más = más opaca) · t60 = cuánto suena la cuerda grave (s)
      pos = dónde pica la cuerda (0.1 junto al puente = brillante, 0.4 = redonda) · exLP = suavidad de la yema (1 = carne, 0 = uña)
@@ -122,14 +151,16 @@ registerInstrument((() => {
 
   const choice = (k, label, opts, vals, def) => ({ k, label, type: 'choice', opts, vals, def });
   return {
-    id: 'guitarra_acomp', name: 'Guitarra acompañante', version: '1.3', usesProg: true, kind: 'melodic', cat: 'acomp',
-    desc: 'Una nota larga = un pasaje: la guitarra acompaña ese tiempo con un círculo de acordes y un patrón de rasgueo, tocado por un intérprete (Pedro Infante, Flamenco, Bossa, Ranchera, Lo-fi). La altura de la nota elige la tónica; el largo, cuánto acompaña.',
+    id: 'guitarra_acomp', name: 'Guitarra acompañante', version: '1.4', usesProg: true, kind: 'melodic', cat: 'acomp',
+    desc: 'Una nota larga = un pasaje: la guitarra acompaña ese tiempo con un círculo de acordes y un patrón de rasgueo, tocado por un intérprete (Pedro Infante, Flamenco, Bossa, Ranchera, Lo-fi). La altura de la nota elige la tónica; el largo, cuánto acompaña. Con «Personalizado» escribes tu propio patrón: cuerdas 1–6 (6 = grave; «321» juntas), D U C S B B5 Bs M X, . silencio, - mitad, + doble, @nombre y «;» para uno distinto por acorde.',
     params: [
       { k: 'gain', label: 'Ganancia', min: 0, max: 1.5, step: .01, def: .5 },
       choice('interprete', 'Intérprete', ['Pedro Infante (caricia)', 'Flamenco (aporreado)', 'Bossa (suave)', 'Ranchera (con uña)', 'Lo-fi (apagada)', 'Bossa (de disco, en bloque)'], ['infante', 'flamenco', 'bossa', 'ranchera', 'lofi', 'bossa2'], 'infante'),
       choice('circulo', 'Círculo de acordes', ['Lo-fi romántico (I–vi–ii–V)', 'Jazz 2-5-1', 'Bossa (I–#i°–ii–V)', 'Andaluza (i–VII–VI–V)', 'Menor (i–VI–III–VII)', 'Pop (I–V–vi–IV)', 'Ranchera (I–IV–V–I)', 'Círculo de quintas', 'Del proyecto (la progresión de la pestaña Acordes)'], ['lofi', 'jazz', 'bossa', 'andaluza', 'menor', 'pop', 'ranchera', 'quintas', 'proyecto'], 'lofi'),
       choice('ext', 'Acordes', ['Tríadas', 'Séptimas', 'Novenas'], [0, 1, 2], 1),
-      choice('patron', 'Patrón de la mano derecha', ['Abajo (negras)', 'Balada', 'Ida y vuelta', 'Arpegio', 'Bossa', 'Ranchera', 'Vals (3 pulsos)', 'Flamenco', 'Bossa (clave de 2 compases)', 'Ranchera (chuntata, con muteo)', 'Balada (con golpe en la tapa)'], ['abajo', 'balada', 'idavuelta', 'arpegio', 'bossa', 'ranchera', 'vals', 'flamenco', 'bossaclave', 'ranchachk', 'baladaperc'], 'balada'),
+      choice('patron', 'Patrón de la mano derecha', ['Abajo (negras)', 'Balada', 'Ida y vuelta', 'Arpegio', 'Bossa', 'Ranchera', 'Vals (3 pulsos)', 'Flamenco', 'Bossa (clave de 2 compases)', 'Ranchera (chuntata, con muteo)', 'Balada (con golpe en la tapa)', 'Arpegio ascendente', 'Travis (pulgar alternado)', 'Arpegio de vals (3 pulsos)', 'Balada pop arpegiada', 'Clásico (p-i-m-a)', 'Personalizado (texto de abajo)'], ['abajo', 'balada', 'idavuelta', 'arpegio', 'bossa', 'ranchera', 'vals', 'flamenco', 'bossaclave', 'ranchachk', 'baladaperc', 'arpasc', 'travis', 'arpvals', 'arppop', 'arpclas', 'custom'], 'balada'),
+      { k: 'patronTxt', label: 'Patrón escrito (varios con «;», uno por acorde)', type: 'text', def: '' },
+      { k: 'retardo', label: 'Retardo del cambio de acorde (pulsos; − anticipa)', min: -1, max: 1, step: .05, def: 0 },
       { k: 'muteo', label: 'Muteo y golpes (cuánto pesan)', min: 0, max: 1.5, step: .05, def: 1 },
       { k: 'pulsos', label: 'Pulsos por acorde', min: 1, max: 16, step: 1, def: 4 },
       { k: 'cuerdas', label: 'Cuerdas', min: 4, max: 6, step: 1, def: 6 },
@@ -145,10 +176,16 @@ registerInstrument((() => {
       'Bossa nova': { interprete: 'bossa2', circulo: 'bossa', ext: 2, patron: 'bossaclave', pulsos: 4, humaniza: .45, velo: 1, brillo: 1, cuerpo: 1 },
       'Bossa suave (antigua)': { interprete: 'bossa', circulo: 'bossa', ext: 2, patron: 'bossa', pulsos: 4, humaniza: .45, velo: 1, brillo: .9, cuerpo: .6 },
       'Ranchera': { interprete: 'ranchera', circulo: 'ranchera', ext: 0, patron: 'ranchera', pulsos: 4, humaniza: .5, velo: 1, brillo: 1, cuerpo: .6 },
+      'Arpegio ascendente': { interprete: 'infante', circulo: 'pop', ext: 1, patron: 'arpasc', pulsos: 4, humaniza: .55, velo: 1, brillo: 1, cuerpo: .65 },
+      'Travis (pulgar alternado)': { interprete: 'infante', circulo: 'ranchera', ext: 0, patron: 'travis', pulsos: 4, humaniza: .5, velo: 1, brillo: 1.05, cuerpo: .6 },
+      'Arpegio de vals': { interprete: 'infante', circulo: 'lofi', ext: 1, patron: 'arpvals', pulsos: 3, humaniza: .5, velo: 1, brillo: 1, cuerpo: .65 },
+      'Balada pop arpegiada': { interprete: 'lofi', circulo: 'pop', ext: 1, patron: 'arppop', pulsos: 4, humaniza: .6, velo: .9, brillo: .85, cuerpo: .7 },
+      'Clásico (p-i-m-a)': { interprete: 'infante', circulo: 'andaluza', ext: 0, patron: 'arpclas', pulsos: 4, humaniza: .35, velo: 1, brillo: 1.1, cuerpo: .55 },
+      'Mixto por acorde (ejemplo)': { interprete: 'infante', circulo: 'pop', ext: 1, patron: 'custom', patronTxt: '6- 3- 2- 1- 2- 3- 2- 3- ; D D- U- U- D- U- ; B C B5 C ; @bossa', pulsos: 4, humaniza: .5, velo: 1, brillo: 1, cuerpo: .65 },
       'Lo-fi nocturno': { interprete: 'lofi', circulo: 'lofi', ext: 2, patron: 'balada', pulsos: 4, humaniza: .7, velo: .9, brillo: .8, cuerpo: .7 }
     },
     play(K, n) {
-      const p = n.p, sr = n.sr, beat = n.beat, pf = PERF[p.interprete] || PERF.infante, pat = PAT[p.patron] || PAT.balada, prog = PROG[p.circulo] || PROG.lofi;
+      const p = n.p, sr = n.sr, beat = n.beat, pf = PERF[p.interprete] || PERF.infante, basePat = (p.patron === 'custom' ? parsePat(String(p.patronTxt || '').split(';')[0]) : null) || PAT[p.patron] || PAT.balada, prog = PROG[p.circulo] || PROG.lofi;
       const hum = clamp(p.humaniza == null ? .5 : p.humaniza, 0, 1), ext = clamp(Math.round(p.ext == null ? 1 : p.ext), 0, 2), ns = clamp(Math.round(p.cuerdas || 6), 4, 6);
       const speed = 1 / clamp(p.velo || 1, .3, 3), sus = clamp(p.sustain || 1, .3, 3), tonic = ((n.midi % 12) + 12) % 12, chordLen = Math.max(1, Math.round(p.pulsos || 4)) * beat;
       const mut = clamp(p.muteo == null ? 1 : p.muteo, 0, 1.5);
@@ -157,10 +194,14 @@ registerInstrument((() => {
       const burst = (t, amp, fc, Q, dur, tau) => { const i0 = Math.round(t * sr), n = Math.floor(dur * sr), q = bpf(fc, Q, sr); if (amp < .001) return; for (let k = 0; k < n && i0 + k < total; k++) acc[i0 + k] += runBq(q, (r() * 2 - 1) * Math.exp(-k / (tau * sr))) * amp; };
       const thump = (t, amp, f0, f1, dur, tau) => { const i0 = Math.round(t * sr), n = Math.floor(dur * sr); if (amp < .001) return; let ph = 0; for (let k = 0; k < n && i0 + k < total; k++) { const tt = k / sr; ph += TWO_PI * (f1 + (f0 - f1) * Math.exp(-tt / .018)) / sr; acc[i0 + k] += Math.sin(ph) * Math.exp(-tt / tau) * amp; } };
       // los tramos de acorde: de la progresión del proyecto (cada acorde dura lo suyo) o del círculo elegido (cada `pulsos`). Sin progresión, «Del proyecto» cae al círculo Lo-fi.
-      const segs = [];
+      const segs = [], delay = clamp(+p.retardo || 0, -1, 1) * beat;
+      const custom = p.patron === 'custom', parts = custom ? String(p.patronTxt || '').split(';').map(parsePat) : [];
       if (p.circulo === 'proyecto' && n.chords && n.chords.length) { for (const c of n.chords) { const cs = c.t0, ce = Math.min(n.len, c.t1); if (ce - cs > .02) segs.push({ cs, ce, notes: voicingChord(c, ns) }); } }
       else { for (let cs = 0, ci = 0; cs < n.len - 1e-6; cs += chordLen, ci++) { const ch = prog[ci % prog.length]; segs.push({ cs, ce: Math.min(n.len, cs + chordLen), notes: voicing(tonic, ch[0], ch[1], ext, ns) }); } }
+      if (delay) for (let k = 1; k < segs.length; k++) { const lo = segs[k - 1].cs + .05, b = clamp(segs[k].cs + delay, lo, n.len - .02); segs[k - 1].ce = b; segs[k].cs = b; }
+      let segI = -1;
       for (const { cs, ce, notes } of segs) {
+        segI++; const pat = (custom && parts.length && parts[segI % parts.length]) || basePat;
         const last = ce >= n.len - 1e-6, rel = last ? .9 : .05;
         const hit = (idx, t, vol, ringMax, boost, shift, susx) => {         // una cuerda en el tiempo t (dentro del pasaje)
           const tt = t, ring = Math.floor(Math.min((gl && !last ? ringMax : ce - t + rel), ringMax) * sr); if (ring < 16 || tt < 0) return;
@@ -183,6 +224,7 @@ registerInstrument((() => {
             else if (kind === 'B') hit(0, t0, fz, 8, fz * .6);
             else if (kind === 'B5') hit(Math.min(1, ns - 1), t0, fz, 8, fz * .6);
             else if (kind[0] === 'A') hit(Math.min(+kind[1], ns - 1), t0, fz, 8, fz);
+            else if (kind[0] === 'N') { const ds = [...kind.slice(1)]; ds.forEach((dg, j) => hit(clamp(ns - +dg, 0, ns - 1), t0 + j * d * .4, fz, 8, fz)); }
           }
         }
       }

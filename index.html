@@ -2472,7 +2472,7 @@ function renderInspector(){
   for(const d of inst.params){
     if(d.type==='choice'){ const vals=d.vals||d.opts.map((_,i)=>i); const s=el('select',{onchange:e=>{ tr.params[d.k]=vals[+e.target.value]; touch(); upd(); previewTrack(); }},...d.opts.map((o,i)=>el('option',{value:i,text:o}))); s.value=Math.max(0,vals.indexOf(tr.params[d.k]));
       put(d,el('div',{class:'row'},el('label',{text:d.label,title:d.label}),s)); }
-    else if(d.type==='text'){ put(d,el('div',{class:'row'},el('label',{text:d.label}),el('input',{type:'text',value:tr.params[d.k]==null?'':tr.params[d.k],onchange:e=>{ tr.params[d.k]=e.target.value; touch(); }}))); }
+    else if(d.type==='text'){ put(d,el('div',{class:'row'},el('label',{text:d.label}),el('input',{type:'text',value:tr.params[d.k]==null?'':tr.params[d.k],onchange:e=>{ tr.params[d.k]=e.target.value; touch(); previewTrack(); }}))); }
     else put(d,sliderRow(d.label,()=>tr.params[d.k],v=>{ tr.params[d.k]=v; touch(); upd(); },d.min,d.max,d.step,d.def));
   }
   if(useSec) groups.forEach((g,gi)=>{ const key=inst.id+'|'+g.name, det=el('details',{class:'psec'},el('summary',{},g.name,g.cnt),...g.rows); det.open=key in openMap?openMap[key]:gi===0; det.addEventListener('toggle',()=>{ openMap[key]=det.open; }); pk.push(det); });
