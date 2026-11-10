@@ -118,6 +118,11 @@ aside{background:var(--p);overflow:auto;min-height:0}
 .row label{color:#b8bdca;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .val{text-align:right;color:var(--m);font-variant-numeric:tabular-nums;font-size:12px}
 .row select,.row input[type=text]{grid-column:2/4;min-width:0}
+.pdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;border:1px solid rgba(179,190,219,.45);box-sizing:border-box;vertical-align:middle}
+.pdot.on{background:var(--a,#22d3ee);border-color:var(--a,#22d3ee);box-shadow:0 0 6px var(--a,#22d3ee)}
+.psec{margin:5px 0;border:1px solid var(--b);border-radius:8px;padding:2px 8px}
+.psec>summary{font-size:12px;padding:4px 0}
+.psec .cnt{color:var(--m);font-size:11px;font-weight:normal}
 .btnrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .copyrow{display:flex;gap:4px;align-items:center;flex-wrap:wrap;color:var(--m);font-size:12px}
 .copyrow input{width:52px}
@@ -2457,13 +2462,21 @@ function renderInspector(){
     el('button',{class:'sm danger',text:'Borrar pista',onclick:()=>{ if(tr.notes.length&&!confirm('¿Borrar «'+tr.name+'» con '+tr.notes.length+' notas?')) return; P.tracks.splice(sel,1); sel=Math.max(0,Math.min(sel,P.tracks.length-1)); selNotes.clear(); renderTracks(); renderInspector(); centerTrack(); touch(); }})));
   box.append(sec('Pista «'+tr.name+'»',...kids));
   const pk=[]; const npk=new Set(inst.noteParams||[]); const noteOv=tr.notes.filter(n=>n.o&&Object.keys(n.o).some(k=>k!=='cid'&&!npk.has(k))).length;
-  if(inst.presets){ const names=Object.keys(inst.presets), ps=el('select',{onchange:e=>{ const p=inst.presets[names[+e.target.value-1]]; if(!p){ return; } for(const k in p) tr.params[k]=p[k]; touch(); renderInspector(); previewTrack(); }},el('option',{value:0,text:'Elegir…'}),...names.map((o,i)=>el('option',{value:i+1,text:o}))); pk.push(el('div',{class:'row'},el('label',{text:'Preajuste'}),ps)); }
+  if(inst.presets){ const names=Object.keys(inst.presets), ps=el('select',{onchange:e=>{ const p=inst.presets[names[+e.target.value-1]]; if(!p){ return; } if(inst.presetReset) for(const d of inst.params) if(d.def!==undefined) tr.params[d.k]=d.def; for(const k in p) tr.params[k]=p[k]; touch(); renderInspector(); previewTrack(); }},el('option',{value:0,text:'Elegir…'}),...names.map((o,i)=>el('option',{value:i+1,text:o}))); pk.push(el('div',{class:'row'},el('label',{text:'Preajuste'}),ps)); }
+  pk.push(el('div',{class:'btnrow'},el('button',{class:'sm',text:'↺ Estado basal',title:'Devuelve todos los parámetros de este instrumento a su valor por defecto (los ajustes por nota no se tocan)',onclick:()=>{ for(const d of inst.params) if(d.def!==undefined) tr.params[d.k]=d.def; touch(); renderInspector(); previewTrack(); }})));
+  const useDots=inst.params.some(d=>typeof d.on==='function'), useSec=inst.params.some(d=>d.sec), dots=[], groups=[]; let curG=null; const openMap=(window.__secOpen||(window.__secOpen={}));
+  const upd=()=>{ if(!useDots) return; for(const x of dots){ let on=true; if(typeof x.d.on==='function'){ try{ on=!!x.d.on(tr.params); }catch(e){} } x.dot.classList.toggle('on',on); x.dot.title=on?'Está influyendo en el sonido':'Sin efecto con los ajustes actuales'; x.on=on; }
+    for(const g of groups){ const n=dots.filter(x=>x.g===g&&x.on).length; g.cnt.textContent=n?(' · '+n+' activos'):''; } };
+  const put=(d,row)=>{ if(useSec){ const nm=d.sec||'Otros'; if(!curG||curG.name!==nm){ curG={name:nm,rows:[],cnt:el('span',{class:'cnt'})}; groups.push(curG); } curG.rows.push(row); } else pk.push(row);
+    if(useDots){ const dot=el('span',{class:'pdot'}); if(row.firstChild) row.firstChild.prepend(dot); dots.push({dot,d,g:curG}); } };
   for(const d of inst.params){
-    if(d.type==='choice'){ const vals=d.vals||d.opts.map((_,i)=>i); const s=el('select',{onchange:e=>{ tr.params[d.k]=vals[+e.target.value]; touch(); previewTrack(); }},...d.opts.map((o,i)=>el('option',{value:i,text:o}))); s.value=Math.max(0,vals.indexOf(tr.params[d.k]));
-      pk.push(el('div',{class:'row'},el('label',{text:d.label}),s)); }
-    else if(d.type==='text'){ pk.push(el('div',{class:'row'},el('label',{text:d.label}),el('input',{type:'text',value:tr.params[d.k]==null?'':tr.params[d.k],onchange:e=>{ tr.params[d.k]=e.target.value; touch(); }}))); }
-    else pk.push(sliderRow(d.label,()=>tr.params[d.k],v=>{ tr.params[d.k]=v; touch(); },d.min,d.max,d.step,d.def));
+    if(d.type==='choice'){ const vals=d.vals||d.opts.map((_,i)=>i); const s=el('select',{onchange:e=>{ tr.params[d.k]=vals[+e.target.value]; touch(); upd(); previewTrack(); }},...d.opts.map((o,i)=>el('option',{value:i,text:o}))); s.value=Math.max(0,vals.indexOf(tr.params[d.k]));
+      put(d,el('div',{class:'row'},el('label',{text:d.label,title:d.label}),s)); }
+    else if(d.type==='text'){ put(d,el('div',{class:'row'},el('label',{text:d.label}),el('input',{type:'text',value:tr.params[d.k]==null?'':tr.params[d.k],onchange:e=>{ tr.params[d.k]=e.target.value; touch(); }}))); }
+    else put(d,sliderRow(d.label,()=>tr.params[d.k],v=>{ tr.params[d.k]=v; touch(); upd(); },d.min,d.max,d.step,d.def));
   }
+  if(useSec) groups.forEach((g,gi)=>{ const key=inst.id+'|'+g.name, det=el('details',{class:'psec'},el('summary',{},g.name,g.cnt),...g.rows); det.open=key in openMap?openMap[key]:gi===0; det.addEventListener('toggle',()=>{ openMap[key]=det.open; }); pk.push(det); });
+  upd();
   if(tr.params.lpSrc) pk.push(el('div',{class:'hint',text:'Esta pista usa un filtro con función propia: '+tr.params.lpSrc}));
   if(noteOv) pk.push(el('div',{class:'hint',text:noteOv+' notas tienen ajustes propios (punto blanco) y no siguen estos controles.'}),
     el('div',{class:'btnrow'},el('button',{class:'sm',text:'Unificar: borrar ajustes por nota',onclick:()=>{ for(const n of tr.notes) if(n.o){ const keep={}; for(const k in n.o) if(k==='cid'||npk.has(k)) keep[k]=n.o[k]; if(Object.keys(keep).length) n.o=keep; else delete n.o; } touch(); renderInspector(); }})));
