@@ -634,7 +634,7 @@ function syncKeyUI(){ const k=KEY(), gen=genreOf(P); $('kRoot').value=k.root; $(
   for(const o of $('kScale').options){ const af=!!gen&&gen.keys.includes(o.value); o.textContent=(af?'● ':gen?'\u00a0\u00a0\u00a0':'')+(o.value==='off'?'Ninguna':o.value); o.style.color=af?'#f3e3a0':''; } $('kScale').value=k.scale; }
 // teclado en pantalla
 let oskOn=false;
-function buildOsk(){ const box=$('osk'); box.hidden=!oskOn; $('bOsk').classList.toggle('on',oskOn); if(!oskOn) return; box.innerHTML=''; const tr=P.tracks[sel]; if(!tr||!INSTRUMENTS[tr.inst]) return; const info=trackInfo(tr);
+function buildOsk(){ const box=$('osk'); box.hidden=!oskOn; $('bOsk').classList.toggle('on',oskOn); if(!oskOn) return; box.innerHTML=''; const tr=P.tracks[sel]; if(!tr||!INSTRUMENTS[tr.inst]) return; const info=trackInfo(tr); box.classList.toggle('padgrid',!!(info.perc&&info.rows>4));
   const press=(k,id,m)=>{ k.dataset.m=m; k.onpointerdown=e=>{ e.preventDefault(); try{ k.setPointerCapture(e.pointerId); }catch(_){} k.classList.add('on'); liveOn(id,m,.85); }; const up=()=>{ k.classList.remove('on'); liveOff(id); }; k.onpointerup=up; k.onpointercancel=up; };
   if(info.perc){ for(let i=0;i<info.rows;i++){ const p=el('div',{class:'pad',text:(info.lanes[i]&&info.lanes[i].name)||'Golpe'}); press(p,'osk'+i,i); box.append(p); } return; }
   const lo=baseOct, hi=Math.min(127,baseOct+24);

@@ -101,6 +101,8 @@ aside{background:var(--p);overflow:auto;min-height:0}
 #osk{display:flex;gap:0;padding:6px 8px;background:var(--p);border-bottom:1px solid var(--b);overflow-x:auto;touch-action:none;user-select:none;-webkit-user-select:none}
 #osk .wk{position:relative;flex:0 0 34px;height:88px;background:#d9dce6;border:1px solid #0b0d14;border-radius:0 0 5px 5px;margin-right:-1px;color:#0b0d14;font:10px system-ui;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;cursor:pointer}
 #osk[hidden]{display:none}
+#osk.padgrid{flex-wrap:wrap;gap:6px;overflow-x:hidden;overflow-y:auto;max-height:190px}
+#osk.padgrid .pad{flex:1 1 22%;min-width:64px;margin:0;height:50px;text-align:center;line-height:1.1}
 #osk .wk.on,#osk .bk.on,#osk .pad.on{background:#8fa8ff}
 #osk .wk.sc::after{content:"";position:absolute;top:6px;width:5px;height:5px;border-radius:50%;background:#5c6bc0}
 #osk .bk{flex:0 0 0;position:relative;z-index:2;width:0}
@@ -2512,7 +2514,7 @@ function syncKeyUI(){ const k=KEY(), gen=genreOf(P); $('kRoot').value=k.root; $(
   for(const o of $('kScale').options){ const af=!!gen&&gen.keys.includes(o.value); o.textContent=(af?'● ':gen?'\u00a0\u00a0\u00a0':'')+(o.value==='off'?'Ninguna':o.value); o.style.color=af?'#f3e3a0':''; } $('kScale').value=k.scale; }
 // teclado en pantalla
 let oskOn=false;
-function buildOsk(){ const box=$('osk'); box.hidden=!oskOn; $('bOsk').classList.toggle('on',oskOn); if(!oskOn) return; box.innerHTML=''; const tr=P.tracks[sel]; if(!tr||!INSTRUMENTS[tr.inst]) return; const info=trackInfo(tr);
+function buildOsk(){ const box=$('osk'); box.hidden=!oskOn; $('bOsk').classList.toggle('on',oskOn); if(!oskOn) return; box.innerHTML=''; const tr=P.tracks[sel]; if(!tr||!INSTRUMENTS[tr.inst]) return; const info=trackInfo(tr); box.classList.toggle('padgrid',!!(info.perc&&info.rows>4));
   const press=(k,id,m)=>{ k.dataset.m=m; k.onpointerdown=e=>{ e.preventDefault(); try{ k.setPointerCapture(e.pointerId); }catch(_){} k.classList.add('on'); liveOn(id,m,.85); }; const up=()=>{ k.classList.remove('on'); liveOff(id); }; k.onpointerup=up; k.onpointercancel=up; };
   if(info.perc){ for(let i=0;i<info.rows;i++){ const p=el('div',{class:'pad',text:(info.lanes[i]&&info.lanes[i].name)||'Golpe'}); press(p,'osk'+i,i); box.append(p); } return; }
   const lo=baseOct, hi=Math.min(127,baseOct+24);
