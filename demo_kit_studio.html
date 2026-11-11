@@ -1983,8 +1983,9 @@ function previewChord(c){
     const s=a.createBufferSource(); s.buffer=toAudioBuffer(out); s.connect(a.destination); s.start(); pvSrc=s; }
   catch(e){ console.error(e); toast('Error en la vista previa: '+e.message,'err'); } }
 let pvTimer=0;
-function previewTrack(){ clearTimeout(pvTimer); pvTimer=setTimeout(()=>{ const tr=P.tracks[sel]; if(!tr) return; prewarm();
-  const n=[...selNotes][0]||tr.notes[0]||{b:0,l:.5,m:INSTRUMENTS[tr.inst]&&INSTRUMENTS[tr.inst].kind==='perc'?0:60,v:1}; previewNote(n,tr); },160); }
+let pvLane=null;   // carril que debe sonar en la escucha previa: lo fija el parámetro que se está moviendo cuando su definición trae `lane` (p. ej. los pads de la batería)
+function previewTrack(){ clearTimeout(pvTimer); const ln=pvLane; pvLane=null; pvTimer=setTimeout(()=>{ const tr=P.tracks[sel]; if(!tr) return; prewarm();
+  const n=ln!=null?{b:0,l:.5,m:ln,v:1}:[...selNotes][0]||tr.notes[0]||{b:0,l:.5,m:INSTRUMENTS[tr.inst]&&INSTRUMENTS[tr.inst].kind==='perc'?0:60,v:1}; previewNote(n,tr); },160); }
 
 // ───────────── pantalla activa (Wake Lock) ─────────────
 let wl=null, wlVideo=null, wlTimer=0;
@@ -2489,10 +2490,10 @@ function renderInspector(){
   const put=(d,row)=>{ if(useSec){ const nm=d.sec||'Otros'; if(!curG||curG.name!==nm){ curG={name:nm,rows:[],cnt:el('span',{class:'cnt'})}; groups.push(curG); } curG.rows.push(row); } else pk.push(row);
     if(useDots){ const dot=el('span',{class:'pdot'}); if(row.firstChild) row.firstChild.prepend(dot); dots.push({dot,d,g:curG}); } };
   for(const d of inst.params){
-    if(d.type==='choice'){ const vals=d.vals||d.opts.map((_,i)=>i); const s=el('select',{onchange:e=>{ tr.params[d.k]=vals[+e.target.value]; touch(); upd(); if(inst.laneNames){ draw(); buildOsk(); } previewTrack(); }},...d.opts.map((o,i)=>el('option',{value:i,text:o}))); s.value=Math.max(0,vals.indexOf(tr.params[d.k]));
+    if(d.type==='choice'){ const vals=d.vals||d.opts.map((_,i)=>i); const s=el('select',{onchange:e=>{ tr.params[d.k]=vals[+e.target.value]; if(d.lane!=null) pvLane=d.lane; touch(); upd(); if(inst.laneNames){ draw(); buildOsk(); } previewTrack(); }},...d.opts.map((o,i)=>el('option',{value:i,text:o}))); s.value=Math.max(0,vals.indexOf(tr.params[d.k]));
       put(d,el('div',{class:'row'},el('label',{text:d.label,title:d.label}),s)); }
     else if(d.type==='text'){ put(d,el('div',{class:'row'},el('label',{text:d.label}),el('input',{type:'text',value:tr.params[d.k]==null?'':tr.params[d.k],onchange:e=>{ tr.params[d.k]=e.target.value; touch(); previewTrack(); }}))); }
-    else put(d,sliderRow(d.label,()=>tr.params[d.k],v=>{ tr.params[d.k]=v; touch(); upd(); },d.min,d.max,d.step,d.def));
+    else put(d,sliderRow(d.label,()=>tr.params[d.k],v=>{ tr.params[d.k]=v; if(d.lane!=null) pvLane=d.lane; touch(); upd(); },d.min,d.max,d.step,d.def));
   }
   if(useSec) groups.forEach((g,gi)=>{ const key=inst.id+'|'+g.name, det=el('details',{class:'psec'},el('summary',{},g.name,g.cnt),...g.rows); det.open=key in openMap?openMap[key]:gi===0; det.addEventListener('toggle',()=>{ openMap[key]=det.open; }); pk.push(det); });
   upd();

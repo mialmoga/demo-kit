@@ -55,14 +55,14 @@ registerInstrument((() => {
   // ── los 16 pads ──
   const NP = 16, DEFSND = ['bombo', 'caja', 'hatc', 'hato', 'palma', 'rim', 'tomg', 'tomm', 'toma', 'crash', 'cenc', 'shak', 'ride', 'congag', 'congaa', 'congas'];
   const OLD = ['bombo', 'caja', 'hatc', 'hato', 'palma', 'rim', 'tomg', 'tomm', 'toma', 'crash', 'cenc', 'shak'];      // claves de la v1.0
-  const num = (k, label, min, max, step, def, sec, on) => ({ k, label, min, max, step, def, sec, on });
+  const num = (k, label, min, max, step, def, sec, on, lane) => ({ k, label, min, max, step, def, sec, on, lane });
   const params = [num('gain', 'Volumen general', 0, 2, .01, 1, 'General'),
     { k: 'midiMap', label: 'MIDI: nota de cada pad', type: 'choice', opts: ['Consecutivas desde C1 (pads MPC)', 'General MIDI (según el sonido)'], vals: ['seq', 'gm'], def: 'seq', sec: 'General' }];
   for (let i = 1; i <= NP; i++) {
     const sec = 'Pad ' + i, snd = p => S[(p || {})['p' + i + '_snd'] || DEFSND[i - 1]] || S[DEFSND[i - 1]];
-    params.push({ k: 'p' + i + '_snd', label: 'Sonido', type: 'choice', opts: ORDER.map(id => S[id].name), vals: ORDER.slice(), def: DEFSND[i - 1], sec },
-      num('p' + i + '_vol', 'Volumen', 0, 1.6, .01, 1, sec), num('p' + i + '_tono', 'Tono (st)', -12, 12, .5, 0, sec, p => !!snd(p).ap.tono),
-      num('p' + i + '_dec', 'Duración (×)', .3, 3, .01, 1, sec, p => !!snd(p).ap.dec), num('p' + i + '_pan', 'Paneo', -1, 1, .01, 0, sec, p => !!snd(p).ap.pan));
+    params.push({ k: 'p' + i + '_snd', label: 'Sonido', type: 'choice', opts: ORDER.map(id => S[id].name), vals: ORDER.slice(), def: DEFSND[i - 1], sec, lane: i - 1 },
+      num('p' + i + '_vol', 'Volumen', 0, 1.6, .01, 1, sec, undefined, i - 1), num('p' + i + '_tono', 'Tono (st)', -12, 12, .5, 0, sec, p => !!snd(p).ap.tono, i - 1),
+      num('p' + i + '_dec', 'Duración (×)', .3, 3, .01, 1, sec, p => !!snd(p).ap.dec, i - 1), num('p' + i + '_pan', 'Paneo', -1, 1, .01, 0, sec, p => !!snd(p).ap.pan, i - 1));
   }
   const sndOf = (p, i) => S[(p || {})['p' + (i + 1) + '_snd']] || S[DEFSND[i]];
   const presets = {
