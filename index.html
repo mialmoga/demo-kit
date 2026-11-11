@@ -581,7 +581,7 @@ html[data-anim="off"] *,html[data-anim="off"] *::before,html[data-anim="off"] *:
         <button id="tDel" class="sm danger">Quitar punto</button></span>
       <span id="sCtl" hidden>Compás <select id="sSel" aria-label="Compás"></select> <span id="sInfo"></span><button id="sDelSig" class="sm danger">Quitar cambio</button></span>
       <span id="mCtl" hidden>Nombre <input id="mName" type="text" maxlength="40" value="Verso" size="12" aria-label="Nombre de la sección"> <span id="mQuick"></span> <span id="mInfo"></span><button id="mDelBtn" class="sm danger">Quitar marca</button></span>
-      <span id="cCtl" hidden><input id="cText" type="text" size="64" maxlength="4000" placeholder="Am7 | Dm7 G7 | Cmaj7 %" aria-label="Progresión de acordes" spellcheck="false"> <span id="cInfo"></span> <button id="cGen" class="sm" title="Convierte la progresión en notas normales: una pista de acordes cerrados (pad) y, si quieres, otra de bajo. Sirve con cualquier instrumento: luego cambias el sonido de la pista">Generar pista de acordes</button><label class="chk"><input type="checkbox" id="cBass" checked> con bajo</label> <button id="cHelpBtn" class="sm" title="Elige raíz y escala y te muestra los acordes que encajan; un clic los añade a la progresión">🎼 Ayuda de acordes</button></span>
+      <span id="cCtl" hidden><input id="cText" type="text" size="64" maxlength="4000" placeholder="Am7 | Dm7 G7 | Cmaj7 %" aria-label="Progresión de acordes" spellcheck="false"> <span id="cInfo"></span> <button id="cGen" class="sm" title="Convierte la progresión en notas normales: una pista de acordes cerrados (pad) y, si quieres, otra de bajo. Sirve con cualquier instrumento: luego cambias el sonido de la pista">Generar pista de acordes</button><label class="chk"><input type="checkbox" id="cBass" checked> con bajo</label> <select id="cVoic" class="sm" title="Cómo se acomodan las notas de cada acorde al generar la pista: cerrado, abierto o amplio"></select> <button id="cHelpBtn" class="sm" title="Elige raíz y escala y te muestra los acordes que encajan; un clic los añade a la progresión">🎼 Ayuda de acordes</button></span>
       <span id="cHint" class="hint" hidden>«|» separa compases · varios acordes en un compás se reparten el tiempo · «%» solo en un compás (o un compás vacío) repite el anterior · «%» o «.» junto a otros acordes sostienen el acorde · C/E = con bajo en E · se repite si el proyecto es más largo · «Generar pista de acordes» la vuelve notas y la guitarra la lee con el círculo «Del proyecto»</span>
       <span id="mHint" class="hint" hidden>clic en un compás = marca nueva con ese nombre · elige una marca y cambia el nombre o toca un atajo para renombrarla · arrastra = mover de compás · doble clic o clic derecho = quitar. Solo organiza: no cambia el sonido</span>
       <span id="tHint" class="hint">inicial = el BPM de arriba · clic = punto nuevo · arrastra = mover (horizontal: pulso, vertical: BPM) · doble clic o clic derecho = quitar</span>
@@ -1037,16 +1037,33 @@ function progAt(P,beat){ let r=null; for(const c of progChords(P).chords){ if(c.
 // Acordes cerrados con la conducción de voces más suave: de cada acorde elige la inversión y octava cuyo centro queda más cerca del acorde anterior (el primero, cerca de do central).
 // Con más de 4 notas quita primero la quinta y luego la oncena, para que 9/11/13 no queden empastados. Devuelve {chords:[{b,l,ms:[midi…]}], bass:[{b,l,m}]}.
 // un acorde → notas MIDI cerradas cerca de `prev` (centro del acorde anterior): elige la inversión y octava de centro más cercano. Devuelve {ms, mean}.
-function voiceChord(c,prev){
-  let iv=c.ivs.slice(); if(iv.length>4){ const k=iv.findIndex(x=>x===7||x===6||x===8); if(k>0&&iv.length>4) iv.splice(k,1); } if(iv.length>5){ const k=iv.indexOf(17); if(k>0) iv.splice(k,1); }
-  const cands=[]; for(let r=0;r<iv.length;r++){ const v=iv.map((x,i)=>c.root+x+(i<r?12:0)).sort((a,b)=>a-b); const mean=v.reduce((a,b)=>a+b,0)/v.length, sh=Math.round((prev-mean)/12)*12; const ms=v.map(m=>m+sh); const mn=ms.reduce((a,b)=>a+b,0)/ms.length; cands.push({ms,d:Math.abs(mn-prev)}); }
-  cands.sort((a,b)=>a.d-b.d); let ms=cands[0].ms; while(Math.min(...ms)<48) ms=ms.map(m=>m+12); while(Math.max(...ms)>84) ms=ms.map(m=>m-12);
-  return {ms,mean:ms.reduce((a,b)=>a+b,0)/ms.length};
+const VOICINGS=[['suave','Cerrado suave'],['fijo','Cerrado fijo'],['drop2','Abierto (drop 2)'],['drop24','Abierto (drop 2+4)'],['amplio','Amplio (orquestal)'],['alterna','Alternar cerrado/abierto']];
+// Un acorde → notas MIDI. `mode` (ver VOICINGS):
+//   suave   cerrado, con la inversión y octava más cercanas al acorde anterior (conducción de voces suave)
+//   fijo    cerrado, siempre en estado fundamental y cerca de do central: cada acorde y cada vuelta salen idénticos
+//   drop2   como «suave», pero la segunda nota desde arriba baja una octava
+//   drop24  la segunda y la cuarta desde arriba bajan una octava (con tríadas solo la segunda)
+//   amplio  notas del acorde repartidas en dos octavas (alternas suben una octava); con `noRoot` quita la fundamental, que ya toca el bajo
+//   alterna cerrado en los compases impares y drop 2 en los pares
+// Devuelve {ms, mean}: `mean` es el centro de la versión cerrada, para que la conducción de voces no se desvíe al abrir.
+function voiceChord(c,prev,mode,noRoot){
+  mode=mode||'suave'; let iv=c.ivs.slice(); if(iv.length>4){ const k=iv.findIndex(x=>x===7||x===6||x===8); if(k>0&&iv.length>4) iv.splice(k,1); } if(iv.length>5){ const k=iv.indexOf(17); if(k>0) iv.splice(k,1); }
+  const mean=v=>v.reduce((a,b)=>a+b,0)/v.length, closed=(ivs,r)=>ivs.map((x,i)=>c.root+x+(i<r?12:0)).sort((a,b)=>a-b);
+  let cl;
+  if(mode==='fijo'){ const v=closed(iv,0), sh=Math.round((prev-mean(v))/12)*12; cl=v.map(m=>m+sh); }
+  else { const cands=[]; for(let r=0;r<iv.length;r++){ const v=closed(iv,r), sh=Math.round((prev-mean(v))/12)*12; const ms=v.map(m=>m+sh); cands.push({ms,d:Math.abs(mean(ms)-prev)}); } cands.sort((a,b)=>a.d-b.d); cl=cands[0].ms; }
+  while(Math.min(...cl)<48) cl=cl.map(m=>m+12); while(Math.max(...cl)>84) cl=cl.map(m=>m-12);
+  const mc=mean(cl); let ms=cl.slice(), open=mode==='drop2'||mode==='drop24'||mode==='amplio'||(mode==='alterna'&&(c.bar||0)%2===1);
+  if(open){ const n=ms.length;
+    if(mode==='amplio'){ let pool=ms.slice(); if(noRoot){ const rp=((c.root%12)+12)%12, r=pool.filter(m=>((m%12)+12)%12!==rp); if(r.length>=2) pool=r; } ms=pool.map((m,i)=>i%2?m+12:m); }
+    else { if(n>=2) ms[n-2]-=12; if(mode==='drop24'&&n>=4) ms[n-4]-=12; }
+    ms.sort((a,b)=>a-b); while(Math.min(...ms)<40) ms=ms.map(m=>m+12); while(Math.max(...ms)>96) ms=ms.map(m=>m-12); }
+  return {ms,mean:mc};
 }
 function progToNotes(P,opts){
-  const L=progChords(P).chords.filter(c=>c.ok), o=Object.assign({center:62,gap:.02},opts||{}), out={chords:[],bass:[]}; let prev=o.center;
+  const L=progChords(P).chords.filter(c=>c.ok), o=Object.assign({center:62,gap:.02,voicing:'suave',noRoot:false},opts||{}), out={chords:[],bass:[]}; let prev=o.center;
   for(const c of L){
-    const v=voiceChord(c,prev); prev=v.mean; const len=Math.max(.05,c.b1-c.b0-o.gap);
+    const v=voiceChord(c,o.voicing==='fijo'?o.center:prev,o.voicing,o.noRoot); prev=v.mean; const len=Math.max(.05,c.b1-c.b0-o.gap);
     out.chords.push({b:r6(c.b0),l:r6(len),ms:v.ms});
     const bp=c.bass!=null?c.bass:c.root; out.bass.push({b:r6(c.b0),l:r6(len),m:36+(((bp-36)%12)+12)%12}); }
   return out;
@@ -2678,8 +2695,9 @@ function refreshChordInfo(){
   const t=(P.prog&&P.prog.text)||''; if(document.activeElement!==$('cText')) $('cText').value=t;
   const r=progChords(P); let msg; if(!t.trim()) msg='escribe una progresión para verla aquí'; else if(r.errors.length) msg='⚠ '+r.errors.slice(0,3).map(e=>e.msg).join(' · ')+(r.errors.length>3?' · …':''); else msg=r.cycleBars+(r.cycleBars>1?' compases':' compás')+(r.cycleBars<P.bars?' · se repite cada '+r.cycleBars+' hasta el compás '+P.bars:'')+(r.cycleBars>P.bars?' · el proyecto solo tiene '+P.bars+' compases: se corta':'');
   $('cInfo').textContent=msg; $('cGen').disabled=!r.chords.some(c=>c.ok); $('cInfo').style.color=r.errors.length?'#ff9aa6':''; }
+{ const sv=$('cVoic'); for(const [v,n] of VOICINGS) sv.append(el('option',{value:v,text:n})); try{ const s=localStorage.getItem('dk_voicing'); if(s&&VOICINGS.some(x=>x[0]===s)) sv.value=s; }catch(e){} sv.onchange=()=>{ try{ localStorage.setItem('dk_voicing',sv.value); }catch(e){} }; }
 $('cGen').onclick=()=>{
-  const r=progToNotes(P); if(!r.chords.length){ toast('Escribe primero una progresión con acordes válidos','err'); return; }
+  const r=progToNotes(P,{voicing:$('cVoic').value,noRoot:$('cBass').checked&&$('cVoic').value==='amplio'}); if(!r.chords.length){ toast('Escribe primero una progresión con acordes válidos','err'); return; }
   pushUndo(); const mk=(inst,name,notes)=>{ const t=newTrack(inst,name); const base=t.name; let k=1; while(P.tracks.some(x=>x.name===t.name)) t.name=base+' '+(++k); t.notes=notes; P.tracks.push(t); return t; };
   const tc=mk('pad','Acordes (progresión)',r.chords.flatMap(c=>c.ms.map(m=>({b:c.b,l:c.l,m,v:.8})))); let nb=0;
   if($('cBass').checked){ mk('subfall','Bajo (progresión)',r.bass.map(x=>({b:x.b,l:x.l,m:x.m,v:.9}))); nb=r.bass.length; }

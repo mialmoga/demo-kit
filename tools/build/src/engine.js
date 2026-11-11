@@ -253,16 +253,33 @@ function progAt(P,beat){ let r=null; for(const c of progChords(P).chords){ if(c.
 // Acordes cerrados con la conducción de voces más suave: de cada acorde elige la inversión y octava cuyo centro queda más cerca del acorde anterior (el primero, cerca de do central).
 // Con más de 4 notas quita primero la quinta y luego la oncena, para que 9/11/13 no queden empastados. Devuelve {chords:[{b,l,ms:[midi…]}], bass:[{b,l,m}]}.
 // un acorde → notas MIDI cerradas cerca de `prev` (centro del acorde anterior): elige la inversión y octava de centro más cercano. Devuelve {ms, mean}.
-function voiceChord(c,prev){
-  let iv=c.ivs.slice(); if(iv.length>4){ const k=iv.findIndex(x=>x===7||x===6||x===8); if(k>0&&iv.length>4) iv.splice(k,1); } if(iv.length>5){ const k=iv.indexOf(17); if(k>0) iv.splice(k,1); }
-  const cands=[]; for(let r=0;r<iv.length;r++){ const v=iv.map((x,i)=>c.root+x+(i<r?12:0)).sort((a,b)=>a-b); const mean=v.reduce((a,b)=>a+b,0)/v.length, sh=Math.round((prev-mean)/12)*12; const ms=v.map(m=>m+sh); const mn=ms.reduce((a,b)=>a+b,0)/ms.length; cands.push({ms,d:Math.abs(mn-prev)}); }
-  cands.sort((a,b)=>a.d-b.d); let ms=cands[0].ms; while(Math.min(...ms)<48) ms=ms.map(m=>m+12); while(Math.max(...ms)>84) ms=ms.map(m=>m-12);
-  return {ms,mean:ms.reduce((a,b)=>a+b,0)/ms.length};
+const VOICINGS=[['suave','Cerrado suave'],['fijo','Cerrado fijo'],['drop2','Abierto (drop 2)'],['drop24','Abierto (drop 2+4)'],['amplio','Amplio (orquestal)'],['alterna','Alternar cerrado/abierto']];
+// Un acorde → notas MIDI. `mode` (ver VOICINGS):
+//   suave   cerrado, con la inversión y octava más cercanas al acorde anterior (conducción de voces suave)
+//   fijo    cerrado, siempre en estado fundamental y cerca de do central: cada acorde y cada vuelta salen idénticos
+//   drop2   como «suave», pero la segunda nota desde arriba baja una octava
+//   drop24  la segunda y la cuarta desde arriba bajan una octava (con tríadas solo la segunda)
+//   amplio  notas del acorde repartidas en dos octavas (alternas suben una octava); con `noRoot` quita la fundamental, que ya toca el bajo
+//   alterna cerrado en los compases impares y drop 2 en los pares
+// Devuelve {ms, mean}: `mean` es el centro de la versión cerrada, para que la conducción de voces no se desvíe al abrir.
+function voiceChord(c,prev,mode,noRoot){
+  mode=mode||'suave'; let iv=c.ivs.slice(); if(iv.length>4){ const k=iv.findIndex(x=>x===7||x===6||x===8); if(k>0&&iv.length>4) iv.splice(k,1); } if(iv.length>5){ const k=iv.indexOf(17); if(k>0) iv.splice(k,1); }
+  const mean=v=>v.reduce((a,b)=>a+b,0)/v.length, closed=(ivs,r)=>ivs.map((x,i)=>c.root+x+(i<r?12:0)).sort((a,b)=>a-b);
+  let cl;
+  if(mode==='fijo'){ const v=closed(iv,0), sh=Math.round((prev-mean(v))/12)*12; cl=v.map(m=>m+sh); }
+  else { const cands=[]; for(let r=0;r<iv.length;r++){ const v=closed(iv,r), sh=Math.round((prev-mean(v))/12)*12; const ms=v.map(m=>m+sh); cands.push({ms,d:Math.abs(mean(ms)-prev)}); } cands.sort((a,b)=>a.d-b.d); cl=cands[0].ms; }
+  while(Math.min(...cl)<48) cl=cl.map(m=>m+12); while(Math.max(...cl)>84) cl=cl.map(m=>m-12);
+  const mc=mean(cl); let ms=cl.slice(), open=mode==='drop2'||mode==='drop24'||mode==='amplio'||(mode==='alterna'&&(c.bar||0)%2===1);
+  if(open){ const n=ms.length;
+    if(mode==='amplio'){ let pool=ms.slice(); if(noRoot){ const rp=((c.root%12)+12)%12, r=pool.filter(m=>((m%12)+12)%12!==rp); if(r.length>=2) pool=r; } ms=pool.map((m,i)=>i%2?m+12:m); }
+    else { if(n>=2) ms[n-2]-=12; if(mode==='drop24'&&n>=4) ms[n-4]-=12; }
+    ms.sort((a,b)=>a-b); while(Math.min(...ms)<40) ms=ms.map(m=>m+12); while(Math.max(...ms)>96) ms=ms.map(m=>m-12); }
+  return {ms,mean:mc};
 }
 function progToNotes(P,opts){
-  const L=progChords(P).chords.filter(c=>c.ok), o=Object.assign({center:62,gap:.02},opts||{}), out={chords:[],bass:[]}; let prev=o.center;
+  const L=progChords(P).chords.filter(c=>c.ok), o=Object.assign({center:62,gap:.02,voicing:'suave',noRoot:false},opts||{}), out={chords:[],bass:[]}; let prev=o.center;
   for(const c of L){
-    const v=voiceChord(c,prev); prev=v.mean; const len=Math.max(.05,c.b1-c.b0-o.gap);
+    const v=voiceChord(c,o.voicing==='fijo'?o.center:prev,o.voicing,o.noRoot); prev=v.mean; const len=Math.max(.05,c.b1-c.b0-o.gap);
     out.chords.push({b:r6(c.b0),l:r6(len),ms:v.ms});
     const bp=c.bass!=null?c.bass:c.root; out.bass.push({b:r6(c.b0),l:r6(len),m:36+(((bp-36)%12)+12)%12}); }
   return out;

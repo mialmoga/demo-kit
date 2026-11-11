@@ -794,8 +794,9 @@ function refreshChordInfo(){
   const t=(P.prog&&P.prog.text)||''; if(document.activeElement!==$('cText')) $('cText').value=t;
   const r=progChords(P); let msg; if(!t.trim()) msg='escribe una progresión para verla aquí'; else if(r.errors.length) msg='⚠ '+r.errors.slice(0,3).map(e=>e.msg).join(' · ')+(r.errors.length>3?' · …':''); else msg=r.cycleBars+(r.cycleBars>1?' compases':' compás')+(r.cycleBars<P.bars?' · se repite cada '+r.cycleBars+' hasta el compás '+P.bars:'')+(r.cycleBars>P.bars?' · el proyecto solo tiene '+P.bars+' compases: se corta':'');
   $('cInfo').textContent=msg; $('cGen').disabled=!r.chords.some(c=>c.ok); $('cInfo').style.color=r.errors.length?'#ff9aa6':''; }
+{ const sv=$('cVoic'); for(const [v,n] of VOICINGS) sv.append(el('option',{value:v,text:n})); try{ const s=localStorage.getItem('dk_voicing'); if(s&&VOICINGS.some(x=>x[0]===s)) sv.value=s; }catch(e){} sv.onchange=()=>{ try{ localStorage.setItem('dk_voicing',sv.value); }catch(e){} }; }
 $('cGen').onclick=()=>{
-  const r=progToNotes(P); if(!r.chords.length){ toast('Escribe primero una progresión con acordes válidos','err'); return; }
+  const r=progToNotes(P,{voicing:$('cVoic').value,noRoot:$('cBass').checked&&$('cVoic').value==='amplio'}); if(!r.chords.length){ toast('Escribe primero una progresión con acordes válidos','err'); return; }
   pushUndo(); const mk=(inst,name,notes)=>{ const t=newTrack(inst,name); const base=t.name; let k=1; while(P.tracks.some(x=>x.name===t.name)) t.name=base+' '+(++k); t.notes=notes; P.tracks.push(t); return t; };
   const tc=mk('pad','Acordes (progresión)',r.chords.flatMap(c=>c.ms.map(m=>({b:c.b,l:c.l,m,v:.8})))); let nb=0;
   if($('cBass').checked){ mk('subfall','Bajo (progresión)',r.bass.map(x=>({b:x.b,l:x.l,m:x.m,v:.9}))); nb=r.bass.length; }
