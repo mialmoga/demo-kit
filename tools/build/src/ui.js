@@ -539,8 +539,9 @@ function fxBlock(tr){
   const fmtDb=v=>(v>0?'+':'')+fmtNum(v)+' dB', fmtHz=v=>v>=1000?fmtNum(+(v/1000).toFixed(2))+' kHz':Math.round(v)+' Hz', fmtMs=v=>fmtNum(v)+' ms';
   const ps=el('select',{onchange:e=>{ const p=FX_PRESETS[e.target.value]; if(!p) return; pushUndo(); tr.fx=tr.fx||{}; for(const g of ['eq','comp']){ if(p[g]) tr.fx[g]=Object.assign({},FX_DEF[g],p[g],{on:true}); else if(tr.fx[g]) tr.fx[g]=Object.assign({},tr.fx[g],{on:false}); } touch(); renderInspector(); previewTrack(); }},el('option',{value:'',text:'Elegir…'}),...Object.keys(FX_PRESETS).map(k=>el('option',{value:k,text:k})));
   const box=sec('Mezcla y efectos de la pista',
-    el('p',{class:'desc',text:'Se aplican al audio de esta pista ya renderizado (EQ → compresor → delay → reverb): cambiarlos no vuelve a renderizar el instrumento. También salen en los stems.'}),
+    el('p',{class:'desc',text:'Se aplican al audio de esta pista ya renderizado (Potencia → EQ → compresor → delay → reverb): cambiarlos no vuelve a renderizar el instrumento. También salen en los stems.'}),
     el('div',{class:'row'},el('label',{text:'Preajuste'}),ps),
+    group('pw','Potencia',sl('pw','sub','Graves profundos (80 Hz)',0,9,.5,fmtDb),sl('pw','body','Cuerpo (300 Hz)',0,12,.5,fmtDb),sl('pw','drive','Saturación',0,1,.01),sl('pw','dark','Recorte de agudos',0,1,.01),sl('pw','glue','Compresión «pegamento»',0,1,.01)),
     group('eq','EQ',sl('eq','low','Graves (120 Hz)',-12,12,.5,fmtDb),sl('eq','mid','Medios',-12,12,.5,fmtDb),sl('eq','midF','Frec. medios',200,5000,10,fmtHz),sl('eq','midQ','Q de medios',.3,6,.05),sl('eq','high','Agudos (7 kHz)',-12,12,.5,fmtDb)),
     group('comp','Compresor',sl('comp','thr','Umbral',-48,0,.5,fmtDb),sl('comp','ratio','Razón',1,20,.1,v=>fmtNum(v)+':1'),sl('comp','atk','Ataque',.5,100,.5,fmtMs),sl('comp','rel','Liberación',10,800,5,fmtMs),sl('comp','knee','Codo',0,24,.5,fmtDb),sl('comp','makeup','Compensación',0,24,.5,fmtDb),sl('comp','mix','Mezcla (paralelo)',0,1,.01),el('div',{class:'hint',id:'compGR'})),
     group('delay','Delay',el('div',{class:'row'},el('label',{text:'Tiempo'}),ts),sl('delay','fb','Repeticiones',0,.92,.01),sl('delay','tone','Tono (Hz)',500,12000,50),sl('delay','mix','Mezcla',0,1,.01),
@@ -554,6 +555,12 @@ function masterBlock(){
   return sec('Master',el('p',{class:'desc',text:'Al final de la mezcla. Con todo neutro (0 dB, ganancia 1) no se toca el sonido original.'}),
     sliderRow('Graves (120 Hz)',()=>M().low,v=>setMaster('low',v),-12,12,.5,0,fmtDb),
     sliderRow('Agudos (7 kHz)',()=>M().high,v=>setMaster('high',v),-12,12,.5,0,fmtDb),
+    el('h5',{text:'Potencia',style:'margin:8px 0 2px;font-size:12px;opacity:.8'}),
+    sliderRow('Graves profundos (80 Hz)',()=>M().pwSub,v=>setMaster('pwSub',v),0,9,.5,0,fmtDb),
+    sliderRow('Cuerpo (300 Hz)',()=>M().pwBody,v=>setMaster('pwBody',v),0,12,.5,0,fmtDb),
+    sliderRow('Saturación',()=>M().pwDrive,v=>setMaster('pwDrive',v),0,1,.01,0),
+    sliderRow('Recorte de agudos',()=>M().pwDark,v=>setMaster('pwDark',v),0,1,.01,0),
+    sliderRow('Compresión «pegamento»',()=>M().pwGlue,v=>setMaster('pwGlue',v),0,1,.01,0),
     sliderRow('Ganancia',()=>M().gain,v=>setMaster('gain',v),0,2,.01,1),
     el('label',{class:'chk',style:'margin:4px 0',title:'Limitador con anticipación: ningún pico pasa del techo'},el('input',{type:'checkbox',checked:M().limit,onchange:e=>setMaster('limit',e.target.checked)}),' limitador'),
     sliderRow('Techo del limitador',()=>M().ceil,v=>setMaster('ceil',v),.5,1,.01,.97));

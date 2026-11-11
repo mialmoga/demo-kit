@@ -100,6 +100,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 - **Efectos por pista** («Mezcla y efectos de la pista», en el inspector). Se aplican en este orden sobre el audio ya renderizado de la pista, así que moverlos **no vuelve a renderizar el instrumento**. También suenan al tocar en vivo y en la vista previa:
   - **EQ de 3 bandas:** graves (shelf en 120 Hz), medios (campana con frecuencia y Q ajustables) y agudos (shelf en 7 kHz), de ±12 dB.
+  - **Potencia** (antes del EQ): graves profundos (shelf a 80 Hz, hasta +9 dB), cuerpo (campana a 300 Hz, hasta +12 dB), saturación (igualada en nivel RMS, así vuelve el sonido más denso sin hacerlo más fuerte), recorte de agudos (de 20 kHz a unos 3.5 kHz) y compresión «pegamento». Sirve para acercar bajos y percusiones a un carácter denso y oscuro; con todo en cero no cambia nada.
   - **Compresor:** umbral, razón, ataque, liberación, codo, compensación de ganancia y mezcla en paralelo. Un indicador muestra cuánto está comprimiendo (reducción máxima) la última vez que se renderizó.
   - **Delay** (tiempo en negras/corcheas, repeticiones, tono, mezcla, ping-pong) y **reverb** (tamaño, amortiguación, mezcla, pre-delay).
   - **Preajustes** de EQ y compresor: Voz, Bajo, Bombo, Pegamento suave y Brillo.
@@ -128,7 +129,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 - **Carril de velocidad:** en el mismo carril de la automatización, «Velocidad de notas» muestra una barra por nota; arrástrala para cambiarla (si la nota está seleccionada, cambia toda la selección; si no, las notas que empiezan en ese pulso).
 
-- **Master:** graves y agudos (shelves de ±12 dB en 120 Hz y 7 kHz), ganancia y limitador con anticipación y techo ajustable. Con todo neutro el sonido original queda intacto.
+- **Master:** bloque **Potencia** (los mismos cinco ajustes de la pista, aplicados a toda la mezcla), graves y agudos (shelves de ±12 dB en 120 Hz y 7 kHz), ganancia y limitador con anticipación y techo ajustable. Con todo neutro el sonido original queda intacto.
 
 - **Tocar en vivo** la pista activa con el teclado de la compu o con un controlador MIDI, para afinar parámetros escuchando (ver [abajo](#tocar-en-vivo)).
 
@@ -484,12 +485,13 @@ Los ajustes están en **14 secciones plegables**, con un puntito que se enciende
 
 ## Batería de pads (`plugins/bateria_pads.js`)
 
-Una sola pista de percusión con **16 pads** (v1.1). Cada golpe es una nota en su carril del piano roll, y con **⌨ Tocar** y el teclado en pantalla los pads quedan en una rejilla para **tocar y grabar ritmos al vuelo** sin cambiar de pista.
+Una sola pista de percusión con **16 pads** (v1.2). Cada golpe es una nota en su carril del piano roll, y con **⌨ Tocar** y el teclado en pantalla los pads quedan en una rejilla para **tocar y grabar ritmos al vuelo** sin cambiar de pista.
 
-- **Sonido elegible por pad:** cada pad escoge entre 26 sonidos: Bombo, Bombo 808, Caja, Rim, Palma, Chasquido, Hi-hat cerrado, de pedal y abierto, Ride, Campana de ride, Crash, Tom grave/medio/agudo, Conga grave, aguda y seca (slap), Bongó, Timbal, Cencerro, Shaker, Pandero, Claves, Woodblock y Triángulo. Los nombres de los carriles y de los pads siguen al sonido elegido.
+- **Sonido elegible por pad:** cada pad escoge entre 28 sonidos: Bombo, Bombo 808, Caja, Rim, Palma, Chasquido, Hi-hat cerrado, de pedal y abierto, Ride, Campana de ride, Crash, Tom grave/medio/agudo, Conga grave, aguda y seca (slap), Bongó, Timbal, Cencerro, Shaker, Pandero, Claves, Woodblock y Triángulo, más versiones metálicas del hi-hat cerrado y abierto. Los nombres de los carriles y de los pads siguen al sonido elegido.
 - **Asignación de fábrica:** pads 1–12 como en la v1.0 (Bombo, Caja, Hi-hat cerrado, Hi-hat abierto, Palma, Rim, Tom grave, Tom medio, Tom agudo, Crash, Cencerro, Shaker) y 13 Ride, 14 Conga grave, 15 Conga aguda, 16 Conga seca.
 - **Ajustes por pad:** cada pad tiene su sección con **sonido, volumen, tono (semitonos), duración (×) y paneo**; el puntito se apaga cuando un ajuste no aplica a ese sonido (por ejemplo, la duración de la palma).
-- **Preajustes de kit:** Kit básico, Kit lo-fi (seco), Kit 808, Kit latino, Kit de rock (ride y toms) y Kit orquestal.
+- **Controles por sonido (v1.2):** además de volumen, tono, duración y paneo, cada pad tiene **Ruido (×)** (cuánto ruido lleva el crash, ride, hi-hat metálico, shaker, pandero, rim, toms, congas y la caja), **Brillo** (corte de agudos), **Ataque (ms)** (entrada suave), **Sub** (capa de graves sostenida del bombo y del bombo 808) y **Clic** (golpe del bombo). El puntito de cada control se apaga cuando no aplica al sonido elegido. El crash ahora es metal inarmónico más ruido, y el ruido se baja con **Ruido (×)**.
+- **Preajustes de kit:** Kit básico, Kit lo-fi (seco), Kit 808, Kit latino, Kit de rock (ride y toms), Kit oscuro y denso y Kit orquestal.
 - **Sonidos:** bombo, caja, palma, chasquido, hi-hats cerrado y abierto y crash son los del kit cargado (`K.kick`, `K.snare`…), así que cambian con el kit; el resto está sintetizado dentro del plugin y suena igual con cualquier kit.
 - **Teclas:** `Z X C V B N M , . /` tocan los pads 1 a 10 y `S D G H J L` los pads 11 a 16.
 - **MIDI:** por defecto cada pad responde a una nota consecutiva desde C1 (36, 37, 38…), como los pads tipo MPC. Con **MIDI: nota de cada pad → General MIDI**, cada pad responde a la nota de batería GM de su sonido (36 bombo, 38 caja, 42 hi-hat cerrado, 46 abierto, 51 ride…). La **exportación MIDI** usa el mismo mapa y va por el canal 10 (batería); en el modo consecutivo escribe 36 + carril.

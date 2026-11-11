@@ -374,16 +374,17 @@ function makeDuck(P,beat){
 }
 // ───────────────────────── efectos: delay, reverb (por pista) y master (EQ + limitador) ─────────────────────────
 // Trabajan sobre el audio ya renderizado, así que cambiar un efecto no vuelve a renderizar el instrumento.
-const FX_DEF={eq:{on:false,low:0,mid:0,midF:1000,midQ:1,high:0},comp:{on:false,thr:-18,ratio:3,atk:10,rel:120,knee:6,makeup:0,mix:1},delay:{on:false,time:.75,fb:.4,tone:4500,mix:.3,pp:true},reverb:{on:false,size:.65,damp:.5,mix:.25,pre:12}};
-const MASTER_DEF={low:0,high:0,gain:1,limit:true,ceil:.97};
-const fxOf=tr=>{ const f=(tr&&tr.fx)||{}; return {eq:Object.assign({},FX_DEF.eq,f.eq),comp:Object.assign({},FX_DEF.comp,f.comp),delay:Object.assign({},FX_DEF.delay,f.delay),reverb:Object.assign({},FX_DEF.reverb,f.reverb)}; };
+const FX_DEF={pw:{on:false,sub:0,body:0,drive:0,dark:0,glue:0},eq:{on:false,low:0,mid:0,midF:1000,midQ:1,high:0},comp:{on:false,thr:-18,ratio:3,atk:10,rel:120,knee:6,makeup:0,mix:1},delay:{on:false,time:.75,fb:.4,tone:4500,mix:.3,pp:true},reverb:{on:false,size:.65,damp:.5,mix:.25,pre:12}};
+const MASTER_DEF={low:0,high:0,gain:1,limit:true,ceil:.97,pwSub:0,pwBody:0,pwDrive:0,pwDark:0,pwGlue:0};
+const fxOf=tr=>{ const f=(tr&&tr.fx)||{}; return {pw:Object.assign({},FX_DEF.pw,f.pw),eq:Object.assign({},FX_DEF.eq,f.eq),comp:Object.assign({},FX_DEF.comp,f.comp),delay:Object.assign({},FX_DEF.delay,f.delay),reverb:Object.assign({},FX_DEF.reverb,f.reverb)}; };
 // curvas de los efectos de la pista (tr.auto['fx:<grupo>.<parámetro>'], puntos {b,v} con el valor real del parámetro): continuas, se aplican sobre el audio ya renderizado
 const FX_LANES={'fx:eq.low':{g:'eq',k:'low',label:'EQ · graves',min:-12,max:12,unit:'dB'},'fx:eq.mid':{g:'eq',k:'mid',label:'EQ · medios',min:-12,max:12,unit:'dB'},'fx:eq.midF':{g:'eq',k:'midF',label:'EQ · frecuencia de medios',min:200,max:5000,unit:'Hz'},'fx:eq.high':{g:'eq',k:'high',label:'EQ · agudos',min:-12,max:12,unit:'dB'},
   'fx:comp.thr':{g:'comp',k:'thr',label:'Compresor · umbral',min:-48,max:0,unit:'dB'},'fx:comp.makeup':{g:'comp',k:'makeup',label:'Compresor · compensación',min:0,max:24,unit:'dB'},'fx:comp.mix':{g:'comp',k:'mix',label:'Compresor · mezcla',min:0,max:1,unit:''},
   'fx:delay.mix':{g:'delay',k:'mix',label:'Delay · mezcla',min:0,max:1,unit:''},'fx:reverb.mix':{g:'reverb',k:'mix',label:'Reverb · mezcla',min:0,max:1,unit:''}};
 function fxLanePts(tr){ let o=null; if(tr&&tr.auto) for(const k in FX_LANES){ const p=autoPts(tr,k); if(p){ (o||(o={}))[k]=p; } } return o; }
 const eqOn=(e,L)=>!!(e.on&&(e.low||e.mid||e.high||(L&&(L['fx:eq.low']||L['fx:eq.mid']||L['fx:eq.high'])))), compOn=(c,L)=>!!(c.on&&(c.mix>0||(L&&L['fx:comp.mix']))&&c.ratio>1);
-const fxActive=(fx,L)=>!!(eqOn(fx.eq,L)||compOn(fx.comp,L)||(fx.delay.on&&(fx.delay.mix>0||(L&&L['fx:delay.mix'])))||(fx.reverb.on&&(fx.reverb.mix>0||(L&&L['fx:reverb.mix']))));
+const pwOn=p=>!!(p&&p.on&&(p.sub||p.body||p.drive||p.dark||p.glue));
+const fxActive=(fx,L)=>!!(pwOn(fx.pw)||eqOn(fx.eq,L)||compOn(fx.comp,L)||(fx.delay.on&&(fx.delay.mix>0||(L&&L['fx:delay.mix'])))||(fx.reverb.on&&(fx.reverb.mix>0||(L&&L['fx:reverb.mix']))));
 const masterOf=P=>Object.assign({},MASTER_DEF,P.master);
 const REV_WET=.74;      // calibración de la reverb (ver pruebas): con mezcla = 1 el nivel del agua ≈ nivel de la entrada
 const revFbk=size=>.7+.26*clamp(size,0,1);                                    // máx .96 → cola de unos 5 s
@@ -422,7 +423,8 @@ function applyFx(L,R,fx,beat,maxLen,tv,lanes){      // → {L,R}; la salida pued
   if(rev){ const fbk=revFbk(fx.reverb.size); tail+=Math.min(6*SR,Math.ceil((1400/44100)*SR*Math.log(.001)/Math.log(fbk)))+Math.round(clamp(fx.reverb.pre,0,200)*SR/1000); }
   const m=Math.min(maxLen==null?n+tail:maxLen,n+tail); let a=L,b=R;
   const eqA=eqOn(fx.eq,lanes), cpA=compOn(fx.comp,lanes), LN=lanes||{};
-  if(eqA||cpA){ a=Float32Array.from(a); b=Float32Array.from(b);                  // EQ → compresor → eco → reverb
+  const pwA=pwOn(fx.pw); if(pwA||eqA||cpA){ a=Float32Array.from(a); b=Float32Array.from(b);                  // potencia → EQ → compresor → eco → reverb
+    if(pwA) powerFx(a,b,fx.pw);
     if(eqA){ if(LN['fx:eq.low']||LN['fx:eq.mid']||LN['fx:eq.midF']||LN['fx:eq.high']) eqAuto(a,b,fx.eq,{low:LN['fx:eq.low'],mid:LN['fx:eq.mid'],midF:LN['fx:eq.midF'],high:LN['fx:eq.high']}); else { shelf(a,b,120,fx.eq.low,false); peakEq(a,b,fx.eq.midF,fx.eq.mid,fx.eq.midQ); shelf(a,b,7000,fx.eq.high,true); } }
     if(cpA) compFx(a,b,fx.comp,(LN['fx:comp.thr']||LN['fx:comp.makeup']||LN['fx:comp.mix'])?{thr:LN['fx:comp.thr'],makeup:LN['fx:comp.makeup'],mix:LN['fx:comp.mix']}:null); }
   if(dly) [a,b]=delayFx(a,b,m,fx.delay,beat,tv,LN['fx:delay.mix']);
@@ -470,6 +472,17 @@ function eqAuto(L,R,eq,g){                  // EQ con curvas: se recalculan los 
         s[0]=x1; s[1]=x2; s[2]=y1; s[3]=y2; } } }
 }
 let lastGR=0;                                // reducción máxima (dB) del último compresor aplicado; la interfaz la muestra
+// «Potencia»: graves y cuerpo → saturación (con el mismo nivel RMS, así solo se vuelve más densa, no más fuerte) → recorte de agudos → compresión de pegamento. En el sitio.
+//   sub  0–9 dB de graves (shelf a 80 Hz) · body 0–12 dB de cuerpo (campana a 300 Hz) · drive 0–1 saturación · dark 0–1 recorte de agudos (de 20 kHz a ~3.5 kHz) · glue 0–1 compresión
+function powerFx(L,R,p){
+  const n=L.length; if(p.sub) shelf(L,R,80,clamp(p.sub,0,12),false); if(p.body) peakEq(L,R,300,clamp(p.body,0,12),.6);
+  if(p.drive>0){ const g=1+clamp(p.drive,0,1)*9, ig=1/Math.tanh(g); let s0=0,s1=0;
+    for(let i=0;i<n;i++){ s0+=L[i]*L[i]+R[i]*R[i]; L[i]=Math.tanh(L[i]*g)*ig*.5; R[i]=Math.tanh(R[i]*g)*ig*.5; s1+=L[i]*L[i]+R[i]*R[i]; }
+    // nivelación: la saturación se normaliza para que el RMS quede como el original, pero sin pasar de un recorte razonable
+    const k=s1>1e-12?Math.sqrt(s0/s1):1; for(let i=0;i<n;i++){ L[i]*=k; R[i]*=k; } }
+  if(p.dark>0){ const a=1-Math.exp(-2*Math.PI*20000*Math.pow(.175,clamp(p.dark,0,1))/SR); for(const X of [L,R]){ let y1=0,y2=0; for(let i=0;i<n;i++){ y1+=a*(X[i]-y1); y2+=a*(y1-y2); X[i]=y2; } } }
+  if(p.glue>0){ const q=clamp(p.glue,0,1); compFx(L,R,{thr:-10-10*q,ratio:1.5+3*q,atk:20,rel:150,knee:6,makeup:3*q,mix:1}); }
+}
 function compFx(L,R,p,ga){                      // compresor con codo suave, detector de pico enlazado (no mueve el paneo), en el sitio
   const thr=p.thr, ratio=Math.max(1,p.ratio), kn=Math.max(0,p.knee), mix=clamp(p.mix,0,1), mk=Math.pow(10,(p.makeup||0)/20);
   const aC=Math.exp(-1/(Math.max(.1,p.atk)*1e-3*SR)), rC=Math.exp(-1/(Math.max(1,p.rel)*1e-3*SR)), inv=1/ratio-1; let gs=0, mx=0; const n=L.length;
@@ -482,8 +495,8 @@ function compFx(L,R,p,ga){                      // compresor con codo suave, det
   if(mx>lastGR) lastGR=mx;
 }
 function masterFx(P,out){
-  const m=masterOf(P); if(!m.low&&!m.high&&m.gain===1) return out;          // todo neutro: no se toca el sonido original
-  const L=Float32Array.from(out.L), R=Float32Array.from(out.R), n=L.length; shelf(L,R,120,m.low,false); shelf(L,R,7000,m.high,true);
+  const m=masterOf(P), pw=m.pwSub||m.pwBody||m.pwDrive||m.pwDark||m.pwGlue; if(!m.low&&!m.high&&m.gain===1&&!pw) return out;          // todo neutro: no se toca el sonido original
+  const L=Float32Array.from(out.L), R=Float32Array.from(out.R), n=L.length; if(pw) powerFx(L,R,{sub:m.pwSub,body:m.pwBody,drive:m.pwDrive,dark:m.pwDark,glue:m.pwGlue}); shelf(L,R,120,m.low,false); shelf(L,R,7000,m.high,true);
   const g=m.gain, ceil=clamp(m.ceil,.3,1), oL=new Float32Array(n), oR=new Float32Array(n);
   if(m.limit){      // limitador con anticipación de 1.5 ms: el audio se retrasa W muestras para que la ganancia ya haya bajado cuando llegue el pico
     const W=Math.round(.0015*SR), rel=1-Math.exp(-1/(.08*SR)); let gr=1;
