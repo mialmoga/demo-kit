@@ -705,11 +705,11 @@ function projectToMidi(P){
   { let lastMp=-1; const cand=new Set([0]); for(let b=0;b<=totalBeats+1e-9;b+=.25) cand.add(+b.toFixed(6)); for(const p of (P.tempo||[])) if(p&&p.b>=0&&p.b<=totalBeats) cand.add(+p.b);
     for(const b of [...cand].sort((x,y)=>x-y)){ const mp=Math.round(60e6/Math.max(1,tm.bpmAt(b))); if(mp!==lastMp){ cond.push(meta(Math.round(b*MIDI_PPQ),0x51,[(mp>>>16)&255,(mp>>>8)&255,mp&255],-1)); lastMp=mp; } } }
   const chunks=[midiTrackBytes(cond,endTick)], skipped=[]; let nextCh=0; const melCh=[0,1,2,3,4,5,6,7,8,10,11,12,13,14,15];
-  for(const tr of P.tracks){ if(!tr.notes.length){ continue; } const inst=INSTRUMENTS[tr.inst]||{}, gm=inst.kind==='perc'&&(MIDI_GM_DRUM[tr.inst]||tr.inst==='hat');
+  for(const tr of P.tracks){ if(!tr.notes.length){ continue; } const inst=INSTRUMENTS[tr.inst]||{}, gm=inst.kind==='perc'&&(MIDI_GM_DRUM[tr.inst]||tr.inst==='hat'||typeof inst.midiNote==='function');
     const ch=gm?9:melCh[nextCh++%melCh.length], ev=[meta(0,0x03,midiText(tr.name||inst.name||'Pista')),meta(0,0x04,midiText(inst.name||tr.inst))];
     if(!gm) ev.push({t:0,o:1,b:[0xC0|ch,MIDI_PROG[tr.inst]||0]});
     ev.push({t:0,o:1,b:[0xB0|ch,7,tr.mute?0:Math.max(0,Math.min(127,Math.round((tr.vol==null?1:tr.vol)*100)))]},{t:0,o:1,b:[0xB0|ch,10,Math.max(0,Math.min(127,Math.round(64+(tr.pan||0)*63)))]});
-    const list=tr.notes.map(n=>{ let key=gm?(tr.inst==='hat'?(Math.round(n.m)===1?46:42):MIDI_GM_DRUM[tr.inst]):Math.max(0,Math.min(127,Math.round(inst.kind==='perc'?60+(n.m||0):n.m)));
+    const list=tr.notes.map(n=>{ let key=typeof inst.midiNote==='function'&&inst.kind==='perc'?inst.midiNote(n.m,tr.params||{}):null; if(key==null) key=gm?(tr.inst==='hat'?(Math.round(n.m)===1?46:42):MIDI_GM_DRUM[tr.inst]):Math.max(0,Math.min(127,Math.round(inst.kind==='perc'?60+(n.m||0):n.m)));
       const on=Math.round(n.b*MIDI_PPQ), len=gm?120:Math.max(1,Math.round((n.l||.25)*MIDI_PPQ)); return {key,on,off:on+len,vel:Math.max(1,Math.min(127,Math.round((n.v==null?1:n.v)*100)))}; });
     const byKey=new Map(); for(const x of list){ if(!byKey.has(x.key)) byKey.set(x.key,[]); byKey.get(x.key).push(x); }
     for(const arr of byKey.values()){ arr.sort((a,b)=>a.on-b.on); for(let i=0;i+1<arr.length;i++) if(arr[i].off>arr[i+1].on) arr[i].off=Math.max(arr[i].on+1,arr[i+1].on); }   // una misma nota no se solapa consigo misma

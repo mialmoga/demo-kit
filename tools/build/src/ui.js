@@ -203,7 +203,7 @@ async function trimOverlaps(){ const tr=P.tracks[sel], ov=monoOverlaps(tr); if(!
 // ───────────── piano roll ─────────────
 function trackInfo(tr){
   const inst=INSTRUMENTS[tr.inst];
-  if(inst&&inst.kind==='perc'){ const n=Math.max(1,(inst.lanes||[1]).length); return {perc:true,rows:n,RH:n>1?30:44,lanes:inst.lanes||[{name:inst.name}]}; }
+  if(inst&&inst.kind==='perc'){ let lanes=inst.lanes||[{name:inst.name}]; if(typeof inst.laneNames==='function'){ try{ const nm=inst.laneNames(tr.params||{}); lanes=lanes.map((l,i)=>Object.assign({},l,{name:nm[i]||l.name})); }catch(e){} } const n=Math.max(1,lanes.length); return {perc:true,rows:n,RH:n>12?24:n>1?30:44,lanes}; }
   let lo=24,hi=107; for(const n of tr.notes){ if(n.m<lo+2) lo=Math.floor(n.m)-2; if(n.m>hi-2) hi=Math.ceil(n.m)+2; }
   lo=Math.max(0,lo); hi=Math.min(127,hi); return {perc:false,lo,hi,rows:hi-lo+1,RH:16};
 }
@@ -590,7 +590,7 @@ function renderInspector(){
   const put=(d,row)=>{ if(useSec){ const nm=d.sec||'Otros'; if(!curG||curG.name!==nm){ curG={name:nm,rows:[],cnt:el('span',{class:'cnt'})}; groups.push(curG); } curG.rows.push(row); } else pk.push(row);
     if(useDots){ const dot=el('span',{class:'pdot'}); if(row.firstChild) row.firstChild.prepend(dot); dots.push({dot,d,g:curG}); } };
   for(const d of inst.params){
-    if(d.type==='choice'){ const vals=d.vals||d.opts.map((_,i)=>i); const s=el('select',{onchange:e=>{ tr.params[d.k]=vals[+e.target.value]; touch(); upd(); previewTrack(); }},...d.opts.map((o,i)=>el('option',{value:i,text:o}))); s.value=Math.max(0,vals.indexOf(tr.params[d.k]));
+    if(d.type==='choice'){ const vals=d.vals||d.opts.map((_,i)=>i); const s=el('select',{onchange:e=>{ tr.params[d.k]=vals[+e.target.value]; touch(); upd(); if(inst.laneNames){ draw(); buildOsk(); } previewTrack(); }},...d.opts.map((o,i)=>el('option',{value:i,text:o}))); s.value=Math.max(0,vals.indexOf(tr.params[d.k]));
       put(d,el('div',{class:'row'},el('label',{text:d.label,title:d.label}),s)); }
     else if(d.type==='text'){ put(d,el('div',{class:'row'},el('label',{text:d.label}),el('input',{type:'text',value:tr.params[d.k]==null?'':tr.params[d.k],onchange:e=>{ tr.params[d.k]=e.target.value; touch(); previewTrack(); }}))); }
     else put(d,sliderRow(d.label,()=>tr.params[d.k],v=>{ tr.params[d.k]=v; touch(); upd(); },d.min,d.max,d.step,d.def));
@@ -636,7 +636,7 @@ function syncKeyUI(){ const k=KEY(), gen=genreOf(P); $('kRoot').value=k.root; $(
 let oskOn=false;
 function buildOsk(){ const box=$('osk'); box.hidden=!oskOn; $('bOsk').classList.toggle('on',oskOn); if(!oskOn) return; box.innerHTML=''; const tr=P.tracks[sel]; if(!tr||!INSTRUMENTS[tr.inst]) return; const info=trackInfo(tr); box.classList.toggle('padgrid',!!(info.perc&&info.rows>4));
   const press=(k,id,m)=>{ k.dataset.m=m; k.onpointerdown=e=>{ e.preventDefault(); try{ k.setPointerCapture(e.pointerId); }catch(_){} k.classList.add('on'); liveOn(id,m,.85); }; const up=()=>{ k.classList.remove('on'); liveOff(id); }; k.onpointerup=up; k.onpointercancel=up; };
-  if(info.perc){ for(let i=0;i<info.rows;i++){ const p=el('div',{class:'pad',text:(info.lanes[i]&&info.lanes[i].name)||'Golpe'}); press(p,'osk'+i,i); box.append(p); } return; }
+  if(info.perc){ for(let i=0;i<info.rows;i++){ const p=el('div',{class:'pad',text:(info.lanes[i]&&info.lanes[i].name)||'Golpe'}); if(info.rows>1&&PERC_KEYLBL[i]) p.append(el('small',{class:'pk',text:PERC_KEYLBL[i]})); press(p,'osk'+i,i); box.append(p); } return; }
   const lo=baseOct, hi=Math.min(127,baseOct+24);
   for(let m=lo;m<=hi;m++){ const pc=((m%12)+12)%12;
     if(isBlack(m)){ const w=el('span',{class:'bk'}),i=el('i',{title:midiName(m)}); press(i,'osk'+m,m); w.append(i); box.append(w); }
@@ -1172,7 +1172,8 @@ $('plgCode').addEventListener('keydown',e=>{ if(e.key==='Tab'){ e.preventDefault
 const LIVE_LEN=2.2, LIVE_MAX=110;
 const KEYMAP={KeyZ:0,KeyS:1,KeyX:2,KeyD:3,KeyC:4,KeyV:5,KeyG:6,KeyB:7,KeyH:8,KeyN:9,KeyJ:10,KeyM:11,Comma:12,KeyL:13,Period:14,Semicolon:15,Slash:16,
   KeyQ:12,Digit2:13,KeyW:14,Digit3:15,KeyE:16,KeyR:17,Digit5:18,KeyT:19,Digit6:20,KeyY:21,Digit7:22,KeyU:23,KeyI:24,Digit9:25,KeyO:26,Digit0:27,KeyP:28};
-const PERC_KEYS=['KeyZ','KeyX','KeyC','KeyV','KeyB','KeyN','KeyM'];
+const PERC_KEYS=['KeyZ','KeyX','KeyC','KeyV','KeyB','KeyN','KeyM','Comma','Period','Slash','KeyS','KeyD','KeyG','KeyH','KeyJ','KeyL'];   // hasta 16 carriles de percusión
+const PERC_KEYLBL=['Z','X','C','V','B','N','M',',','.','/','S','D','G','H','J','L'];
 let liveEnabled=true, baseOct=60, sustain=false, midiAcc=null;
 const voices=new Map(), sustained=new Set(), liveCache=new Map(), downCodes=new Map();
 const liveKey=(tr,m)=>tr.inst+'|'+tr.pan+'|'+(tr.ducked?1:0)+'|'+P.bpm+'|'+m+'|'+JSON.stringify(tr.params)+'|'+JSON.stringify(tr.fx||0);
@@ -1195,7 +1196,9 @@ function codeToNote(tr,code){
   if(info.perc){ if(info.rows===1) return 0; const i=PERC_KEYS.indexOf(code); return i>=0&&i<info.rows?i:null; }   // percusión: una tecla por carril
   return clamp(baseOct+k,0,127);
 }
-function midiToNote(tr,n){ const info=trackInfo(tr); return info.perc?(info.rows===1?0:((n-36)%info.rows+info.rows)%info.rows):n; }
+function midiToNote(tr,n){ const info=trackInfo(tr); if(!info.perc) return n; const inst=INSTRUMENTS[tr.inst];
+  if(inst&&typeof inst.midiLane==='function'){ let l=null; try{ l=inst.midiLane(n,tr.params||{}); }catch(e){} if(l!=null) return l; if((tr.params||{}).midiMap==='gm') return null; }   // mapa propio del instrumento (p. ej. General MIDI)
+  return info.rows===1?0:((n-36)%info.rows+info.rows)%info.rows; }
 function releaseVoice(v,t){ try{ const a=ctx,g=v.g.gain; g.cancelScheduledValues(a.currentTime); g.setValueAtTime(g.value,a.currentTime); g.linearRampToValueAtTime(0,a.currentTime+t); v.s.stop(a.currentTime+t+.02); }catch(e){} }
 function liveOn1(id,m,vel){
   const tr=P.tracks[sel]; if(!tr||!INSTRUMENTS[tr.inst]) return; liveOff(id,true); let buf;
@@ -1234,7 +1237,7 @@ window.addEventListener('blur',()=>{ if(down.size||voices.size) allOff(); });
 function onMidi(ev){
   const sv=$('midiIn').value; if(sv!=='all'&&ev.target&&ev.target.id!==sv) return; const d=ev.data; if(!d||d.length<2) return;
   const st=d[0]&0xF0, n=d[1], v=d.length>2?d[2]:0;
-  if(st===0x90&&v>0){ const tr=P.tracks[sel]; if(tr&&liveEnabled) liveOn('m'+n,midiToNote(tr,n),Math.max(.05,v/127)); }
+  if(st===0x90&&v>0){ const tr=P.tracks[sel]; if(tr&&liveEnabled){ const mn=midiToNote(tr,n); if(mn!=null) liveOn('m'+n,mn,Math.max(.05,v/127)); } }
   else if(st===0x80||(st===0x90&&v===0)) liveOff('m'+n);
   else if(st===0xB0){ if(n===64) setSustain(v>=64); else if(n===120||n===123) allOff(); }
 }

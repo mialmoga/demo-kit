@@ -5,7 +5,7 @@
 # Demo Kit
 
 **Make sound from code.**
-Un pequeño estudio de síntesis procedural que corre en el navegador: piano roll, capas, instrumentos parametrizables, automatización, plugins (hasta una voz que canta la letra que escribas sobre las notas) y exportación a WAV, stems y MIDI, todo sobre `demo_kit.js`.
+Un pequeño estudio de síntesis procedural que corre en el navegador: piano roll, capas, instrumentos parametrizables, automatización, progresiones de acordes, plugins (una voz que canta la letra que escribas sobre las notas, una guitarra que acompaña, un instrumento «supremo» para sonidos mecánicos y de agua, una batería de pads…) y exportación a WAV, stems y MIDI, todo sobre `demo_kit.js`.
 
 ### 🎹 [Abrir Demo Kit en el navegador](https://mialmoga.github.io/demo-kit/)
 
@@ -55,7 +55,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 - **Piano roll** con rejilla (1/4 a 1/32, tresillos o libre), zoom, notas fantasma de las otras pistas, selección múltiple, velocidad por nota y **deshacer/rehacer global** (notas, pistas, parámetros, efectos, master, BPM… hasta 100 pasos; los sliders y arrastres cuentan como un solo paso). Con el ratón, **clic derecho** sobre una nota la borra; en pantallas táctiles hay modos **Dibujar / Navegar / Borrar / Seleccionar**.
 
-- **Carpetas del repositorio:** en «Demos y plugins» aparece la sección **En el repositorio** con lo que haya en `demos/` (demos `.js`), `plugins/` (plugins `.js`), `genres/` (géneros `.json`), `kits/bootleg/` (kits de síntesis alternos `.js`), `proyectos/` o `projects/` (proyectos `.demokit.json`) y `project_examples/` (ejemplos). Cada archivo trae su botón **Cargar** / **Abrir** (y «Cargar todas» en demos). Los géneros son datos y se cargan directo; los kits y plugins son código y piden confirmación (ver [Kits alternos](#kits-alternos)).
+- **Carpetas del repositorio:** en «Demos y plugins» aparece la sección **En el repositorio** con lo que haya en `demos/` (demos `.js`), `plugins/` (plugins `.js`), `genres/` (géneros `.json`), `kits/bootleg/` (kits de síntesis alternos `.js`; no lista los `test_*`), `projects/` (proyectos `.demokit.json` que no son los ejemplos oficiales) y `project_examples/` (los ejemplos oficiales). Cada archivo trae su botón **Cargar** / **Abrir** (y «Cargar todas» en demos). Los géneros son datos y se cargan directo; los kits y plugins son código y piden confirmación (ver [Kits alternos](#kits-alternos)).
   - Si una carpeta no existe, el estudio te dice cómo se llama y que la crees junto a `index.html`: en cuanto pongas archivos ahí, aparecen solos.
   - Cómo encuentra los archivos, en este orden: (1) un `manifest.json` dentro de la carpeta (una lista de nombres, p. ej. `["cancion.js","otra.js"]`); (2) la API de GitHub si está en GitHub Pages; (3) el listado de carpeta de un servidor local (`python3 -m http.server`).
   - **Recomendado:** el repo trae un workflow (`.github/workflows/manifests.yml`) que, en cada push a esas carpetas, regenera solo el `manifest.json` de cada una. Así el estudio nunca toca la API de GitHub (que limita a unas 60 consultas por hora) y funciona igual en cualquier hosting. Si el workflow no corre en tu fork, actívalo en la pestaña *Actions* o genera los manifest a mano con `node .github/scripts/gen-manifests.js` (el script y el workflow deben incluir `genres/` y `kits/bootleg/`).
@@ -83,6 +83,12 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
   - **En `genres/`:** Cumbia, Bossa nova, Ranchera, Bolero y Ska (`latinos.json`), y House, Trap y Épica cinematográfica (`electronica.json`), más el ejemplo Reggae. Los géneros con guitarra marcan como afín la **Guitarra acompañante**.
   - **Instrumentos afines marcados:** los instrumentos y las escalas típicos del género salen primero y con un ● en los selectores (los demás siguen disponibles), y una casilla permite agregar además una pista por cada instrumento afín. Los instrumentos se agrupan en cuatro categorías, cada una con su color pastel: **percusión**, **melódicos**, **acompañamiento** y **efectos**; el borde de cada pista lleva el color de su categoría.
   - **Extensible:** un género es un archivo `.json` (`{"format":"demokit-genres","genres":[…]}`, ver [Géneros](#géneros-genres)). Suéltalo en la ventana, ponlo en `genres/` o créalo desde el propio panel; los géneros propios se recuerdan en el navegador. `genres/reggae.json` es un ejemplo completo.
+
+- **Progresión de acordes del proyecto (♬ Acordes):** cuarta pestaña de la pista de tempo. Escribes tus acordes en texto, por ejemplo `Am7 | Dm7 G7 | Cmaj7 %`, y el proyecto los guarda (`prog`). Una franja sobre la regla dibuja cada acorde.
+  - **Sintaxis:** `|` separa compases; varios acordes dentro de un compás lo dividen en partes iguales; un `%` solo repite el compás anterior; `%`, `.` o `_` entre acordes mantienen el anterior. La progresión se repite sobre los compases del proyecto.
+  - **Acordes que entiende:** tríadas, `sus2`/`sus4`, `6`, `69`, `7`, `maj7`, `9`, `11`, `13`, `dim`, `ø`, `aug`, alteraciones (`b5`, `#9`, `alt`…) y bajo distinto con barra (`C/E`).
+  - **«Generar pista de acordes»** crea una pista de pad con la progresión en **acordes cerrados** (cada acorde se coloca lo más cerca posible del anterior), y opcionalmente otra de **bajo**. Las notas ya dibujadas no se borran: los instrumentos que leen la progresión (la guitarra con «Del proyecto») simplemente las ignoran.
+  - **Ayuda de acordes:** un panel plegable donde eliges una **raíz** y una **escala** y te muestra una tabla de acordes válidos por grado (sus2, tríada, sus4, séptima). Un clic en un cuadrito **suena** el acorde; el interruptor del panel permite también **agregarlo** a la progresión (arranca en «solo oír»).
 
 - **Pistas / capas ilimitadas**, cada una con su instrumento, volumen, paneo, mute y solo.
 
@@ -112,11 +118,13 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
   - Es caro, así que solo ocurre al pulsarlo. Las notas horneadas pasan a una pista «<nombre> · bake» (con audio estéreo guardado en el proyecto, que pesa), y las notas idénticas comparten el mismo clip.
   - **Deshornear** (con la pista bake seleccionada) las devuelve a su pista original, o `Ctrl+Z`.
 
-- **Escalas y acordes:** elige tónica y escala (mayor, menor natural/armónica, pentatónicas, dórica, frigia, mixolidia, blues): el piano roll resalta las notas de la escala y la tónica. «Ajustar» mueve a la escala lo que dibujas. El selector **Acorde** (tríada, séptima, quinta, sus4, octava) hace que cada clic en el roll, cada tecla o cada nota MIDI suene y escriba el acorde completo, apilado sobre los grados de la escala si hay una elegida. La escala se guarda con el proyecto.
+- **Escalas y acordes:** elige tónica y escala (mayor, menor natural/armónica/melódica, mayor armónica, doble armónica mayor, pentatónicas, dórica, frigia, lidia, mixolidia, locria, napolitana mayor y menor, blues): el piano roll resalta las notas de la escala y la tónica. «Ajustar» mueve a la escala lo que dibujas, y el botón de forzar a la escala lleva a la nota más cercana lo ya dibujado. El selector **Acorde** (tríada, séptima, quinta, sus4, octava) hace que cada clic en el roll, cada tecla o cada nota MIDI suene y escriba el acorde completo, apilado sobre los grados de la escala si hay una elegida. La escala se guarda con el proyecto.
 
-- **Teclado en pantalla** (🎹 Teclado): dos octavas para tocar con el ratón o el dedo, con los mismos acordes, grabación y efectos que el teclado de la compu. En pistas de percusión muestra un pad por carril.
+- **Teclado en pantalla** (🎹 Teclado): dos octavas para tocar con el ratón o el dedo, con los mismos acordes, grabación y efectos que el teclado de la compu. En pistas de percusión muestra un pad por carril (si hay más de cuatro, como en la [Batería de pads](#batería-de-pads-pluginsbateria_padsjs), los pads se acomodan en una rejilla).
 
 - **Edición de notas:** transponer (±1, ±12), cuantizar inicios y largos a la rejilla, forzar a la escala, y copiar/pegar notas entre pistas (`Ctrl+C` / `Ctrl+V`, se pega en el cursor). Actúan sobre la selección, o sobre toda la pista si no hay. Todo se deshace con `Ctrl+Z`.
+  - **Edición con el dedo:** el modo **↔ Estirar** solo cambia el tamaño de las notas (no mueve ni crea otras), y la franja de selección trae **← →** (mueven la selección según la rejilla) y **⇤ ⇥** (acortan o alargan según la rejilla). Junto al zoom hay un **Play** pequeño y, en «⋯ Más», un **⏮ Inicio** que lleva el cursor al principio de la composición.
+  - **Notas que se pisan** en un instrumento monofónico (voz, o Forja con legato): se marcan en rojo, la pista muestra «⚠N» y aparece **recortar** (con doble confirmación; solo recorta las que empiezan en momentos distintos).
 
 - **Carril de velocidad:** en el mismo carril de la automatización, «Velocidad de notas» muestra una barra por nota; arrástrala para cambiarla (si la nota está seleccionada, cambia toda la selección; si no, las notas que empiezan en ese pulso).
 
@@ -136,9 +144,12 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 - **Render por pista con caché:** cada pista se renderiza sola y se guarda. Editar una pista solo vuelve a renderizar esa pista, y cambiar volumen, mute o solo no renderiza nada. Un Play tras un cambio pequeño tarda una fracción de segundo.
 
-- **Exportación a WAV** (estéreo, 16 bits, 44.1 kHz) y **a stems**: un ZIP con un WAV por pista (incluidas las silenciadas), con los efectos de cada pista pero sin el master, para seguir mezclando en otro DAW.
+- **Exportación a WAV** (estéreo, 16 bits, 44.1 kHz) y **a stems**: un ZIP con un WAV por pista (incluidas las silenciadas), con los efectos de cada pista pero sin el master, para seguir mezclando en otro DAW. El nombre del archivo lleva el kit y el carácter con que sonó (`nombre_evol-organico.wav`, `nombre_incluido.wav`), para comparar kits sin confundirse.
+  - **Largo del proyecto:** si hay notas fuera del largo del proyecto (o sobra más de un compás vacío al final), al exportar WAV, stems o MIDI el estudio pregunta qué hacer: exportar solo el tiempo del proyecto, exportar todas las notas (hasta la última) sin tocar el proyecto, o **ajustar el proyecto**. El botón **Ajustar** junto a «Compases» acorta o alarga el proyecto a la última nota (`Ctrl+Z` lo deshace). Guardar, «Compacto» y «Demo .js» no preguntan: llevan todas las notas.
 
 - **MIDI:** «⬇ MIDI» descarga un `.mid` con una pista por pista, más tempo, compás (con sus cambios), volumen y paneo (las pistas silenciadas salen con volumen 0; la automatización no se exporta). **Cargar archivos** acepta `.mid`/`.midi` y lo abre como **proyecto nuevo** (con los cambios de tempo y de compás que traiga; si un cambio de compás no cae en límite de compás, se ajusta y se avisa). Las **secciones** viajan como marcadores del `.mid` (eventos de texto, en el compás donde empiezan) y al importar se leen de vuelta, incluidos los «cue points» de otros programas; si un marcador no cae en un compás exacto se ajusta al más cercano y se avisa. Es para llevar las notas a otro programa y de vuelta: el sonido de Demo Kit no viaja en el MIDI.
+
+- **Apariencia y rendimiento (⚙):** dos temas, **Cristal** (por defecto, con transparencias y desenfoque) y **Clásico**, con interruptores para el desenfoque, el fondo animado y las animaciones. Si el equipo va lento, el estudio lo avisa y propone apagarlos.
 
 - **Pantalla completa:** toca el logo «dk» de la cabecera. El fondo (aurora y partículas) se queda quieto cuando no hay actividad y despierta con un toque, una tecla o Play.
 
@@ -190,7 +201,7 @@ Q W E R T Y U I O P
 ```
 
 - **Octava:** `−` / `=` (o los botones de la barra). La octava base se muestra junto al botón.
-- **Percusión:** en pistas de un solo carril (bombo, caja…) cualquier tecla del mapa lo dispara. En pistas de varios carriles (hi-hat: cerrado/abierto), las teclas `Z X C V B N M` son los carriles 1, 2, 3…
+- **Percusión:** en pistas de un solo carril (bombo, caja…) cualquier tecla del mapa lo dispara. En pistas de varios carriles (hi-hat: cerrado/abierto), las teclas `Z X C V B N M , . /` son los carriles 1 a 10 y `S D G H J L` los carriles 11 a 16 (cada pad en pantalla muestra su tecla en la esquina).
 - **MIDI:** pulsa **🎛 MIDI**, acepta el permiso del navegador y elige la entrada. Soporta velocidad, pedal de sustain (CC64) y «all notes off». En percusión, un teclado MIDI usa las notas a partir de C1 (36), una por carril. Web MIDI funciona en Chrome, Edge y Opera; Firefox lo pide como permiso y Safari no lo tiene. Necesita HTTPS (GitHub Pages lo cumple) o `localhost`.
 - **Latencia:** cada nota se renderiza una vez y queda en caché; tocar es solo disparar un buffer ya listo. Al elegir una pista (o al soltar un slider) se precalientan en segundo plano las tres octavas del teclado. Una nota fuera de ese rango, o la primera tras cambiar un parámetro, tarda unos 10–50 ms en renderizarse.
 - **Largo de las notas:** al tocar, cada nota dura como máximo ~2 s y, al soltar la tecla, tiene un fundido de salida de 90 ms. La percusión y los sonidos cortos suenan completos.
@@ -352,10 +363,15 @@ registerInstrument({
 | Campo | Descripción |
 |---|---|
 | `name`, `id` | nombre visible; `id` opcional (por defecto sale del nombre) |
+| `version` | `'mayor.menor'` (ver [Versiones de plugins](#versiones-de-plugins)); sin el campo se toma `1.0` |
 | `kind` | `'melodic'` o `'perc'` |
+| `cat` | categoría para los géneros y los colores: `'perc'`, `'mel'`, `'acomp'` o `'fx'` |
 | `params` | lista de controles; aparecen como sliders en el inspector. Tipos: número (`min`, `max`, `step`, `def`), `type:'choice'` con `opts` y `vals`, y `type:'text'` (cuadro de texto) |
 | `lanes` | solo `perc`: carriles del piano roll (`[{name:'Cerrado'},{name:'Abierto'}]`) |
 | `oneShot` | las notas se dibujan cortas (sonidos que no dependen del largo) |
+| `mono` · `monoWhen(params)` | el instrumento es monofónico (`mono:true`, o `monoWhen` devuelve `true` según los parámetros de la pista, como el legato de Forja): el piano roll marca las notas que se pisan |
+| `usesProg` | `true` = el instrumento lee la [progresión del proyecto](#funciones) (`n.chords`); al editar la progresión, solo esas pistas se vuelven a renderizar |
+| `presetReset` | `true` = al elegir un preajuste, antes se devuelven todos los parámetros a su valor por defecto (así los preajustes no se mezclan entre sí) |
 | `play(K, n)` | se llama una vez por nota |
 | `lyrics` | `true` = el piano roll deja escribir una palabra sobre cada nota (llega en `n.note.w`) |
 | `noteParams` | lista de claves de `params` que se ajustan **por nota** con sliders propios en «Notas» (guardadas en `o` de cada nota) |
@@ -363,7 +379,16 @@ registerInstrument({
 
 **`n` (la nota)**
 
-`t` (segundo de inicio) · `len` (segundos) · `midi` · `hz` · `lane` · `a` (amplitud: velocidad × volumen de pista) · `pan` · `p` (parámetros de la pista, ya con los valores propios de la nota y la automatización aplicados) · `buf` (canal destino) · `bpm` · `beat` · `bar` · `sr` · `note` · `clips`.
+`t` (segundo de inicio) · `len` (segundos) · `midi` · `hz` · `lane` · `a` (amplitud: velocidad × volumen de pista) · `pan` · `p` (parámetros de la pista, ya con los valores propios de la nota y la automatización aplicados) · `buf` (canal destino) · `bpm` · `beat` · `bar` · `sr` · `note` · `clips`, y dos más para plugins que quieren saber qué hay alrededor:
+
+- `link` = `{prevGap, prevMidi, nextGap, nextMidi}`: la distancia en segundos y la altura de la nota anterior y de la siguiente de la misma pista (`null` si no hay). Sirve para hacer **legato** (así lo hace Forja).
+- `chords` = la lista de acordes de la progresión que caen dentro de la nota, `[{t0, t1, sym, root, bass, ivs, pcs}]`, con `t0` y `t1` en segundos **relativos al inicio de la nota** (llega `null` si el proyecto no tiene progresión).
+
+**Parámetros con más ayuda en el inspector** (todo opcional; sin esto los controles salen en una lista como siempre):
+
+- `sec: 'Nombre'` en un parámetro lo agrupa en una **sección plegable** del inspector (cada título muestra cuántos parámetros están activos).
+- `on: p => bool` en un parámetro enciende o apaga un **puntito** junto a su nombre según si hoy influye en el sonido con los ajustes actuales (por ejemplo, la desafinación del unísono no influye si hay una sola voz). Sin `on`, el puntito queda encendido.
+- Todos los instrumentos traen un botón **↺ Estado basal** debajo del preajuste, que devuelve todos sus parámetros a los valores por defecto (los ajustes por nota no se tocan).
 
 `n.buf` apunta a `K.mu` (música, con sidechain) o `K.dr` (batería, sin él) según la casilla «Ducked» de la pista.
 
@@ -384,7 +409,16 @@ K.rnd()   K.hz(midi)   K.lpc(fc)
 - El estado de un filtro o una fase (`let y=0`, `let ph=0`) se crea **dentro de `play()`**: cada nota necesita el suyo.
 - Una excepción en `play()` desactiva esa pista en el render y aparece un aviso con el nombre de la pista; el resto sigue sonando.
 - Los plugins se guardan en el navegador (`localStorage`), se pueden descargar como `.js` y se cargan arrastrándolos a la ventana. Si un proyecto usa un plugin, el plugin va incluido en el `.demokit.json`.
+- Los campos de texto de un plugin (`type:'text'`) escuchan el resultado al cambiarlos.
 - Si cargas **tu propio `demo_kit.js`** (con funciones nuevas), los instrumentos y plugins lo usan desde ese momento: lo que agregues a `K` queda disponible para los plugins.
+
+### Versiones de plugins
+
+Cada plugin puede declarar `version: 'mayor.menor'`. Mismo número mayor = compatible hacia atrás (solo se añaden parámetros u opciones). Lo que hace el estudio:
+
+- **Un proyecto trae un plugin que no tienes instalado:** se usa como **copia temporal**: no se guarda en el navegador ni pisa nada. Un botón **Instalar** en la lista de plugins la vuelve permanente, y al guardar el proyecto el estudio te recuerda que hay un plugin temporal.
+- **El del proyecto no es el mismo que el instalado:** siempre **pregunta**. Recomienda el más nuevo si al plugin instalado no le falta nada de lo que el proyecto usa, y la copia del proyecto si al instalado le faltan parámetros u opciones.
+- **Sueltas un archivo de plugin más viejo que el instalado:** pregunta antes de bajar de versión.
 
 ## Letra sobre las notas (voz cantada)
 
@@ -398,13 +432,68 @@ El plugin [`plugins/automata_vocal.js`](plugins/automata_vocal.js) («Voz cantad
 
 ## Guitarra acompañante (`plugins/guitarra_acompanante.js`)
 
-Un instrumento que **toca acompañamientos en vez de notas sueltas**. Una nota larga en el piano roll es un *pasaje*: la altura de la nota elige la tónica (do, re, mi…) y su largo, cuánto tiempo acompaña. Dentro, la guitarra recorre un **círculo de acordes** y toca un **patrón de mano derecha**; cada acorde dura los *pulsos por acorde* que elijas y el círculo se repite hasta cubrir la nota. Dibujas una nota por sección (Verso, Coro…) y, con otro círculo, patrón o intérprete en otra pista, cambias de aire.
+Un instrumento que **toca acompañamientos en vez de notas sueltas**. Una nota larga en el piano roll es un *pasaje*: la altura de la nota elige la tónica (do, re, mi…) y su largo, cuánto tiempo acompaña. Dentro, la guitarra recorre una **secuencia de acordes** y toca un **patrón de mano derecha**; cada acorde dura los *pulsos por acorde* que elijas y la secuencia se repite hasta cubrir la nota. Dibujas una nota por sección (Verso, Coro…) y, con otra secuencia, patrón o intérprete en otra pista, cambias de aire.
 
-- **Círculos:** Lo-fi romántico (I–vi–ii–V), Jazz 2-5-1, Bossa (I–#i°–ii–V), Andaluza (i–VII–VI–V), Menor (i–VI–III–VII), Pop (I–V–vi–IV), Ranchera (I–IV–V–I) y el círculo de quintas completo. Los acordes pueden ser tríadas, séptimas o novenas.
+- **Círculos:** Lo-fi romántico (I–vi–ii–V), Jazz 2-5-1, Bossa (I–#i°–ii–V), Andaluza (i–VII–VI–V), Menor (i–VI–III–VII), Pop (I–V–vi–IV), Ranchera (I–IV–V–I) y el círculo de quintas completo. Los acordes pueden ser tríadas, séptimas o novenas. Y **«Del proyecto»**: toca los acordes de la [progresión del proyecto](#funciones) (♬ Acordes) en vez de un círculo, con cada acorde en su compás.
 - **Intérpretes:** Pedro Infante (caricia: rasgueo lento, yema, cálida), Flamenco (aporreado: rápido, uña, brillante), Bossa (suave), Ranchera (con uña) y Lo-fi (apagada). Cada uno cambia la velocidad del rasgueo, la dureza del ataque, el brillo y cuánto suena la cuerda.
-- **Patrones:** abajo, balada, ida y vuelta, arpegio, bossa (aproximación del patrón clásico), ranchera, vals (3 pulsos) y flamenco. Hay preajustes completos por estilo.
+- **Patrones:** abajo, balada, ida y vuelta, arpegio, bossa, ranchera, vals (3 pulsos), flamenco, y los arpegios ascendente, Travis (pulgar alternado), vals arpegiado, balada pop y clásico (p-i-m-a). Hay preajustes completos por estilo.
+- **Muteo y golpe en la tapa:** los patrones de ranchera y de balada incluyen el *chuntata* (la mano apaga las cuerdas) y un golpe en la tapa; el parámetro *Muteo y golpes* regula cuánto suenan.
+- **Retardo del cambio de acorde:** de −1 a +1 pulso. Retrasa el cambio (el acorde anterior sigue sonando hasta que entra el nuevo) o, con valores negativos, lo **anticipa**, como en la bossa.
+- **Patrón escrito:** con el patrón «Personalizado (texto de abajo)» escribes el tuyo en el campo de texto. Elementos separados por espacio:
+
+  | Elemento | Qué toca |
+  |---|---|
+  | `1`…`6` | una cuerda (`6` es la más grave); varias juntas, como `321`, suenan casi a la vez |
+  | `.` | un silencio |
+  | `D` `U` `C` `S` | rasgueo hacia abajo · hacia arriba (solo agudas) · golpe corto de cuatro cuerdas agudas · golpe seco de cuatro cuerdas (el acorde de la bossa) |
+  | `B` `B5` `Bs` | bajo (raíz) · bajo en la quinta · bajo corto |
+  | `M` `X` | muteo · golpe en la tapa |
+  | `@nombre` | un patrón que ya existe (`@bossa`, `@abajo`, `@travis`…) |
+
+  Los sufijos dicen cuánto dura hasta el siguiente elemento: nada = una negra, `-` = la mitad (corchea), `--` = un cuarto, `+` = el doble (blanca), `++` = cuatro pulsos; `>` acentúa y `~` suaviza. Las barras `|` se ignoran (para leer mejor). Ejemplos: `6- 3- 2- 1- 2- 3- 2- 3-` (arpegio de corcheas), `D D- U- U- D- U-` (rasgueo), `B C B5 C` (ranchera). El patrón se repite hasta que termina cada acorde, y un elemento mal escrito se ignora (si todo el texto queda inválido suena el patrón de base).
+- **Un patrón por acorde:** separa varios con `;` y se reparten entre los acordes en orden, volviendo a empezar al final. `@arpegio ; D D- U- ; @bossa` arpegia el primer acorde, rasguea el segundo y toca la bossa en el tercero.
 - **Sonido:** cada cuerda es un modelo físico de cuerda pulsada (Karplus-Strong con afinación fraccionaria; los agudos se apagan antes, como en una guitarra), con posición de la púa, golpe de uña y una caja de resonancia. Los retardos entre cuerdas y la fuerza de cada golpe varían un poco (parámetro *Humanización*), todo con la semilla de la pista: el mismo proyecto suena igual siempre.
-- **Compatibilidad:** solo usa `K.add` y `K.rnd`, así que funciona con el kit incluido y con los alternos. Asume un tempo constante dentro de cada nota; si hay un cambio de tempo en medio de un pasaje, parte el pasaje en dos notas.
+- **La bossa se afinó contra grabaciones reales:** el patrón (de dos compases), la duración del rasgueo, el bajo corto y los acordes salen de medir cuatro anotaciones de bossa de **GuitarSet** (ver [Créditos](#créditos)) y de ajustarlos de oído. El resto de estilos sigue siendo una aproximación.
+- **Compatibilidad:** solo usa `K.add` y `K.rnd`, así que funciona con el kit incluido y con los alternos. Asume un tempo constante dentro de cada nota (el del inicio de la nota); los cambios de acorde de la progresión del proyecto sí siguen el mapa de tempo, pero si hay un cambio de tempo en medio de un pasaje, lo más seguro es partirlo en dos notas.
+
+## Forja (`plugins/forja.js`)
+
+El «instrumento supremo»: un sintetizador de una voz por nota con muchísimo control sobre la onda y el legato, pensado para **sonidos mecánicos** (serruchos, motores, taladros, engranes) y **acuosos** (gotas, burbujas, arroyo, lluvia, olas), y con lo suficiente para inventar muchos más. Con el kit Ultimate hereda su carácter (digital, orgánico, pro, ultra) porque todo lo que escribe pasa por `K.add`, pero **todo el sonido está dentro del plugin**: suena igual con cualquier kit.
+
+Los ajustes están en **14 secciones plegables**, con un puntito que se enciende cuando el parámetro está influyendo en el sonido y un botón **↺ Estado basal**. Los preajustes siempre parten del estado basal, así que no se mezclan entre sí.
+
+| Sección | Qué hay |
+|---|---|
+| Generador | **Onda** (seno → triángulo → sierra → cuadrada, con ancho de pulso y PolyBLEP), **Pulsos de motor**, **Tabla de ondas** (hueca, vocal, metálica, zumbido, con morph y barrido), **Agua** y **Máquina**; unísono con desafinación, sincronía dura con barrido, FM |
+| Onda 2 | segunda onda con su forma, semitonos y afinación fina |
+| Motor y máquina | irregularidad, fallos de encendido, filo del golpe; de 1 a 8 **cilindros** con orden de encendido desigual; **engranes** (zumbido agudo con bandas laterales) |
+| Agua | goteo, burbujeo, arroyo/lluvia y olas, con densidad, tamaño, dispersión y corriente (las burbujas suben de tono al formarse) |
+| Ruido y carácter | ruido blanco, rosa o café; dientes (modulación de amplitud), aspereza, deriva de tono, saturación |
+| Filtro | pasabajos, pasabandas, pasaaltos o peine, con envolvente y seguimiento del teclado |
+| Volumen y envolvente | ataque, caída, sostenido, relajación |
+| Tono | caída de tono al atacar; **inercia**, arranque desde abajo y apagado hacia abajo (el motor que sube y se apaga) |
+| Ring, tubo y fuerza | ring mod, tubo resonante (peine con frecuencia propia), la fuerza de la nota abre el filtro |
+| LFO | tono, corte y volumen |
+| Azar | fuente aleatoria (escalón o suave) con cinco destinos: tono, corte, forma/tabla, plegador y volumen |
+| Destructivos | plegador de onda, reducción de bits y de frecuencia de muestreo |
+| Eco | ping-pong estéreo con cola, de 1/16 a 1/2 |
+| Legato | **apagado (polifónico)**, **legato** (sin reataque) o **glissando**, con ventana y tiempo |
+
+- **Legato opcional:** por defecto es polifónico. Con legato o glissando se vuelve monofónico: si la nota siguiente (o la anterior) está a menos de «Ventana» segundos, no se vuelve a atacar y el tono se desliza. El estudio marca las notas que se pisan.
+- **Preajustes (21):** Serrucho, Motor diésel, Moto que acelera, Taladro, Turbina, Relojería, Gotas, Burbujas, Submarino, Robot averiado, Radio rota, Goteo, Burbujeo, Arroyo, Lluvia, Olas, V8, Bóxer, Engranes, Sirena y Turbo-dron.
+
+## Batería de pads (`plugins/bateria_pads.js`)
+
+Una sola pista de percusión con **16 pads** (v1.1). Cada golpe es una nota en su carril del piano roll, y con **⌨ Tocar** y el teclado en pantalla los pads quedan en una rejilla para **tocar y grabar ritmos al vuelo** sin cambiar de pista.
+
+- **Sonido elegible por pad:** cada pad escoge entre 26 sonidos: Bombo, Bombo 808, Caja, Rim, Palma, Chasquido, Hi-hat cerrado, de pedal y abierto, Ride, Campana de ride, Crash, Tom grave/medio/agudo, Conga grave, aguda y seca (slap), Bongó, Timbal, Cencerro, Shaker, Pandero, Claves, Woodblock y Triángulo. Los nombres de los carriles y de los pads siguen al sonido elegido.
+- **Asignación de fábrica:** pads 1–12 como en la v1.0 (Bombo, Caja, Hi-hat cerrado, Hi-hat abierto, Palma, Rim, Tom grave, Tom medio, Tom agudo, Crash, Cencerro, Shaker) y 13 Ride, 14 Conga grave, 15 Conga aguda, 16 Conga seca.
+- **Ajustes por pad:** cada pad tiene su sección con **sonido, volumen, tono (semitonos), duración (×) y paneo**; el puntito se apaga cuando un ajuste no aplica a ese sonido (por ejemplo, la duración de la palma).
+- **Preajustes de kit:** Kit básico, Kit lo-fi (seco), Kit 808, Kit latino, Kit de rock (ride y toms) y Kit orquestal.
+- **Sonidos:** bombo, caja, palma, chasquido, hi-hats cerrado y abierto y crash son los del kit cargado (`K.kick`, `K.snare`…), así que cambian con el kit; el resto está sintetizado dentro del plugin y suena igual con cualquier kit.
+- **Teclas:** `Z X C V B N M , . /` tocan los pads 1 a 10 y `S D G H J L` los pads 11 a 16.
+- **MIDI:** por defecto cada pad responde a una nota consecutiva desde C1 (36, 37, 38…), como los pads tipo MPC. Con **MIDI: nota de cada pad → General MIDI**, cada pad responde a la nota de batería GM de su sonido (36 bombo, 38 caja, 42 hi-hat cerrado, 46 abierto, 51 ride…). La **exportación MIDI** usa el mismo mapa y va por el canal 10 (batería); en el modo consecutivo escribe 36 + carril.
+- **Proyectos de la v1.0:** abren igual; los ajustes por pad guardados con las claves antiguas se siguen leyendo.
 
 ## Extender el kit
 
@@ -436,13 +525,12 @@ function demoKit(sr, seconds, seed0) {
 El kit incluido **es y seguirá siendo el predeterminado**: así toda canción ya hecha suena siempre igual. Los demás son alternativas que se cargan a propósito, para quien prefiera otro carácter (cada sonido tiene lo suyo).
 
 - **Cómo se cargan:** desde **En el repositorio → Kits de síntesis** (carpeta `kits/bootleg/`), o soltando el `.js` en la ventana. Siempre piden confirmación (es código) y, antes de reemplazar el kit, el estudio lo **revisa solo** con unas notas de prueba y avisa si: `K.syn` ignora el búfer que se le pasa (los pads y bajos no los agacharía el sidechain), el filtro se desborda (valores NaN) con cortes altos, alguna percusión falla, o la mezcla sale más de 4 dB más fuerte que con el kit incluido (puede saturar). Puedes cargarlo de todos modos.
-- **`kits/bootleg/`:** los kits alternos que sí funcionan como reemplazo: los que se hicieron con Éter con arreglos de compatibilidad (*ultra-SAFE*, *Pro_SAFE*, *Ultra*, *Pro*), la serie *ultimate* y *fidelity*, y **Evol** (abajo). Cada archivo pasa por la revisión automática al cargarlo. Aquí vive también `test_evol.js`, el script de pruebas (no es un kit y no aparece en el panel). Cada carpeta trae una nota que explica qué es cada archivo.
-- **`kits/experiments/`:** los kits originales sin arreglar y versiones anteriores de Evol. No funcionan como reemplazo directo y no aparecen en el panel; se guardan como referencia.
+- **`kits/bootleg/`:** los kits alternos que sí funcionan como reemplazo. Hoy son dos: **Evol** y **Ultimate** (abajo). Antes había una decena de versiones (Pro, Ultra, Fidelity y varias de Ultimate, hechas con Éter); su intención se rescató en un solo kit, que se comprobó contra los originales. Cada archivo pasa por la revisión automática al cargarlo, y cada carpeta trae una nota que explica qué es cada archivo.
 - **Volver:** «Volver al kit incluido» en «Demos y plugins».
 
 #### Evol
 
-`demo-kit-Evol.js` es un kit alterno más fino para los **instrumentos de síntesis** y la **percusión**; el resto (snap, campana, chop, riser, sweep y mezcla) es idéntico al incluido. No necesita que cambies nada de lo que ya tienes: es un kit más, y el mejor modo de entenderlo es escucharlo con una canción tuya.
+`demo-kit-Evol.js` (v1.2.0) es un kit alterno más fino para los **instrumentos de síntesis** y la **percusión**; el resto (snap, campana, chop, riser, sweep y mezcla) es idéntico al incluido. No necesita que cambies nada de lo que ya tienes: es un kit más, y el mejor modo de entenderlo es escucharlo con una canción tuya.
 
 | Qué | Qué hace |
 |---|---|
@@ -456,15 +544,33 @@ El kit incluido **es y seguirá siendo el predeterminado**: así toda canción y
 
 `K.syn` acepta las mismas opciones de siempre (`det`, `atk`, `rel`, `w`, `dec`, `lp` en Hz o función del tiempo) y, opcionales: `filt` (`'lp'`, `'bp'`, `'hp'`, `'off'`), `res` (Q, .5–24), `drive` (0–1), `pw` (ancho de pulso), `sub` (sub-oscilador una octava abajo), `noise`, `kt` (seguimiento de tecla), `fenv: [octavas, caída_s]` (el corte sube y cae), `spread` (apertura estéreo) y `drift` (cents). Un plugin que use alguna de las opciones nuevas debe avisar que necesita Evol (con el kit incluido simplemente se ignoran).
 
-**Carácter.** Con Evol cargado, en «Demos y plugins» → «Kit de síntesis» aparece el selector **Carácter del kit: Neutro · Orgánico · Digital**. Es **global** (vale para toda la canción), se recuerda en el navegador y el siguiente Play vuelve a renderizar. Si abres un proyecto guardado con otro carácter, el estudio **pregunta** si quieres cambiarlo para que suene como se guardó. Para ir más fino (por instrumento o por nota) se usa un plugin o código: `demoKit.character = 'organico'` antes de crear el kit, o `K.syn(…, {character})` para una sola nota. Sin nada, es el neutro.
+**Carácter.** Con Evol (o Ultimate) cargado, en «Demos y plugins» → «Kit de síntesis» aparece el selector **Carácter del kit** (Neutro · Orgánico · Digital; con Ultimate, también Pro y Ultra). Es **global** (vale para toda la canción), se recuerda en el navegador y el siguiente Play vuelve a renderizar. Si abres un proyecto guardado con otro carácter, el estudio **pregunta** si quieres cambiarlo para que suene como se guardó. Para ir más fino (por instrumento o por nota) se usa un plugin o código: `demoKit.character = 'organico'` antes de crear el kit, o `K.syn(…, {character})` para una sola nota. Sin nada, es el neutro.
 - `organico`: cada golpe y cada nota varían un poco (nivel, afinación, caída), el filtro «respira» y hay saturación suave, como un equipo analógico.
-- `digital`: todo exacto y repetible, con reducción de bits (12) y de frecuencia de muestreo (mantiene cada 2 muestras).
+- `digital`: todo exacto y repetible, con reducción de bits (12) y de frecuencia de muestreo (mantiene cada 2 muestras). Lo aplica `K.add`, así que también afecta a lo que escriban los plugins.
 
-**Pruebas.** `node test_evol.js demo-kit-Evol.js demo_kit.js` (script sin navegador) revisa el contrato del kit, el determinismo, un barrido de filtros sin NaN, los niveles contra el kit incluido y el carácter. Sirve para probar cualquier kit alterno: `node test_evol.js otro_kit.js demo_kit.js`.
+#### Ultimate
+
+`demo-kit-ultimate.js` (v1.0.0) es **Evol más extras opcionales**: rescata lo mejor de las propuestas de Éter y de las versiones Pro, Ultra y Fidelity. Su regla de oro: **nada actúa si no lo pides**; con las opciones de siempre suena igual, muestra por muestra, que Evol.
+
+| Opción de `K.syn` / kit | Qué hace |
+|---|---|
+| `wavetable`, `wtIndex`, `morph` | tabla de ondas (0 = seno, 1 = cuadrada) |
+| `amFreq`, `amDepth` | modulación de amplitud (trémolo rápido) |
+| `ringModFreq` | modulación en anillo (timbre metálico) |
+| `envSens`, `envAtk`, `envRel` | el filtro se abre según la fuerza de la nota |
+| `comb`, `combTime`, `combFb` | filtro en peine |
+| `delay`, `delayBeats`, `delayFb`, `delayMix`, `delayTail`, `bpm` | ping-pong estéreo por nota, con la cola sonando después de la nota |
+| `lfo` | deriva de afinación lenta y viva |
+| `K.kick(…, {fold})` | wavefolding del cuerpo del bombo |
+| `demoKit.master = {limit:'maximizer', delay:{…}}` | limitador suave continuo y un delay en el bus maestro (para demos escritas a mano) |
+
+Siempre activo (no cambia el sonido de algo válido): blindaje contra NaN e infinitos en `add`, `K.syn` y `K.mix`. Los caracteres **`pro`** (sinte grueso por defecto: cinco voces desafinadas, apertura estéreo, deriva LFO, bombo con wavefolding y limitador suave en la mezcla) y **`ultra`** (pro con el filtro abriéndose según la fuerza de cada nota) activan esos extras de un golpe; con ellos, `K.syn` sin opciones suena unos 6 dB más bajo que en Evol. Se identifica con `demoKit.info = {id:'ultimate', …}`, así que un proyecto hecho con él lo recuerda. Un plugin puede usar las opciones de Ultimate, pero debe avisar que las necesita (con otro kit simplemente se ignoran); [Forja](#forja-pluginsforjajs) prefiere hacerlo todo por dentro para no depender de ningún kit.
+
+**Pruebas.** `node test_evol.js demo-kit-Evol.js demo_kit.js` (script sin navegador, en el repositorio) revisa el contrato del kit, el determinismo, un barrido de filtros sin NaN, los niveles contra el kit incluido y el carácter. Sirve para probar cualquier kit alterno: `node test_evol.js otro_kit.js demo_kit.js`.
 
 ## Usar la música en otros proyectos (librería) lib/
 
-`demokit.min.js` (≈44 KB, ≈17 KB con gzip; `demokit.js` es la versión legible, v1.4) es el kit, el motor y un reproductor, **sin interfaz**. Carga canciones `.demokit.json` (las del estudio) **o** demos `.js` escritas a mano, las sintetiza en el momento y las reproduce con Web Audio. No hay muestras: la canción es solo código o datos.
+`demokit.min.js` (`demokit.js` es la versión legible, v1.5.0) es el kit, el motor y un reproductor, **sin interfaz**. Carga canciones `.demokit.json` (las del estudio) **o** demos `.js` escritas a mano, las sintetiza en el momento y las reproduce con Web Audio. No hay muestras: la canción es solo código o datos.
 
 ```html
 <script src="demokit.min.js"></script>
@@ -495,7 +601,8 @@ El kit incluido **es y seguirá siendo el predeterminado**: así toda canción y
 - **Versión del kit:** cada proyecto guarda `kit: N`. Si no coincide con la de la librería (o el estudio), `song.warnings` avisa de que puede sonar distinto. Se sube cuando un cambio del kit altera canciones ya guardadas.
 - **Plugins:** el código de plugins que traiga un `.demokit.json` **no se ejecuta** salvo que pases `allowPlugins: true` (esas pistas se omiten y aparece un aviso en `song.warnings`). Las demos `.js` sí ejecutan su código: cárgalas solo si son tuyas o confías en ellas.
 - **Cualquier demo con `async function render…(sr, onProg)` suena**, aunque no use `demoKit` (por ejemplo Electronic Rush, que lo trae todo integrado); solo las que usan las funciones del kit se pueden convertir en proyecto editable.
-- La librería se genera con `build_lib.py` a partir de los mismos archivos del estudio, para que suenen idéntico.
+- La librería se genera con `build_lib.py` (en `tools/build/`) a partir de los mismos archivos del estudio, para que suenen idéntico.
+- **Ojo con los kits alternos:** la librería todavía ignora el `engine` que trae un proyecto. Una canción hecha con Evol o Ultimate sonaría distinta con el kit incluido sin avisar, salvo que cargues antes el mismo kit con `DemoKit.setKit(...)`.
 - `ejemplo/libreria.html` es una página mínima que carga y toca las demos de `demos/`, y `ejemplo/exportado.js` es un ejemplo de demo exportada desde el estudio. Necesitan un servidor (por ejemplo `python3 -m http.server` desde la raíz del repo), porque usan `fetch`.
 - Los plugins que traiga un proyecto (incluida la voz cantada) solo suenan con `allowPlugins: true`.
 
@@ -510,6 +617,7 @@ El kit incluido **es y seguirá siendo el predeterminado**: así toda canción y
   "tempo": [{"b": 16, "bpm": 90, "ramp": true}],   // cambios de tempo (opcional); "bpm" de arriba es el tempo inicial
   "marks": [{"bar": 0, "name": "Intro"}, {"bar": 8, "name": "Verso"}],   // secciones (opcional); "bar" cuenta desde 0; no cambian el sonido
   "genre": "lofi",          // género con el que se creó (opcional, informativo)
+  "prog": {"text": "Am7 | Dm7 G7 | Cmaj7 %"},   // progresión de acordes del proyecto (opcional); la leen los instrumentos con usesProg
   "engine": {"id": "evol", "v": "1.2.0", "c": "organico"},   // kit alterno con el que se hizo y su carácter (opcional; solo si el kit se identifica con demoKit.info)
   "sc": { "mode": "param|table", "depth": 0.7, "rel": 0.12, "rate": 800, "table": "<base64>" },
   "tracks": [{
@@ -572,6 +680,8 @@ Todo vive en un solo `<script>` dentro del HTML:
 
 El render es determinista (misma semilla → mismo audio) y se hace por bloques cediendo el hilo para que la interfaz no se congele.
 
+**Construir desde las fuentes (`tools/build/`).** `index.html` y `demo_kit_studio.html` se generan: no se editan a mano. Las fuentes viven en `tools/build/src/` (`head.html`, `demo_kit.js`, `engine.js`, `ui.js`, `genres.js`, `tail.html`…) y `python3 tools/build/build.py` las une, escribe los dos HTML y reescribe solo la versión de `sw.js` (un hash del contenido, así que la app instalada se actualiza sin que nadie se acuerde de subir el número). `build_lib.py` hace lo mismo con la librería.
+
 **Cómo funciona el render por pista.** Cada pista se renderiza en su propio kit y se guarda como un *stem* (audio de 16 bits recortado al tramo con sonido). La clave de caché de una pista es un hash de su instrumento, parámetros, paneo, notas, tempo, compases y versión del plugin o del kit, así que cualquier cambio que afecte el sonido invalida solo esa pista. La mezcla final (sidechain, saturación suave, fundido y limitador) se hace aparte con el `K.mix` del kit, y a ella llegan el volumen, el mute y el solo. Cada pista usa una semilla propia derivada de su identificador, de modo que dos pistas de ruido (el hi-hat y la caja, por ejemplo) no repiten la misma secuencia.
 
 ## Notas y límites conocidos
@@ -596,6 +706,11 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 * Icono y banner: Velvet.
 * Kit de síntesis (`kits/demo_kit.js`, `kits/demo_kit_comentado.js`) y librería (`lib/`): Ámbar.
 * Secciones, géneros, categorías de instrumentos, marcadores MIDI, revisión de kits y kit Evol: Ámbar, a partir de ideas de Brujo y de una propuesta inicial de Éter para los géneros.
+* Kit Ultimate: Ámbar, rescatando las propuestas de Éter y las versiones Pro, Ultra y Fidelity.
+* Versiones de plugins, progresión de acordes y ayuda de acordes, edición táctil, avisos de notas que se pisan, ajuste del largo al exportar, panel de apariencia, secciones y puntitos del inspector: Ámbar, a partir de ideas y pruebas de Brujo.
+* Forja, Batería de pads, patrones escritos de la guitarra: ideas de Brujo, construidos por Ámbar.
+
+**Datos de referencia.** El patrón de bossa de la guitarra se afinó midiendo anotaciones de **GuitarSet**: Qingyang Xi, Rachel M. Bittner, Johan Pauwels, Xuzhou Ye y Juan P. Bello. (2019). *GuitarSet* (Version 1.1.0) [Dataset]. Zenodo. 19th International Society for Music Information Retrieval Conference (ISMIR), París, Francia. https://doi.org/10.5281/zenodo.3371780. El repositorio del conjunto usa licencia MIT y el registro de Zenodo, Creative Commons Attribution 4.0 (la cita solo se pide en publicaciones académicas; aquí se incluye de todos modos). Solo se usaron las anotaciones (tiempos y notas) para medir el ritmo y la manera de rasguear; no se incluye ni se reproduce audio del conjunto.
 
 **Demos (`demos/`)**
 
@@ -626,13 +741,15 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 | `theremin_fantasma.js` | Ámbar |
 | `cristal_fm.js` | Ámbar |
 | `guitarra_acompanante.js` | Ámbar (la idea de programar el acompañamiento salió de la «guitarrita» de Éter) |
+| `forja.js` | Ámbar, a partir de la idea de Brujo del «instrumento supremo» |
+| `bateria_pads.js` | Ámbar, a partir de la idea de Brujo |
 
 **Kits alternos (`kits/bootleg/`)**
 
 | Archivo | Autoría |
 |---|---|
 | `demo-kit-Evol.js` | Ámbar |
-| `demo-kit-ultra-SAFE_fix.js`, `demo-kit-Pro_SAFE_fix.js`, `demo-kit-Ultra_fix.js`, `demo-kit-Pro_fix.js` | originales de Brujo y Éter; arreglos de compatibilidad de Ámbar |
+| `demo-kit-ultimate.js` | Ámbar, a partir de los kits originales de Brujo y Éter (Pro, Ultra, Ultimate y Fidelity) |
 
 **Géneros (`genres/`)**
 
@@ -642,14 +759,7 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 
 **Proyectos**
 
-| Archivo | Autoría |
+| Carpeta | Autoría |
 |---|---|
-| `project_examples/COTTON_SUGAR_140_BPM.demokit.json` y `MARSHMALLOW_SKY_150_BPM.demokit.json` | Ámbar (guardados tras convertir las demos) |
-| `projects/` (todos traen al menos un plugin incrustado): `la_casa_que_respira_theremin.demokit.json` | Ámbar (misma pieza que `la_casa_que_respira`, con el plugin incrustado) |
-| `projects/tres_constantes_completa.demokit.json` | Ámbar |
-| `projects/marea_de_ceniza.demokit.json` | Ámbar |
-| `projects/el_manifiesto.demokit.json` | Ámbar |
-| `proyectos/la_casa_que_respira.demokit.json` | Ámbar |
-| `proyectos/Nexo_Latente.demokit.json` | Éter |
-
-`rendered/` trae tres WAV de muestra exportados desde el estudio (`la_casa_que_respira.wav`, `la_casa_que_respira_theremin.wav` y `marea_de_ceniza.wav`).
+| `project_examples/` (los ejemplos oficiales: demos convertidas a proyecto y rolas hechas en el estudio, como *Marea de ceniza*, *Sueños sin dientes* y *La rotita*) | Ámbar |
+| `projects/` (proyectos que no son oficiales o no son de Ámbar; sirve de carpeta de prueba para quien clone el repo): una pieza de Brujo y `Nexo_Latente.demokit.json` | Brujo y Éter |
