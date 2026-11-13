@@ -2,7 +2,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 //  MOTOR DEL ESTUDIO (sin DOM): instrumentos, render, conversión de demos, proyectos
 // ═══════════════════════════════════════════════════════════════════════
-const SR=44100, TAIL=2.5, KIT_SEED=20261015;
+let SR=44100, OSF=1, HQ=false, TAIL=2.5, KIT_SEED=20261015;   // OSF = sobremuestreo de la síntesis y HQ = stems en coma flotante: solo los activa la exportación de audio
 const Kit={make:(typeof demoKit==='function')?demoKit:null};   // se puede reemplazar cargando otro demo_kit.js
 const tick=()=>new Promise(r=>setTimeout(r,0));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));              // las demos lo usan
@@ -350,7 +350,7 @@ function tmap(P){
 function noteArgs(K,P,tr,nt,beat,t0,nb){
   const p=nt.o?Object.assign({},tr.params,nt.o):tr.params, tm=t0!=null?null:tmap(P), vb=!!tm&&!tm.constant, bpmN=vb?tm.bpmAt(nt.b):P.bpm, bt=vb?60/bpmN:beat;
   return {t:t0!=null?t0:(vb?tm.sec(nt.b):nt.b*beat),len:Math.max(.01,vb?tm.span(nt.b,nt.l||.25):(nt.l||.25)*beat),midi:nt.m,hz:K.hz(nt.m),lane:nt.m,a:(nt.v==null?1:nt.v)*(tr.vol==null?1:tr.vol),
-    pan:clamp((tr.pan||0)+(nt.pan||0),-1,1),p,buf:tr.ducked?K.mu:K.dr,sr:SR,bpm:bpmN,beat:bt,bar:bt*meter(P).lenAt(nt.b),note:nt,clips:P.clips,link:nb&&!(t0!=null)?linkOf(P,nt,nb):null,chords:chordsFor(P,nt,tm,vb,beat)};
+    pan:clamp((tr.pan||0)+(nt.pan||0),-1,1),p,buf:tr.ducked?K.mu:K.dr,sr:K.sr||SR,bpm:bpmN,beat:bt,bar:bt*meter(P).lenAt(nt.b),note:nt,clips:P.clips,link:nb&&!(t0!=null)?linkOf(P,nt,nb):null,chords:chordsFor(P,nt,tm,vb,beat)};
 }
 // acordes de la progresión del proyecto que caen dentro de la nota, con inicio y fin en segundos RELATIVOS al inicio de la nota (el primero empieza en 0 aunque el acorde venga de antes).
 // null si el proyecto no tiene progresión: los instrumentos que no la usan ni lo notan.
@@ -516,7 +516,7 @@ const stemBytes=c=>c.stems.reduce((a,st)=>a+st.q[0].length*4,0)+(c.fxStems?c.fxS
 function stemMemory(){ let m=0; for(const c of stemCache.values()) m+=stemBytes(c); return m; }
 function trimStems(keep){ let m=stemMemory(); if(m<=STEM_BUDGET) return; for(const [id,c] of stemCache){ if(keep.has(id)) continue; m-=stemBytes(c); stemCache.delete(id); if(m<=STEM_BUDGET) break; } }
 function bumpKit(){ KIT_REV++; stemCache.clear(); }
-function trackKey(P,tr,total){ const inst=INSTRUMENTS[tr.inst], k=[tr.inst,inst?inst.rev:0,KIT_REV,tr.params,tr.pan,tr.ducked?1:0,P.bpm,tempoPts(P),P.seed,total,tr.notes,(l=>l.length?[tr.alv===16?16:8,l.map(x=>[x.k,x.pts])]:0)(paramLanes(tr,inst))];
+function trackKey(P,tr,total){ const inst=INSTRUMENTS[tr.inst], k=[SR,OSF,HQ,tr.inst,inst?inst.rev:0,KIT_REV,tr.params,tr.pan,tr.ducked?1:0,P.bpm,tempoPts(P),P.seed,total,tr.notes,(l=>l.length?[tr.alv===16?16:8,l.map(x=>[x.k,x.pts])]:0)(paramLanes(tr,inst))];
   if(inst&&inst.usesProg) k.push([(P.prog&&P.prog.text)||'',P.sig||0,sigPts(P),P.bars]);   // solo los instrumentos que leen la progresión se re-renderizan al editarla
   return hash2(JSON.stringify(k)); }
 const trackSeed=(P,tr)=>(((P.seed||KIT_SEED)^parseInt(hash2(String(tr.id)).split('-')[0],36))>>>0)||1;
@@ -532,13 +532,44 @@ function extractStems(K){
   }
   return out;
 }
+// ── sobremuestreo: la síntesis se calcula a SR×OSF y se baja a SR con un FIR pasabajas de ventana Kaiser (≈100 dB de rechazo) en etapas de ÷2.
+//    Banda de paso hasta 0.45·SR; lo que cae por encima de la mitad de SR (armónicos de ondas cuadradas, sierras, metales…) se elimina en vez de «rebotar» como ruido.
+const _firCache=new Map();
+function firHalf(Rin,pe){ const key=Rin+'|'+pe, c=_firCache.get(key); if(c) return c;
+  const stop=Rin/2-pe, fc=(pe+stop)/2/Rin, dw=2*Math.PI*(stop-pe)/Rin, A=100, beta=.1102*(A-8.7);
+  let N=Math.ceil((A-8)/(2.285*dw)); if(N%2===0) N++; N=Math.min(Math.max(N,7),1201); const M=(N-1)/2, h=new Float64Array(N);
+  const i0=x=>{ let s=1,t=1; for(let k=1;k<60;k++){ t*=(x/2/k); s+=t*t; } return s; }, b0=i0(beta); let sum=0;
+  for(let k=0;k<N;k++){ const m=k-M, w=i0(beta*Math.sqrt(Math.max(0,1-(m/M)*(m/M))))/b0, s=m===0?2*fc:Math.sin(2*Math.PI*fc*m)/(Math.PI*m); h[k]=s*w; sum+=h[k]; }
+  for(let k=0;k<N;k++) h[k]/=sum; const o={h:Float32Array.from(h),M}; _firCache.set(key,o); return o; }
+function decim2(x,Rin,pe){ const {h,M}=firHalf(Rin,pe), n=x.length, no=Math.ceil(n/2), y=new Float32Array(no), h0=h[M];
+  for(let o=0;o<no;o++){ const c=2*o; let s=h0*x[c];
+    if(c-M>=0&&c+M<n){ for(let k=1;k<=M;k++) s+=h[M+k]*(x[c+k]+x[c-k]); }
+    else { for(let k=1;k<=M;k++){ const a=c+k,b=c-k; s+=h[M+k]*((a<n?x[a]:0)+(b>=0?x[b]:0)); } }
+    y[o]=s; }
+  return y; }
+async function decimatePow2(x,Rout,factor){ let Rin=Rout*factor, y=x; const pe=.45*Rout; while(Rin>Rout){ y=decim2(y,Rin,pe); Rin/=2; await tick(); } return y; }
+// stems en coma flotante (q = Float32, pk = 32767 para que el mezclador no cambie); si OSF>1 baja cada bus a SR solo en el tramo con sonido
+async function extractStemsHQ(K,osf){
+  const out=[], TAPS=1300;
+  for(const bus of ['mu','dr']){
+    const A=K[bus][0],B=K[bus][1],n=A.length; let s0=-1,s1=0;
+    for(let i=0;i<n;i++){ if(A[i]!==0||B[i]!==0){ s0=i; break; } } if(s0<0) continue;
+    for(let i=n-1;i>=s0;i--){ if(A[i]!==0||B[i]!==0){ s1=i+1; break; } }
+    let a=Math.max(0,s0-TAPS*osf), b=Math.min(n,s1+TAPS*osf); a-=a%osf;
+    let qa=A.subarray(a,b), qb=B.subarray(a,b), off=a;
+    if(osf>1){ qa=await decimatePow2(qa,SR,osf); qb=await decimatePow2(qb,SR,osf); off=a/osf; }
+    const m=qa.length; let i0=0; while(i0<m&&qa[i0]===0&&qb[i0]===0) i0++; let i1=m; while(i1>i0&&qa[i1-1]===0&&qb[i1-1]===0) i1--;
+    if(i1<=i0) continue; out.push({bus,s0:off+i0,pk:32767,q:[Float32Array.from(qa.subarray(i0,i1)),Float32Array.from(qb.subarray(i0,i1))]});
+  }
+  return out;
+}
 async function renderTrackStem(P,tr,beat,total){
   const inst=INSTRUMENTS[tr.inst]; if(!inst) throw new Error('instrumento no disponible ('+tr.inst+')');
-  const K=Kit.make(SR,total,trackSeed(P,tr)); K.sr=SR; const t=Object.assign({},tr,{vol:1}), lanes=paramLanes(tr,inst), LV=tr.alv===16?16:8; let last=performance.now(),i=0;
+  const KSR=SR*OSF, K=Kit.make(KSR,total,trackSeed(P,tr)); K.sr=KSR; const t=Object.assign({},tr,{vol:1}), lanes=paramLanes(tr,inst), LV=tr.alv===16?16:8; let last=performance.now(),i=0;
   const SN=tr.notes.slice().sort((a,b)=>a.b-b.b);
   for(let j=0;j<SN.length;j++){ const nt=SN[j]; let pv=null,nx=null; for(let q=j-1;q>=0;q--) if(SN[q].b<nt.b-1e-6){ pv=SN[q]; break; } for(let q=j+1;q<SN.length;q++) if(SN[q].b>nt.b+1e-6){ nx=SN[q]; break; }
     inst.play(K,noteArgs(K,P,t,laneNote(lanes,LV,nt),beat,null,{prev:pv,next:nx})); if(++i%25===0&&performance.now()-last>14){ await tick(); last=performance.now(); } }
-  return extractStems(K);
+  return HQ?await extractStemsHQ(K,OSF):extractStems(K);
 }
 async function ensureStems(P,trs,onProg,from,to){
   const beat=60/P.bpm, tmx=tmap(P), total=(tmx.constant?meter(P).total(P.bars)*beat:tmx.sec(meter(P).total(P.bars)))+TAIL, live=new Set(P.tracks.map(t=>t.id)), errors=[], todo=[]; let tot=0;
@@ -611,11 +642,20 @@ function liveNoteBuffer(P,tr,m,lenSec){
 }
 
 // ───────────────────────── WAV ─────────────────────────
-function encodeWav(L,R,sr){
-  const n=L.length,buf=new ArrayBuffer(44+n*4),v=new DataView(buf); const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
-  ws(0,'RIFF'); v.setUint32(4,36+n*4,true); ws(8,'WAVE'); ws(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,2,true);
-  v.setUint32(24,sr,true); v.setUint32(28,sr*4,true); v.setUint16(32,4,true); v.setUint16(34,16,true); ws(36,'data'); v.setUint32(40,n*4,true);
-  let o=44; for(let i=0;i<n;i++){ let s=L[i]; s=s>1?1:s<-1?-1:s; v.setInt16(o,s<0?s*32768:s*32767,true); o+=2; s=R[i]; s=s>1?1:s<-1?-1:s; v.setInt16(o,s<0?s*32768:s*32767,true); o+=2; }
+// opts: {bits:16|24, float:true para 32 bits en coma flotante, dither (solo 16 bits; ruido TPDF de ±1 LSB con semilla fija, así es reproducible; activo por omisión)}
+function encodeWav(L,R,sr,opts){
+  opts=opts||{}; const fl=!!opts.float, bits=fl?32:(opts.bits===24?24:16), bps=bits/8, n=L.length, data=n*2*bps, buf=new ArrayBuffer(44+data+(fl?12:0)), v=new DataView(buf);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  ws(0,'RIFF'); v.setUint32(4,buf.byteLength-8,true); ws(8,'WAVE'); ws(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,fl?3:1,true); v.setUint16(22,2,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2*bps,true); v.setUint16(32,2*bps,true); v.setUint16(34,bits,true);
+  let o=36; if(fl){ ws(36,'fact'); v.setUint32(40,4,true); v.setUint32(44,n,true); o=48; }
+  ws(o,'data'); v.setUint32(o+4,data,true); o+=8;
+  let seed=0x9E3779B9; const rnd=()=>{ seed^=seed<<13; seed>>>=0; seed^=seed>>>17; seed^=seed<<5; seed>>>=0; return seed/4294967296; };
+  const dith=bits===16&&opts.dither!==false;
+  for(let i=0;i<n;i++) for(let c=0;c<2;c++){ const x=c?R[i]:L[i];
+    if(fl){ v.setFloat32(o,x,true); o+=4; }
+    else if(bits===24){ const s=x>1?1:x<-1?-1:x, q=Math.round(s*8388607); v.setUint8(o,q&255); v.setUint8(o+1,(q>>8)&255); v.setUint8(o+2,(q>>16)&255); o+=3; }
+    else { let s=x>1?1:x<-1?-1:x; s=s*32767+(dith?(rnd()-rnd()):0); s=s>32767?32767:s<-32768?-32768:Math.round(s); v.setInt16(o,s,true); o+=2; } }
   return new Blob([buf],{type:'audio/wav'});
 }
 

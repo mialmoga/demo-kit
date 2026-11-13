@@ -16,6 +16,7 @@ const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const midiName=m=>NOTE_NAMES[((Math.round(m)%12)+12)%12]+(Math.floor(Math.round(m)/12)-1);
 const isBlack=m=>[1,3,6,8,10].includes(((Math.round(m)%12)+12)%12);
 const trackColor=(i,a)=>'hsla('+((i*53+205)%360)+',70%,62%,'+(a==null?1:a)+')';
+let exportBusy=false;   // mientras se exporta con otra frecuencia o sobremuestreo no se toca nada en vivo
 const download=(blob,name)=>{const a=el('a',{href:URL.createObjectURL(blob),download:name});document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),8000);};
 
 // ───────────── estado ─────────────
@@ -72,7 +73,7 @@ async function doRender(){
 }
 let pvSrc=null;
 function previewNote(n,tr){
-  tr=tr||P.tracks[sel]; if(!tr) return;
+  tr=tr||P.tracks[sel]; if(!tr||exportBusy) return;
   try{ const out=previewBuffer(P,tr,n), a=ac(); if(pvSrc){try{pvSrc.stop();}catch(e){}}
     const s=a.createBufferSource(); s.buffer=toAudioBuffer(out); s.connect(a.destination); s.start(); pvSrc=s; }
   catch(e){ console.error(e); toast('Error en la vista previa: '+e.message,'err'); }
@@ -1242,7 +1243,7 @@ function midiToNote(tr,n){ const info=trackInfo(tr); if(!info.perc) return n; co
   return info.rows===1?0:((n-36)%info.rows+info.rows)%info.rows; }
 function releaseVoice(v,t){ try{ const a=ctx,g=v.g.gain; g.cancelScheduledValues(a.currentTime); g.setValueAtTime(g.value,a.currentTime); g.linearRampToValueAtTime(0,a.currentTime+t); v.s.stop(a.currentTime+t+.02); }catch(e){} }
 function liveOn1(id,m,vel){
-  const tr=P.tracks[sel]; if(!tr||!INSTRUMENTS[tr.inst]) return; liveOff(id,true); let buf;
+  const tr=P.tracks[sel]; if(!tr||!INSTRUMENTS[tr.inst]||exportBusy) return; liveOff(id,true); let buf;
   try{ buf=liveBuf(tr,m); }catch(e){ console.error(e); toast('Error al tocar: '+e.message,'err'); return; }
   const a=ac(), s=a.createBufferSource(), g=a.createGain(); s.buffer=buf; g.gain.value=(tr.vol==null?1:tr.vol)*vel; s.connect(g); g.connect(a.destination); s.start();
   const v={s,g,oneShot:!!INSTRUMENTS[tr.inst].oneShot}; voices.set(id,v); down.set(id,m); s.onended=()=>{ if(voices.get(id)===v) voices.delete(id); }; invalidate(); oskSync(); recOn(id,m,vel,tr);
@@ -1374,13 +1375,15 @@ async function makeZip(files){      // files: [{name, blob}]
 async function exportStems(){
   if(!P.tracks.some(t=>t.notes.length)){ toast('No hay notas que exportar.','err'); return; }
   const sc=await exportScope(); if(!sc) return;
+  const eo=await expoDialog(sc,'Exportar stems',P.tracks.filter(t=>t.notes.length).length); if(!eo) return;
   if(rendering) return; rendering=true; stop(); $('stat').textContent='Renderizando stems…'; $('stat').className=''; const t0=performance.now();
   try{
-    const r=await renderStems(scopeProj(sc),prog); const used=new Set(), files=[];
-    r.files.forEach((f,i)=>{ let nm=String(i+1).padStart(2,'0')+'_'+(f.name.replace(/[^\w\-áéíóúüñÁÉÍÓÚÜÑ ]+/g,'').trim().replace(/\s+/g,'_')||'pista'); while(used.has(nm)) nm+='_'; used.add(nm); { const [a,b]=trimOut(f.L,f.R,sc); files.push({name:nm+'.wav',blob:encodeWav(a,b,SR)}); } });
-    const zip=await makeZip(files); download(zip,(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'_'+kitTag()+'_stems.zip');
+    const r=await expoRun(eo,sc,async()=>{ const o=await renderStems(scopeProj(sc),prog); o.files=o.files.map(f=>{ const [a,b]=trimOut(f.L,f.R,sc); return {name:f.name,L:a,R:b}; }); return o; });
+    const used=new Set(), files=[]; let pk=0;
+    r.files.forEach((f,i)=>{ let nm=String(i+1).padStart(2,'0')+'_'+(f.name.replace(/[^\w\-áéíóúüñÁÉÍÓÚÜÑ ]+/g,'').trim().replace(/\s+/g,'_')||'pista'); while(used.has(nm)) nm+='_'; used.add(nm); pk=Math.max(pk,expoPeak(f.L,f.R)); files.push({name:nm+'.wav',blob:expoEnc(f.L,f.R,eo)}); });
+    const zip=await makeZip(files); download(zip,(P.name||'proyecto').replace(/[^\w\-]+/g,'_')+'_'+kitTag()+expoTag(eo)+'_stems.zip');
     if(r.errors.length) toast('Aviso en «'+r.errors[0].track+'»: '+r.errors[0].msg,'err');
-    toast('Stems listos: '+files.length+' WAV en un ZIP ('+((performance.now()-t0)/1000).toFixed(1)+' s).','ok');
+    toast('Stems listos: '+files.length+' WAV en un ZIP ('+((performance.now()-t0)/1000).toFixed(1)+' s'+expoPeakTxt(pk,eo)+').','ok');
   }catch(e){ console.error(e); toast('Error al exportar stems: '+e.message,'err'); }
   finally{ prog(0); rendering=false; updateStat(); }
 }
@@ -1455,10 +1458,45 @@ $('fileIn').onchange=async e=>{ await handleFiles([...e.target.files]); e.target
 $('bLib').onclick=()=>{ renderLib(); openModal('libModal'); };
 $('bExample').onclick=()=>{ restoreTemps(); loadProject(starterProject()); closeModal('libModal'); };
 $('bNewPlg').onclick=()=>openPlugin();
-$('bWav').onclick=async()=>{ const sc=await exportScope(); if(!sc) return; let L,R;
-  if(sc.mode==='grow'){ if(rendering) return; rendering=true; stop(); $('stat').textContent='Renderizando…'; $('stat').className=''; try{ const o=await renderProject(scopeProj(sc),prog); L=o.L; R=o.R; }catch(e){ console.error(e); toast('Error al renderizar: '+e.message,'err'); return; } finally{ prog(0); rendering=false; updateStat(); } }
-  else { if(dirty||!cache){ if(!(await doRender())) return; } [L,R]=trimOut(cache.L,cache.R,sc); }
-  const nm=(P.name||'cancion').replace(/[^\w\-]+/g,'_')+'_'+kitTag()+'.wav'; download(encodeWav(L,R,SR),nm); toast('WAV exportado: «'+nm+'» ('+fmtT(L.length/SR)+')','ok'); };
+// ───────────── exportar audio: formato, frecuencia y calidad ─────────────
+// Formato: 16 bits (con dither), 24 bits o 32 bits en coma flotante. Frecuencia: 44.1, 48 o 96 kHz.
+// Calidad: normal, o la síntesis calculada a 2× / 4× la frecuencia final y bajada con un filtro de alta calidad (quita el ruido de «rebote»).
+// Con 16 bits / 44.1 kHz / normal se usa el render que ya está en caché (como siempre); con cualquier otra cosa se vuelve a renderizar desde cero.
+const EXPO_LS='demokit-export-audio', EXPO_DEF={fmt:'pcm16',sr:44100,q:1}, EXPO_MEM=700*1048576;
+const EXPO_FMT=[['pcm16','16 bits (con dither)',2],['pcm24','24 bits',3],['f32','32 bits, coma flotante',4]];
+const expoGet=()=>{ try{ const o=JSON.parse(localStorage.getItem(EXPO_LS)||'{}'); return {fmt:EXPO_FMT.some(f=>f[0]===o.fmt)?o.fmt:EXPO_DEF.fmt,sr:[44100,48000,96000].includes(o.sr)?o.sr:EXPO_DEF.sr,q:[1,2,4].includes(o.q)?o.q:EXPO_DEF.q}; }catch(e){ return Object.assign({},EXPO_DEF); } };
+const expoSave=o=>{ try{ localStorage.setItem(EXPO_LS,JSON.stringify(o)); }catch(e){} };
+const expoIsDefault=o=>o.fmt==='pcm16'&&o.sr===44100&&o.q===1;
+const expoQ=(o,secs)=>{ let q=o.q; while(q>1&&secs*o.sr*q*16>EXPO_MEM) q/=2; return q; };          // 4 buses Float32 por pista a SR×q
+const expoSecs=sc=>{ const p=scopeProj(sc); return tmap(p).sec(meter(p).total(p.bars))+TAIL; };
+const expoTag=o=>expoIsDefault(o)?'':'_'+(o.fmt==='pcm24'?'24bit':o.fmt==='f32'?'32f':'16bit')+'_'+(o.sr/1000)+'k'+(o.q>1?'_x'+o.q:'');
+const expoEnc=(L,R,o)=>encodeWav(L,R,o.sr,{bits:o.fmt==='pcm24'?24:16,float:o.fmt==='f32',dither:true});
+function expoDialog(sc,title,tracks){ return new Promise(res=>{ const cur=expoGet(), secs=expoSecs(sc), m=el('div',{class:'modal show'}), done=v=>{ m.remove(); res(v); };
+  m.addEventListener('click',e=>{ if(e.target===m) done(null); });
+  const mk=(opts,val)=>{ const s=el('select'); for(const [v,t] of opts) s.append(el('option',{value:v,text:t})); s.value=val; return s; };
+  const sf=mk(EXPO_FMT.map(f=>[f[0],f[1]]),cur.fmt), sr=mk([[44100,'44.1 kHz (como hasta ahora)'],[48000,'48 kHz (video y motores de juego)'],[96000,'96 kHz']],cur.sr), sq=mk([[1,'Normal'],[2,'Alta (2×): síntesis a doble frecuencia'],[4,'Máxima (4×): síntesis a cuádruple frecuencia']],cur.q);
+  const info=el('p',{class:'desc'}); const rd=()=>({fmt:sf.value,sr:+sr.value,q:+sq.value});
+  const upd=()=>{ const o=rd(), bps=EXPO_FMT.find(f=>f[0]===o.fmt)[2], mb=secs*o.sr*2*bps*(tracks||1)/1048576, q=expoQ(o,secs); let t=fmtT(secs)+' · cada archivo ≈ '+(mb/(tracks||1)).toFixed(0)+' MB'+(tracks>1?' (≈ '+mb.toFixed(0)+' MB en total)':'');
+    if(q!==o.q) t+=' · ⚠ con este largo bajaré el sobremuestreo a '+(q>1?q+'×':'normal')+' para no agotar la memoria';
+    t+=expoIsDefault(o)?' · sin volver a renderizar':' · se vuelve a renderizar'+(o.q>1?' (tarda varias veces más)':''); info.textContent=t; };
+  [sf,sr,sq].forEach(s=>s.onchange=upd); upd();
+  const row=(l,s)=>el('div',{class:'row'},el('label',{text:l}),s);
+  m.append(el('div',{class:'card',style:'max-width:520px'},el('h3',{text:title}),
+    el('p',{class:'desc',text:'Para llevar el audio a un DAW o a un soundtrack: más bits y frecuencia, y menos ruido de rebote en agudos. Tu elección se recuerda.'}),
+    row('Formato',sf),row('Frecuencia',sr),row('Calidad',sq),info,
+    el('div',{style:'display:flex;gap:8px;margin-top:10px'},el('button',{class:'pri',text:'Exportar',onclick:()=>{ const o=rd(); expoSave(o); done(o); }}),el('button',{text:'Cancelar',onclick:()=>done(null)}))));
+  document.body.append(m); }); }
+// ejecuta fn con la frecuencia, el sobremuestreo y los stems en coma flotante que pide la exportación, y deja todo como estaba
+async function expoRun(o,sc,fn){ const prev=[SR,OSF,HQ], q=expoQ(o,expoSecs(sc)); SR=o.sr; OSF=q; HQ=true; exportBusy=true;
+  try{ return await fn(); } finally{ SR=prev[0]; OSF=prev[1]; HQ=prev[2]; exportBusy=false; stemCache.clear(); } }
+const expoPeak=(L,R)=>{ let p=0; for(let i=0;i<L.length;i++){ const a=Math.abs(L[i]),b=Math.abs(R[i]); if(a>p) p=a; if(b>p) p=b; } return p; };
+const expoPeakTxt=(p,o)=>' · pico '+(p>0?(20*Math.log10(p)).toFixed(1):'-∞')+' dBFS'+(p>1&&o.fmt!=='f32'?' ⚠ recorta (usa 32 bits float o baja el volumen)':'');
+$('bWav').onclick=async()=>{ const sc=await exportScope(); if(!sc) return; const eo=await expoDialog(sc,'Exportar WAV',1); if(!eo) return; let L,R;
+  if(expoIsDefault(eo)&&sc.mode!=='grow'){ if(dirty||!cache){ if(!(await doRender())) return; } [L,R]=trimOut(cache.L,cache.R,sc); }
+  else { if(rendering) return; rendering=true; stop(); $('stat').textContent='Renderizando…'; $('stat').className='';
+    try{ const r=await expoRun(eo,sc,async()=>{ const o=await renderProject(scopeProj(sc),prog); const [a,b]=trimOut(o.L,o.R,sc); return {L:a,R:b}; }); L=r.L; R=r.R; }
+    catch(e){ console.error(e); toast('Error al renderizar: '+e.message,'err'); return; } finally{ prog(0); rendering=false; updateStat(); } }
+  const nm=(P.name||'cancion').replace(/[^\w\-]+/g,'_')+'_'+kitTag()+expoTag(eo)+'.wav'; download(expoEnc(L,R,eo),nm); toast('WAV exportado: «'+nm+'» ('+fmtT(L.length/eo.sr)+expoPeakTxt(expoPeak(L,R),eo)+')','ok'); };
 $('bAdd').onclick=()=>addTrack($('addInst').value);
 $('mDraw').onclick=()=>setMode('draw'); $('mNav').onclick=()=>setMode('nav'); $('mErase').onclick=()=>setMode('erase'); $('mSel').onclick=()=>setMode('select'); $('mStretch').onclick=()=>setMode('stretch');
 $('sL').onclick=()=>nudgeSel(-1); $('sR').onclick=()=>nudgeSel(1); $('sShort').onclick=()=>lenSel(-1); $('sLong').onclick=()=>lenSel(1); $('bPlay2').onclick=togglePlay; $('bHome').onclick=()=>{ setCursor(0); wrap.scrollLeft=0; };
