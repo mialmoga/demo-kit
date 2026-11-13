@@ -12,6 +12,7 @@ on:
       - 'plugins/**'
       - 'genres/**'
       - 'projects/**'
+      - 'presets/**'
       - 'project_examples/**'
       - '.github/scripts/gen-manifests.js'
   workflow_dispatch:        # también puedes lanzarlo a mano desde la pestaña Actions

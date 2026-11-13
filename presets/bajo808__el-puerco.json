@@ -1,0 +1,24 @@
+{
+  "format": "demokit-preset",
+  "v": 1,
+  "instrument": "bajo808",
+  "name": "el+puerco",
+  "version": "1.0",
+  "params": {
+    "punch": 14,
+    "punchT": 0.06,
+    "clic": 0.6,
+    "dec": 3.4,
+    "sus": 0.8,
+    "rel": 0.6,
+    "glideMode": "ligado",
+    "glide": 0.15,
+    "ventana": 0.25,
+    "drive": 1,
+    "tipo": "asim",
+    "h2": 0.4,
+    "h3": 0.3,
+    "sub": 0.6,
+    "corte": 5200
+  }
+}

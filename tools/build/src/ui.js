@@ -521,6 +521,19 @@ function sliderRow(label,get,set,min,max,step,def,fmt){
   show(); return el('div',{class:'row'},el('label',{text:label,title:label}),inp,out);
 }
 function renderSelInfo(){ refreshOverlapUI(); const sa=$('selAct'); if(sa) sa.hidden=!selNotes.size; const sl=$('sLyric'); if(sl) sl.hidden=!lyricInst(); const e=$('selInfo'); if(!e) return; const tr=P.tracks[sel]; e.textContent=tr?(tr.notes.length+' notas · '+selNotes.size+' seleccionadas'):''; const v=$('selVel'); if(v){ v.disabled=!selNotes.size; if(selNotes.size){ const x=[...selNotes][0].v; v.value=x==null?1:x; if(v.nextElementSibling) v.nextElementSibling.textContent=fmtNum(+v.value); } } }
+// ── presets propios: se guardan en este navegador y se bajan como .json («instrumento__nombre.json»); se cargan desde «Cargar archivos…», arrastrando o desde la carpeta presets/ del repo
+const UPRE_LS='demokit-presets';
+const upGet=()=>{ try{ const o=JSON.parse(localStorage.getItem(UPRE_LS)||'{}'); return o&&typeof o==='object'?o:{}; }catch(e){ return {}; } };
+const upSet=o=>{ try{ localStorage.setItem(UPRE_LS,JSON.stringify(o)); return true; }catch(e){ toast('No pude guardar en este navegador (almacenamiento lleno o bloqueado); el archivo sí se baja','err'); return false; } };
+function upAdd(inst,name,params,version){ const o=upGet(); (o[inst]=o[inst]||{})[name]={v:version||'',params}; return upSet(o); }
+function presetDiff(inst,tr){ const out={}; for(const d of inst.params){ const v=tr.params[d.k]; if(v===undefined) continue; if(d.def!==undefined?v!==d.def:true) out[d.k]=v; } return out; }
+function presetFile(id,name,version,params){ return {format:'demokit-preset',v:1,instrument:id,name,version:version||undefined,params}; }
+function importPresets(o){
+  const list=o.format==='demokit-presets'?(Array.isArray(o.presets)?o.presets:[]):[o]; let n=0,bad=0; const all=upGet();
+  for(const p of list){ if(!p||typeof p.instrument!=='string'||typeof p.name!=='string'||!p.params||typeof p.params!=='object'){ bad++; continue; } (all[p.instrument]=all[p.instrument]||{})[p.name]={v:p.version||'',params:p.params}; n++; }
+  if(n) upSet(all); toast(n?('Presets importados: '+n+(bad?' · con error: '+bad:'')):'No encontré presets válidos en el archivo',n?'ok':'err'); return n;
+}
+function applyPreset(inst,tr,params){ for(const d of inst.params) if(d.def!==undefined) tr.params[d.k]=d.def; const ok=new Set(inst.params.map(d=>d.k)); for(const k in params) if(ok.has(k)) tr.params[k]=params[k]; }
 function setFx(tr,g,k,v){ tr.fx=tr.fx||{}; tr.fx[g]=Object.assign({},FX_DEF[g],tr.fx[g]); tr.fx[g][k]=v; touch(); }
 const FX_PRESETS={
   'Voz':{eq:{low:-3,mid:2.5,midF:3000,midQ:1,high:2},comp:{thr:-20,ratio:3,atk:8,rel:120,knee:6,makeup:3,mix:1}},
@@ -590,7 +603,24 @@ function renderInspector(){
     el('button',{class:'sm danger',text:'Borrar pista',onclick:()=>{ if(tr.notes.length&&!confirm('¿Borrar «'+tr.name+'» con '+tr.notes.length+' notas?')) return; P.tracks.splice(sel,1); sel=Math.max(0,Math.min(sel,P.tracks.length-1)); selNotes.clear(); renderTracks(); renderInspector(); centerTrack(); touch(); }})));
   box.append(sec('Pista «'+tr.name+'»',...kids));
   const pk=[]; const npk=new Set(inst.noteParams||[]); const noteOv=tr.notes.filter(n=>n.o&&Object.keys(n.o).some(k=>k!=='cid'&&!npk.has(k))).length;
-  if(inst.presets){ const names=Object.keys(inst.presets), ps=el('select',{onchange:e=>{ const p=inst.presets[names[+e.target.value-1]]; if(!p){ return; } if(inst.presetReset) for(const d of inst.params) if(d.def!==undefined) tr.params[d.k]=d.def; for(const k in p) tr.params[k]=p[k]; touch(); renderInspector(); previewTrack(); }},el('option',{value:0,text:'Elegir…'}),...names.map((o,i)=>el('option',{value:i+1,text:o}))); pk.push(el('div',{class:'row'},el('label',{text:'Preajuste'}),ps)); }
+  { const fnames=Object.keys(inst.presets||{}), mine=upGet()[tr.inst]||{}, mnames=Object.keys(mine).sort((x,y)=>x.localeCompare(y)); let cur=null;
+    const ps=el('select',{onchange:e=>{ const v=e.target.value; cur=v; if(!v){ del.style.display='none'; return; } const kind=v[0], nm=v.slice(2);
+        if(kind==='f'){ const p=inst.presets[nm]; if(!p) return; if(inst.presetReset) for(const d of inst.params) if(d.def!==undefined) tr.params[d.k]=d.def; for(const k in p) tr.params[k]=p[k]; }
+        else { const p=mine[nm]; if(!p) return; applyPreset(inst,tr,p.params); }
+        del.style.display=kind==='u'?'':'none'; touch(); renderInspector(); previewTrack(); }},el('option',{value:'',text:'Elegir…'}));
+    if(fnames.length){ const g=el('optgroup',{label:'De fábrica'}); fnames.forEach(n=>g.append(el('option',{value:'f:'+n,text:n}))); ps.append(g); }
+    if(mnames.length){ const g=el('optgroup',{label:'Mis presets'}); mnames.forEach(n=>g.append(el('option',{value:'u:'+n,text:n}))); ps.append(g); }
+    const del=el('button',{class:'sm danger',style:'display:none',text:'🗑',title:'Borra de este navegador el preset elegido (el archivo .json que hayas bajado no se toca)',onclick:()=>{ if(!cur||cur[0]!=='u') return; const nm=cur.slice(2); if(!confirm('¿Borrar el preset «'+nm+'» de este navegador?')) return; const o=upGet(); if(o[tr.inst]){ delete o[tr.inst][nm]; if(!Object.keys(o[tr.inst]).length) delete o[tr.inst]; upSet(o); } renderInspector(); }});
+    pk.push(el('div',{class:'row'},el('label',{text:'Preajuste'}),ps,del));
+    const fin=el('input',{type:'file',accept:'.json,application/json',multiple:true,style:'display:none',onchange:async e=>{ for(const f of e.target.files) await ingest(f); e.target.value=''; renderInspector(); }});
+    pk.push(el('div',{class:'btnrow'},
+      el('button',{class:'sm',text:'💾 Guardar preset',title:'Guarda los ajustes actuales como preset de este instrumento: queda en este navegador y se baja como «'+tr.inst+'__nombre.json»',onclick:()=>{
+        const nm=(prompt('Nombre del preset para «'+inst.name+'»:','')||'').trim(); if(!nm) return; const prm=presetDiff(inst,tr);
+        if((upGet()[tr.inst]||{})[nm]&&!confirm('Ya existe «'+nm+'». ¿Reemplazarlo?')) return;
+        upAdd(tr.inst,nm,prm,inst.version); download(new Blob([JSON.stringify(presetFile(tr.inst,nm,inst.version,prm),null,2)],{type:'application/json'}),slug(tr.inst)+'__'+slug(nm)+'.json'); toast('Preset «'+nm+'» guardado','ok'); renderInspector(); }}),
+      el('button',{class:'sm',text:'Importar…',title:'Abre uno o varios archivos de preset (.json)',onclick:()=>fin.click()}),
+      el('button',{class:'sm',text:'Exportar todos',title:'Baja un solo .json con todos tus presets (copia de seguridad)',onclick:()=>{ const o=upGet(), list=[]; for(const id in o) for(const n in o[id]) list.push({instrument:id,name:n,version:o[id][n].v||undefined,params:o[id][n].params});
+        if(!list.length){ toast('Aún no tienes presets propios','err'); return; } download(new Blob([JSON.stringify({format:'demokit-presets',v:1,presets:list},null,2)],{type:'application/json'}),'demokit-presets.json'); }}),fin)); }
   pk.push(el('div',{class:'btnrow'},el('button',{class:'sm',text:'↺ Estado basal',title:'Devuelve todos los parámetros de este instrumento a su valor por defecto (los ajustes por nota no se tocan)',onclick:()=>{ for(const d of inst.params) if(d.def!==undefined) tr.params[d.k]=d.def; touch(); renderInspector(); previewTrack(); }})));
   const useDots=inst.params.some(d=>typeof d.on==='function'), useSec=inst.params.some(d=>d.sec), dots=[], groups=[]; let curG=null; const openMap=(window.__secOpen||(window.__secOpen={}));
   const upd=()=>{ if(!useDots) return; for(const x of dots){ let on=true; if(typeof x.d.on==='function'){ try{ on=!!x.d.on(tr.params); }catch(e){} } x.dot.classList.toggle('on',on); x.dot.title=on?'Está influyendo en el sonido':'Sin efecto con los ajustes actuales'; x.on=on; }
@@ -1017,7 +1047,7 @@ async function ingest(file,opts){
   }
   const txt=await file.text();
   try{
-    if(/^\s*\{/.test(txt)){ const o=JSON.parse(txt); if(o.format==='demokit-genres'){ const r=addGenres(o,opts); toast(r.ok.length?'Géneros listos: '+r.ok.join(', ')+(r.bad.length?' · con avisos: '+r.bad.join(' · '):''):'No pude leer géneros: '+r.bad.join(' · '),r.ok.length?'ok':'err'); return; } if(o.format==='demokit-studio'){ const pr=await projectFromFile(o,name); if(!pr){ toast('Proyecto no cargado','err'); return; } loadProject(pr); populateAddInst(); toast('Proyecto «'+o.name+'» cargado','ok'); return; } }
+    if(/^\s*\{/.test(txt)){ const o=JSON.parse(txt); if(o.format==='demokit-preset'||o.format==='demokit-presets'){ importPresets(o); return; } if(o.format==='demokit-genres'){ const r=addGenres(o,opts); toast(r.ok.length?'Géneros listos: '+r.ok.join(', ')+(r.bad.length?' · con avisos: '+r.bad.join(' · '):''):'No pude leer géneros: '+r.bad.join(' · '),r.ok.length?'ok':'err'); return; } if(o.format==='demokit-studio'){ const pr=await projectFromFile(o,name); if(!pr){ toast('Proyecto no cargado','err'); return; } loadProject(pr); populateAddInst(); toast('Proyecto «'+o.name+'» cargado','ok'); return; } }
     if(/function\s+demoKit\s*\(/.test(txt)){ if(!trustCode('Kit «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código que reemplazará al kit incluido.')){ toast('Kit no cargado','err'); return; } const f=new Function(txt+'\nreturn demoKit;')(); const k=f(8000,.05,1); if(!k||typeof k.syn!=='function'||typeof k.mix!=='function') throw new Error('el kit no expone syn/mix'); const probs=kitCheck(f); if(probs.length&&!confirm('Revisé el kit «'+name+'» y encontré esto:\n\n• '+probs.join('\n• ')+'\n\n¿Cargarlo de todos modos?')){ toast('Kit no cargado','err'); return; } Kit.make=f; applyStoredChar(); bumpKit(); kitName=name; cache=null; dirty=true; const kept=rememberKit(name,txt); renderLib(); updateStat(); toast('Kit «'+name+'» cargado: los instrumentos y plugins lo usan desde ahora'+(kept?' y se recordará en este navegador':' (no pude guardarlo en este navegador: pesa demasiado; durará solo esta sesión)'),kept?'ok':'err'); return; }
     if(/async\s+function\s+render\w*\s*\(/.test(txt)){ const fn=/async\s+function\s+(render\w*)/.exec(txt)[1]; const d={name:demoName(txt,name.replace(/\.js$/,'')),fn,src:txt,out:null,trusted:!!(opts&&opts.trusted)}; const i=demos.findIndex(x=>x.name===d.name); if(i>=0) demos[i]=d; else demos.push(d); renderLib(); openModal('libModal'); toast('Demo «'+d.name+'» lista: reprodúcela o conviértela','ok'); return; }
     if(/registerInstrument\s*\(/.test(txt)){ if(!trustCode('Plugin «'+name+'»',((txt.length/1024).toFixed(1))+' KB de código. Empieza así:\n'+txt.slice(0,160).replace(/\s+/g,' ')+'…')){ toast('Plugin no instalado','err'); return; } const nd=evalPlugin(txt), cur=installedOf(nd.id); if(cur&&cur.code===txt){ toast('«'+nd.name+'» ya estaba instalado igual','ok'); return; } if(cur&&cmpVer(codeVersion(txt),codeVersion(cur.code))<0){ const r=await choose('«'+nd.name+'»: el archivo es más viejo',['Tienes instalada la v'+verStr(codeVersion(cur.code))+' y este archivo es la v'+verStr(codeVersion(txt))+'. Instalarlo la reemplazaría por una versión anterior.'],[{v:'keep',text:'Conservar la instalada · recomendado'},{v:'old',text:'Reemplazar por la versión anterior'}]); if(r!=='old'){ toast('Plugin no instalado: sigue la v'+verStr(codeVersion(cur.code)),'ok'); return; } } const def=installPlugin(txt); populateAddInst(); renderLib(); toast('Plugin «'+def.name+'» v'+verStr(codeVersion(txt))+' registrado','ok'); return; }
@@ -1050,6 +1080,7 @@ const REPO_GROUPS=[
   {id:'demos',title:'Demos',dirs:['demos'],ext:/\.js$/i,kind:'demo',what:'archivos .js de demos'},
   {id:'plugins',title:'Plugins de instrumento',dirs:['plugins'],ext:/\.js$/i,kind:'plugin',what:'archivos .js de plugins'},
   {id:'proyectos',title:'Proyectos',dirs:['projects'],ext:/\.json$/i,kind:'project',what:'archivos .demokit.json (proyectos guardados)'},
+  {id:'presets',title:'Presets de instrumentos',dirs:['presets'],ext:/\.json$/i,kind:'preset',what:'archivos .json de presets (instrumento__nombre.json)'},
   {id:'generos',title:'Géneros',dirs:['genres','generos'],ext:/\.json$/i,kind:'genre',what:'archivos .json de géneros (formato demokit-genres)'},
   {id:'kits',title:'Kits de síntesis',dirs:['kits/bootleg'],ext:/^(?!make_kit|test_).*\.js$/i,kind:'kit',what:'archivos .js de kits (demoKit)'},
   {id:'ejemplos',title:'Ejemplos de proyectos',dirs:['project_examples'],ext:/\.json$/i,kind:'project',what:'archivos .demokit.json de ejemplo'}];
@@ -1085,6 +1116,7 @@ async function renderRepo(force){
   if(data.offline){ box.append(el('div',{class:'hint',text:'Estás abriendo el estudio como archivo local, y desde ahí un navegador no puede mirar carpetas. Ábrelo desde GitHub Pages o con un servidor (por ejemplo «python3 -m http.server» dentro de la carpeta del repo) y aquí aparecerán solos los archivos de demos/, plugins/, projects/ y project_examples/.'})); return; }
   for(const g of REPO_GROUPS){ const res=data[g.id]||[], found=res.filter(r=>r.status==='ok'), files=found.flatMap(r=>r.files.map(f=>Object.assign({dir:r.dir},f)));
     const head=el('div',{class:'nm ft'},el('b',{text:g.title+(found.length?' · '+files.length:'')})); const sec=el('div',{class:'fold'},head); sec.dataset.fold='repo-'+g.id; applyFold(sec);
+    if(g.kind==='preset'&&files.length>1){ const b=el('button',{class:'sm',style:'margin-left:8px',text:'Cargar todos',onclick:async e=>{ e.stopPropagation(); for(const f of files) await repoLoad(g,f); toast('Presets cargados: '+files.length,'ok'); renderInspector(); }}); head.append(b); }
     if(g.kind==='demo'&&files.length>1){ const b=el('button',{class:'sm',style:'margin-left:8px',text:'Cargar todas',onclick:async e=>{ e.stopPropagation(); for(const f of files) await repoLoad(g,f); toast('Demos cargadas: '+files.length,'ok'); }}); head.append(b); }
     if(!found.length){ const err=res.find(r=>r.status==='error'); sec.append(el('div',{class:'hint',text:err?('No pude mirar «'+err.dir+'/»: '+(err.note||'error')+'.'):('No encontré la carpeta «'+g.dirs[0]+'/». Créala en tu repositorio (junto a index.html) y pon ahí tus '+g.what+': aparecerán aquí solos.')})); }
     else if(!files.length) sec.append(el('div',{class:'hint',text:'La carpeta «'+found[0].dir+'/» está vacía. Pon ahí tus '+g.what+'.'}));

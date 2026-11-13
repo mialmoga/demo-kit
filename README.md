@@ -55,7 +55,7 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 - **Piano roll** con rejilla (1/4 a 1/32, tresillos o libre), zoom, notas fantasma de las otras pistas, selección múltiple, velocidad por nota y **deshacer/rehacer global** (notas, pistas, parámetros, efectos, master, BPM… hasta 100 pasos; los sliders y arrastres cuentan como un solo paso). Con el ratón, **clic derecho** sobre una nota la borra; en pantallas táctiles hay modos **Dibujar / Navegar / Borrar / Seleccionar**.
 
-- **Carpetas del repositorio:** en «Demos y plugins» aparece la sección **En el repositorio** con lo que haya en `demos/` (demos `.js`), `plugins/` (plugins `.js`), `genres/` (géneros `.json`), `kits/bootleg/` (kits de síntesis alternos `.js`; no lista los `test_*`), `projects/` (proyectos `.demokit.json` que no son los ejemplos oficiales) y `project_examples/` (los ejemplos oficiales). Cada archivo trae su botón **Cargar** / **Abrir** (y «Cargar todas» en demos). Los géneros son datos y se cargan directo; los kits y plugins son código y piden confirmación (ver [Kits alternos](#kits-alternos)).
+- **Carpetas del repositorio:** en «Demos y plugins» aparece la sección **En el repositorio** con lo que haya en `demos/` (demos `.js`), `plugins/` (plugins `.js`), `presets/` (presets de instrumentos `.json`, con «Cargar todos»), `genres/` (géneros `.json`), `kits/bootleg/` (kits de síntesis alternos `.js`; no lista los `test_*`), `projects/` (proyectos `.demokit.json` que no son los ejemplos oficiales) y `project_examples/` (los ejemplos oficiales). Cada archivo trae su botón **Cargar** / **Abrir** (y «Cargar todas» en demos). Los géneros son datos y se cargan directo; los kits y plugins son código y piden confirmación (ver [Kits alternos](#kits-alternos)).
   - Si una carpeta no existe, el estudio te dice cómo se llama y que la crees junto a `index.html`: en cuanto pongas archivos ahí, aparecen solos.
   - Cómo encuentra los archivos, en este orden: (1) un `manifest.json` dentro de la carpeta (una lista de nombres, p. ej. `["cancion.js","otra.js"]`); (2) la API de GitHub si está en GitHub Pages; (3) el listado de carpeta de un servidor local (`python3 -m http.server`).
   - **Recomendado:** el repo trae un workflow (`.github/workflows/manifests.yml`) que, en cada push a esas carpetas, regenera solo el `manifest.json` de cada una. Así el estudio nunca toca la API de GitHub (que limita a unas 60 consultas por hora) y funciona igual en cualquier hosting. Si el workflow no corre en tu fork, actívalo en la pestaña *Actions* o genera los manifest a mano con `node .github/scripts/gen-manifests.js` (el script y el workflow deben incluir `genres/` y `kits/bootleg/`).
@@ -457,6 +457,23 @@ Un instrumento que **toca acompañamientos en vez de notas sueltas**. Una nota l
 - **La bossa se afinó contra grabaciones reales:** el patrón (de dos compases), la duración del rasgueo, el bajo corto y los acordes salen de medir cuatro anotaciones de bossa de **GuitarSet** (ver [Créditos](#créditos)) y de ajustarlos de oído. El resto de estilos sigue siendo una aproximación.
 - **Compatibilidad:** solo usa `K.add` y `K.rnd`, así que funciona con el kit incluido y con los alternos. Asume un tempo constante dentro de cada nota (el del inicio de la nota); los cambios de acorde de la progresión del proyecto sí siguen el mapa de tempo, pero si hay un cambio de tempo en medio de un pasaje, lo más seguro es partirlo en dos notas.
 
+## Presets propios
+
+Cualquier instrumento (del kit o de un plugin) puede guardar sus ajustes como preset.
+
+- **💾 Guardar preset** (en el inspector, bajo el selector de preajustes): pide un nombre, guarda el preset en este navegador y baja un archivo `instrumento__nombre.json`, por ejemplo `bajo808__el-puerco.json`. Solo guarda los valores que difieren del estado basal, así el preset sigue sirviendo si el plugin agrega parámetros después.
+- **Selector:** muestra dos grupos, **De fábrica** (los del plugin) y **Mis presets**. Al aplicar uno propio, el instrumento vuelve primero al estado basal y luego aplica los valores del preset (no se mezcla con lo anterior). Un parámetro que el instrumento ya no tenga se ignora. El botón 🗑 borra de este navegador el preset elegido (el archivo bajado no se toca).
+- **Importar…:** abre uno o varios `.json` de preset; también sirven «Cargar archivos…» y arrastrar el archivo a la página.
+- **Exportar todos:** baja un solo `demokit-presets.json` con todos tus presets (copia de seguridad). Importarlo los restaura.
+- **Carpeta `presets/` del repo:** pon ahí tus `.json` (el prefijo antes de `__` es el id del instrumento) y aparecen en «Demos y plugins» → «Presets de instrumentos», con **Cargar** y **Cargar todos**. Cargar un preset lo agrega a «Mis presets» de ese navegador.
+- **Formato:**
+  ```json
+  { "format": "demokit-preset", "v": 1, "instrument": "bajo808", "name": "el+puerco",
+    "version": "1.0", "params": { "drive": 1, "tipo": "asim", "punch": 14 } }
+  ```
+  El archivo de varios presets usa `"format": "demokit-presets"` y una lista `presets` con esos mismos campos.
+- **Ejemplo incluido:** `presets/bajo808__el-puerco.json`, un Bajo 808 sucio y larguísimo (saturación al máximo, asimétrica, sub, armónicos y glide entre ligadas).
+
 ## Forja (`plugins/forja.js`)
 
 El «instrumento supremo»: un sintetizador de una voz por nota con muchísimo control sobre la onda y el legato, pensado para **sonidos mecánicos** (serruchos, motores, taladros, engranes) y **acuosos** (gotas, burbujas, arroyo, lluvia, olas), y con lo suficiente para inventar muchos más. Con el kit Ultimate hereda su carácter (digital, orgánico, pro, ultra) porque todo lo que escribe pasa por `K.add`, pero **todo el sonido está dentro del plugin**: suena igual con cualquier kit.
@@ -487,15 +504,26 @@ Los ajustes están en **14 secciones plegables**, con un puntito que se enciende
 
 Una sola pista de percusión con **16 pads** (v1.2). Cada golpe es una nota en su carril del piano roll, y con **⌨ Tocar** y el teclado en pantalla los pads quedan en una rejilla para **tocar y grabar ritmos al vuelo** sin cambiar de pista.
 
-- **Sonido elegible por pad:** cada pad escoge entre 28 sonidos: Bombo, Bombo 808, Caja, Rim, Palma, Chasquido, Hi-hat cerrado, de pedal y abierto, Ride, Campana de ride, Crash, Tom grave/medio/agudo, Conga grave, aguda y seca (slap), Bongó, Timbal, Cencerro, Shaker, Pandero, Claves, Woodblock y Triángulo, más versiones metálicas del hi-hat cerrado y abierto. Los nombres de los carriles y de los pads siguen al sonido elegido.
+- **Sonido elegible por pad:** cada pad escoge entre 29 sonidos: Bombo, Bombo 808, Caja, Rim, Palma, Chasquido, Hi-hat cerrado, de pedal y abierto, Ride, Campana de ride, Crash, Tom grave/medio/agudo, Conga grave, aguda y seca (slap), Bongó, Timbal, Cencerro, Shaker, Pandero, Claves, Woodblock y Triángulo, más versiones metálicas del hi-hat cerrado y abierto. Los nombres de los carriles y de los pads siguen al sonido elegido.
 - **Asignación de fábrica:** pads 1–12 como en la v1.0 (Bombo, Caja, Hi-hat cerrado, Hi-hat abierto, Palma, Rim, Tom grave, Tom medio, Tom agudo, Crash, Cencerro, Shaker) y 13 Ride, 14 Conga grave, 15 Conga aguda, 16 Conga seca.
 - **Ajustes por pad:** cada pad tiene su sección con **sonido, volumen, tono (semitonos), duración (×) y paneo**; el puntito se apaga cuando un ajuste no aplica a ese sonido (por ejemplo, la duración de la palma).
-- **Controles por sonido (v1.2):** además de volumen, tono, duración y paneo, cada pad tiene **Ruido (×)** (cuánto ruido lleva el crash, ride, hi-hat metálico, shaker, pandero, rim, toms, congas y la caja), **Brillo** (corte de agudos), **Ataque (ms)** (entrada suave), **Sub** (capa de graves sostenida del bombo y del bombo 808) y **Clic** (golpe del bombo). El puntito de cada control se apaga cuando no aplica al sonido elegido. El crash ahora es metal inarmónico más ruido, y el ruido se baja con **Ruido (×)**.
+- **Controles por sonido (v1.2):** además de volumen, tono, duración y paneo, cada pad tiene **Ruido (×)** (cuánto ruido lleva el crash, ride, hi-hat metálico, shaker, pandero, rim, toms, congas y la caja), **Brillo** (corte de agudos), **Ataque (ms)** (entrada suave), **Sub** (capa de graves sostenida del bombo y del bombo 808) y **Clic** (golpe del bombo). El puntito de cada control se apaga cuando no aplica al sonido elegido. **Crash campana** (el sonido por defecto del pad 10) es metal inarmónico con poco ruido y suena a campana; **Crash (platillo)** es el platillo ruidoso y brillante, y es el que usan los kits «de rock» y «oscuro y denso». Ambos aceptan **Ruido (×)**.
 - **Preajustes de kit:** Kit básico, Kit lo-fi (seco), Kit 808, Kit latino, Kit de rock (ride y toms), Kit oscuro y denso y Kit orquestal.
 - **Sonidos:** bombo, caja, palma, chasquido, hi-hats cerrado y abierto y crash son los del kit cargado (`K.kick`, `K.snare`…), así que cambian con el kit; el resto está sintetizado dentro del plugin y suena igual con cualquier kit.
 - **Teclas:** `Z X C V B N M , . /` tocan los pads 1 a 10 y `S D G H J L` los pads 11 a 16.
 - **MIDI:** por defecto cada pad responde a una nota consecutiva desde C1 (36, 37, 38…), como los pads tipo MPC. Con **MIDI: nota de cada pad → General MIDI**, cada pad responde a la nota de batería GM de su sonido (36 bombo, 38 caja, 42 hi-hat cerrado, 46 abierto, 51 ride…). La **exportación MIDI** usa el mismo mapa y va por el canal 10 (batería); en el modo consecutivo escribe 36 + carril.
 - **Proyectos de la v1.0:** abren igual; los ajustes por pad guardados con las claves antiguas se siguen leyendo.
+
+## Bajo 808 (`plugins/bajo808.js`)
+
+Bajo de una voz para graves sostenidos y potentes, que se toca como cualquier instrumento melódico (usa la escala y los acordes del estudio).
+
+- **Caída de tono:** al inicio de cada nota el tono baja unos semitonos en pocos milisegundos (el golpe típico del 808); se ajusta cuánto cae y cuánto dura, y hay un clic opcional.
+- **Sub:** una octava por debajo de la nota, para el peso en los 40–60 Hz.
+- **Armónicos:** saturación suave (tanh), asimétrica (pares e impares) o plegado metálico, más segundo y tercer armónico opcionales; así el bajo se oye en bocinas chicas y tiene cuerpo entre 200 y 500 Hz. Un corte de agudos controla qué tanto brilla.
+- **Envolvente:** caída del volumen, nivel sostenido y relajación.
+- **Glide:** apagado; **solo notas ligadas** (si una nota empieza dentro de la ventana de la anterior no hay nuevo ataque y el tono se desliza); o **siempre** (desliza desde la nota anterior). Con glide activo la pista es monofónica.
+- **Preajustes:** 808 clásico, 808 largo con glide, 808 sucio, Sub suave, Bajo hip-hop corto, Industrial plegado y Trap con deslizamiento.
 
 ## Extender el kit
 
@@ -745,6 +773,7 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 | `guitarra_acompanante.js` | Ámbar (la idea de programar el acompañamiento salió de la «guitarrita» de Éter) |
 | `forja.js` | Ámbar, a partir de la idea de Brujo del «instrumento supremo» |
 | `bateria_pads.js` | Ámbar, a partir de la idea de Brujo |
+| `bajo808.js` | Ámbar, a partir de la idea de Brujo |
 
 **Kits alternos (`kits/bootleg/`)**
 
