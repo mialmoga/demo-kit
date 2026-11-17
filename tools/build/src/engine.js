@@ -642,9 +642,9 @@ function liveNoteBuffer(P,tr,m,lenSec){
 }
 
 // ───────────────────────── WAV ─────────────────────────
-// opts: {bits:16|24, float:true para 32 bits en coma flotante, dither (solo 16 bits; ruido TPDF de ±1 LSB con semilla fija, así es reproducible; activo por omisión)}
+// opts: {loop:{start,end} escribe un bloque «smpl» con un loop (muestras; end incluido), bits:16|24, float:true para 32 bits en coma flotante, dither (solo 16 bits; ruido TPDF de ±1 LSB con semilla fija, así es reproducible; activo por omisión)}
 function encodeWav(L,R,sr,opts){
-  opts=opts||{}; const fl=!!opts.float, bits=fl?32:(opts.bits===24?24:16), bps=bits/8, n=L.length, data=n*2*bps, buf=new ArrayBuffer(44+data+(fl?12:0)), v=new DataView(buf);
+  opts=opts||{}; const fl=!!opts.float, bits=fl?32:(opts.bits===24?24:16), bps=bits/8, n=L.length, data=n*2*bps, lp=opts.loop&&opts.loop.end>opts.loop.start?opts.loop:null, buf=new ArrayBuffer(44+data+(fl?12:0)+(lp?68:0)), v=new DataView(buf);
   const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
   ws(0,'RIFF'); v.setUint32(4,buf.byteLength-8,true); ws(8,'WAVE'); ws(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,fl?3:1,true); v.setUint16(22,2,true);
   v.setUint32(24,sr,true); v.setUint32(28,sr*2*bps,true); v.setUint16(32,2*bps,true); v.setUint16(34,bits,true);
@@ -656,6 +656,8 @@ function encodeWav(L,R,sr,opts){
     if(fl){ v.setFloat32(o,x,true); o+=4; }
     else if(bits===24){ const s=x>1?1:x<-1?-1:x, q=Math.round(s*8388607); v.setUint8(o,q&255); v.setUint8(o+1,(q>>8)&255); v.setUint8(o+2,(q>>16)&255); o+=3; }
     else { let s=x>1?1:x<-1?-1:x; s=s*32767+(dith?(rnd()-rnd()):0); s=s>32767?32767:s<-32768?-32768:Math.round(s); v.setInt16(o,s,true); o+=2; } }
+  if(lp){ ws(o,'smpl'); v.setUint32(o+4,60,true); const q=o+8; v.setUint32(q+8,Math.round(1e9/sr),true); v.setUint32(q+12,60,true); v.setUint32(q+28,1,true);      // 1 loop, hacia delante, sin repeticiones fijas
+    v.setUint32(q+44,lp.start,true); v.setUint32(q+48,lp.end,true); }
   return new Blob([buf],{type:'audio/wav'});
 }
 
