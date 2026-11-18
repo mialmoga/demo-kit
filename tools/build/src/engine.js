@@ -189,7 +189,7 @@ const barBeats=P=>{ const s=P&&P.sig; return s&&s[0]>0&&s[1]>0?s[0]*4/s[1]:4; };
 const mmCache=new WeakMap();
 // ── secciones de la canción: P.marks = [{bar,name,c?}]  (bar = compás 0-based donde empieza; dura hasta la siguiente marca). Solo organizan: no afectan al audio.
 const MARK_PAL=['#d9b38c','#9ec5a0','#8fb3d9','#c9a0d6','#d6a0a0','#b8c98f','#8fcfc9','#c7b8e0'];
-function markPts(P){ const m=new Map(); for(const x of (P&&P.marks)||[]){ if(!x||!(x.bar>=0)) continue; const bar=Math.floor(x.bar), o={bar,name:String(x.name==null?'':x.name).trim().slice(0,40)||'Sección'}; if(x.c>=0&&x.c<MARK_PAL.length) o.c=x.c|0; m.set(bar,o); } return [...m.values()].sort((a,b)=>a.bar-b.bar); }
+function markPts(P){ const m=new Map(); for(const x of (P&&P.marks)||[]){ if(!x||!(x.bar>=0)) continue; const bar=Math.floor(x.bar), o={bar,name:String(x.name==null?'':x.name).trim().slice(0,40)||'Sección'}; if(x.c>=0&&x.c<MARK_PAL.length) o.c=x.c|0; if(x.cue&&typeof x.cue==='object'&&Object.keys(x.cue).length) o.cue=JSON.parse(JSON.stringify(x.cue)); m.set(bar,o); } return [...m.values()].sort((a,b)=>a.bar-b.bar); }
 function markColor(mk){ if(mk.c!=null&&MARK_PAL[mk.c]) return MARK_PAL[mk.c]; const s=String(mk.name).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[\s\d]+$/,''); let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return MARK_PAL[h%MARK_PAL.length]; }
 function sigPts(P){ const m=new Map(); for(const x of (P&&P.sigs)||[]) if(x&&x.bar>0&&x.sig&&x.sig[0]>0&&x.sig[1]>0) m.set(Math.floor(x.bar),[+x.sig[0],+x.sig[1]]); return [...m].sort((a,b)=>a[0]-b[0]).map(([bar,sig])=>({bar,sig})); }
 function meter(P){
@@ -202,6 +202,29 @@ function meter(P){
       barAt:b=>{ const g=segB(Math.max(0,b)), i=g.bar0+Math.max(0,Math.floor((Math.max(0,b)-g.b0)/g.len+1e-9)); return {i,start:g.b0+(i-g.bar0)*g.len,len:g.len,sig:g.sig}; }}; }
   mmCache.set(P,{key,mm}); return mm;
 }
+
+// ── banco de sonidos: cada sección (marca) del proyecto puede ser un «cue» con nombre (hover, click, error…). La metadata va dentro de la marca (mk.cue) y el proyecto lleva P.bank={v:1,theme:'default'}.
+// Tipos: 'one' (disparo), 'loop' (bucle sin costura), 'gate' (presionar → mantener → soltar: ataque, zona que se repite y cola de soltar).
+const CUE_TYPES=['one','loop','gate'];
+const cueSlug=s=>String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'cue';
+function cueOf(mk){ const c=(mk&&mk.cue)||{}, n=x=>+x||0;
+  return {id:c.id?cueSlug(c.id):cueSlug(mk&&mk.name), type:CUE_TYPES.includes(c.type)?c.type:'one', vars:clamp(Math.round(n(c.vars)||1),1,6), vol:clamp(n(c.vol),-24,12), jp:clamp(n(c.jp),0,1200), jv:clamp(n(c.jv),0,12),
+    grp:String(c.grp||'').trim().slice(0,24), cd:clamp(Math.round(n(c.cd)),0,5000), att:clamp(n(c.att),0,10), rel:clamp(n(c.rel),0,60), tail:c.tail==null||c.tail===''?null:clamp(n(c.tail),0,8), pit:!!c.pit, tn:c.tn==null||c.tn===''?null:clamp(Math.round(n(c.tn)),-36,36)}; }
+// lista de cues: una por marca; dura desde su compás hasta el de la siguiente marca (o el final del proyecto)
+function bankCues(P){ const mm=meter(P), tm=tmap(P), L=markPts(P).filter(m=>m.bar<P.bars), out=[], seen=new Map();
+  for(let i=0;i<L.length;i++){ const m=L[i], bar1=i+1<L.length?Math.min(P.bars,L[i+1].bar):P.bars, b0=mm.beatOfBar(m.bar), b1=mm.beatOfBar(bar1), c=cueOf(m);
+    const q={mk:m,c,bar0:m.bar,bar1,b0,b1,sec:tm.sec(b1)-tm.sec(b0)}; if(seen.has(c.id)){ q.dup=true; seen.get(c.id).dup=true; } else seen.set(c.id,q); out.push(q); }
+  return out; }
+// proyecto mínimo con solo lo que cae dentro del cue (notas y automatización movidas al inicio); variant cambia la semilla del azar → tomas distintas
+function cueProject(P,q,variant){
+  const mm=meter(P), tm=tmap(P), solo=P.tracks.some(t=>t.solo), b0=q.b0, b1=q.b1, E=1e-9;
+  const Q={name:(P.name||'banco')+'·'+q.c.id,bpm:Math.round(tm.bpmAt(b0)*1000)/1000||P.bpm,bars:Math.max(1,q.bar1-q.bar0),sig:mm.sigAtBar(q.bar0).slice(),seed:(((P.seed||KIT_SEED)+(variant|0)*7919)>>>0)||1,
+    sc:P.sc,master:P.master,clips:P.clips,key:P.key,tracks:[]};
+  for(const tr of P.tracks){ if(tr.mute||(solo&&!tr.solo)) continue; const notes=[]; for(const n of tr.notes) if(n.b>=b0-E&&n.b<b1-E) notes.push(Object.assign({},n,{b:n.b-b0})); if(!notes.length) continue;
+    const t=Object.assign({},tr,{notes}); if(tr.auto){ const a={}; for(const k in tr.auto){ const pts=tr.auto[k].slice().sort((x,y)=>x.b-y.b), o=[]; let prev=null; for(const p of pts){ if(p.b<b0-E) prev=p; else if(p.b<b1+E) o.push({b:p.b-b0,v:p.v}); }
+        if(prev&&(!o.length||o[0].b>E)) o.unshift({b:0,v:prev.v}); if(o.length) a[k]=o; } t.auto=a; }
+    Q.tracks.push(t); }
+  return Q; }
 const SIGS=[[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[3,8],[5,8],[6,8],[7,8],[9,8],[12,8]];
 // ── progresión de acordes del proyecto: P.prog = {text}. Texto tipo «Am7 | Dm7 G7 | Cmaj7 %»; «|» separa compases, varios acordes en un compás lo reparten por igual,
 // «%» solo en un compás (o un compás vacío) repite el compás anterior; «%» o «.» junto a otros acordes sostienen el anterior. La progresión se repite si el proyecto es más largo.
@@ -685,7 +708,7 @@ function compactTrack(t){
 function expandTrack(t){ if(!Array.isArray(t.n)) return t; t.notes=t.n.map(a=>{ if(!Array.isArray(a)) return a; const n={b:a[0],l:a[1],m:a[2],v:a[3]==null?1:a[3]}; if(a[4]) n.pan=a[4]; if(a[5]) n.o=a[5]; if(a[6]) n.w=a[6]; return n; }); delete t.n; return t; }
 function projectToJSON(P,opts){
   const compact=!!(opts&&opts.compact);
-  const o={format:'demokit-studio',v:compact?2:1,kit:KIT_FORMAT,name:P.name,bpm:P.bpm,bars:P.bars,tempo:(P.tempo&&P.tempo.length)?P.tempo:undefined,sig:barBeats(P)===4&&(!P.sig||P.sig[1]===4)?undefined:P.sig,sigs:sigPts(P).length?sigPts(P):undefined,marks:markPts(P).length?markPts(P):undefined,genre:P.genre||undefined,engine:kitInfo()||P.engine||undefined,seed:P.seed,sc:{mode:P.sc.mode,depth:P.sc.depth,rel:P.sc.rel,rate:P.sc.rate},master:masterOf(P),key:P.key||undefined,prog:(P.prog&&P.prog.text&&P.prog.text.trim())?{text:P.prog.text}:undefined,tracks:compact?P.tracks.map(compactTrack):P.tracks,clips:{},plugins:[]};
+  const o={format:'demokit-studio',v:compact?2:1,kit:KIT_FORMAT,name:P.name,bpm:P.bpm,bars:P.bars,tempo:(P.tempo&&P.tempo.length)?P.tempo:undefined,sig:barBeats(P)===4&&(!P.sig||P.sig[1]===4)?undefined:P.sig,sigs:sigPts(P).length?sigPts(P):undefined,marks:markPts(P).length?markPts(P):undefined,bank:(P.bank&&typeof P.bank==='object')?P.bank:undefined,genre:P.genre||undefined,engine:kitInfo()||P.engine||undefined,seed:P.seed,sc:{mode:P.sc.mode,depth:P.sc.depth,rel:P.sc.rel,rate:P.sc.rate},master:masterOf(P),key:P.key||undefined,prog:(P.prog&&P.prog.text&&P.prog.text.trim())?{text:P.prog.text}:undefined,tracks:compact?P.tracks.map(compactTrack):P.tracks,clips:{},plugins:[]};
   if(P.sc.table){ const T=P.sc.table,u=new Uint8Array(T.length); for(let i=0;i<T.length;i++) u[i]=Math.round(clamp(T[i],0,1)*255); o.sc.table=u8ToB64(u); }
   if(typeof pruneBakedClips==='function') pruneBakedClips(P);
   for(const cid in P.clips){ const d=P.clips[cid],q=new Int16Array(d.length); for(let i=0;i<d.length;i++) q[i]=clamp(Math.round(d[i]*16384),-32768,32767); o.clips[cid]=u8ToB64(new Uint8Array(q.buffer)); }
@@ -700,7 +723,7 @@ function projectReport(P){
 // opts.allowPlugins===false: no se ejecuta el código de los plugins incluidos (por defecto sí, para compatibilidad; el estudio pregunta antes)
 function projectFromJSON(o,opts){
   const errs=[], skipped=[], notes=[]; for(const u of o.plugins||[]){ const md=opts&&opts.pluginMode&&opts.pluginMode[u.id]; if(md==='installed') continue; if(md==='skip'||(opts&&opts.allowPlugins===false)){ skipped.push(u.name||u.id); continue; } try{ installPlugin(u.code,md==='temp'?{temp:true,from:o.name}:undefined); if(md==='temp') notes.push('«'+(u.name||u.id)+'» v'+verStr(codeVersion(u.code))+' se cargó como copia temporal: no toca tu plugin instalado.'); }catch(e){ errs.push(u.id+': '+e.message); } }
-  const P=newProject(o.name,o.bpm,o.bars); if(Array.isArray(o.tempo)) P.tempo=tempoPts({bpm:o.bpm,tempo:o.tempo}); if(Array.isArray(o.sig)&&o.sig[0]>0&&o.sig[1]>0) P.sig=[+o.sig[0],+o.sig[1]]; if(Array.isArray(o.sigs)&&o.sigs.length) P.sigs=o.sigs.map(x=>({bar:x.bar,sig:[+x.sig[0],+x.sig[1]]})); if(Array.isArray(o.marks)&&o.marks.length) P.marks=markPts({marks:o.marks}); if(typeof o.genre==='string'&&o.genre) P.genre=o.genre.slice(0,60); if(o.engine&&typeof o.engine.id==='string'){ P.engine={id:o.engine.id.slice(0,40),v:String(o.engine.v||'').slice(0,20)}; if(typeof o.engine.c==='string') P.engine.c=o.engine.c.slice(0,20); } P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key); if(o.prog&&typeof o.prog.text==='string'&&o.prog.text.trim()) P.prog={text:o.prog.text.slice(0,4000)};
+  const P=newProject(o.name,o.bpm,o.bars); if(Array.isArray(o.tempo)) P.tempo=tempoPts({bpm:o.bpm,tempo:o.tempo}); if(Array.isArray(o.sig)&&o.sig[0]>0&&o.sig[1]>0) P.sig=[+o.sig[0],+o.sig[1]]; if(Array.isArray(o.sigs)&&o.sigs.length) P.sigs=o.sigs.map(x=>({bar:x.bar,sig:[+x.sig[0],+x.sig[1]]})); if(Array.isArray(o.marks)&&o.marks.length) P.marks=markPts({marks:o.marks}); if(o.bank&&typeof o.bank==='object') P.bank=JSON.parse(JSON.stringify(o.bank)); if(typeof o.genre==='string'&&o.genre) P.genre=o.genre.slice(0,60); if(o.engine&&typeof o.engine.id==='string'){ P.engine={id:o.engine.id.slice(0,40),v:String(o.engine.v||'').slice(0,20)}; if(typeof o.engine.c==='string') P.engine.c=o.engine.c.slice(0,20); } P.seed=o.seed||KIT_SEED; Object.assign(P.sc,o.sc||{}); P.sc.table=null; P.master=Object.assign({},MASTER_DEF,o.master||{}); if(o.key) P.key=Object.assign({root:0,scale:'off',fit:false},o.key); if(o.prog&&typeof o.prog.text==='string'&&o.prog.text.trim()) P.prog={text:o.prog.text.slice(0,4000)};
   if(o.sc&&o.sc.table){ const u=b64ToU8(o.sc.table),T=new Float32Array(u.length); for(let i=0;i<u.length;i++) T[i]=u[i]/255; P.sc.table=T; }
   for(const cid in o.clips||{}){ const u=b64ToU8(o.clips[cid]),q=new Int16Array(u.buffer,u.byteOffset,u.length>>1),d=new Float32Array(q.length); for(let i=0;i<q.length;i++) d[i]=q[i]/16384; P.clips[cid]=d; }
   P.tracks=(o.tracks||[]).map(t=>fixTrack(expandTrack(t))); P.loadErrors=errs; P.loadNotes=notes; P.loadWarnings=[]; if(skipped.length) P.loadWarnings.push('Plugins sin ejecutar: '+skipped.join(', ')+'. Las pistas que los usan quedan sin instrumento.'); if(o.kit!=null&&o.kit!==KIT_FORMAT) P.loadWarnings.push('Este proyecto se guardó con la versión '+o.kit+' del kit y esta es la '+KIT_FORMAT+(o.kit>KIT_FORMAT?': puede sonar distinto o faltar instrumentos. Actualiza la librería.':': puede sonar un poco distinto.')); return P;

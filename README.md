@@ -158,6 +158,26 @@ Se pueden componer piezas desde cero, o **cargar una demo y convertirla en un pr
 
 - **MIDI:** «⬇ MIDI» descarga un `.mid` con una pista por pista, más tempo, compás (con sus cambios), volumen y paneo (las pistas silenciadas salen con volumen 0; la automatización no se exporta). **Cargar archivos** acepta `.mid`/`.midi` y lo abre como **proyecto nuevo** (con los cambios de tempo y de compás que traiga; si un cambio de compás no cae en límite de compás, se ajusta y se avisa). Las **secciones** viajan como marcadores del `.mid` (eventos de texto, en el compás donde empiezan) y al importar se leen de vuelta, incluidos los «cue points» de otros programas; si un marcador no cae en un compás exacto se ajusta al más cercano y se avisa. Es para llevar las notas a otro programa y de vuelta: el sonido de Demo Kit no viaja en el MIDI.
 
+- **Banco de sonidos (🔊 Banco):** convierte el proyecto en una librería de sonidos para interfaces y juegos. **Cada sección (marca) es un cue** con nombre (`hover`, `click`, `error`…): compones el sonido con el piano roll y los instrumentos de siempre dentro de su sección. La plantilla de interfaz (o de juego) crea los cues más comunes, uno por compás (a 240 BPM, 1 s cada uno).
+  - **Tipos:** *disparo* (suena y termina), *bucle* (se repite sin costura; para «cargando» y ambientes) y *gate* (presionar → mantener → soltar: suena el ataque, la zona entre **Ataque** y **Soltar** se repite mientras se mantiene, y al soltar suena la cola).
+  - **Por cue:** tomas (1–6, con semilla distinta; el runtime elige una sin repetir la anterior), ajuste de volumen, variación aleatoria de tono y de volumen, grupo exclusivo (los cues del mismo grupo se cortan entre sí) y tiempo de espera entre disparos.
+  - **Probar en vivo** arma el banco con el mismo runtime que se exporta y te deja tocar cada cue (hover incluido). El **▶** de cada fila escucha solo ese cue.
+  - **Exportar:** un solo `nombre_dk.js` con los sonidos dentro, o un `.zip` con `nombre_dk.js` + carpeta de audios (`nombre_dk/*.wav`) + `ejemplo.html` + manifiesto `.json` (por si quieres usar los audios con otro motor). 48 / 44.1 / 22.05 kHz, mono o estéreo, 16 bits. «Nivelar sonoridad» deja todos los cues a −22 LUFS con techo de −1 dBTP.
+  - **Uso en la interfaz:**
+    ```js
+    const ui = DKUI.load();               // devuelve ya; ui.ready es la promesa de carga
+    ui.play('click');                     // opciones: {pitch (semitonos), volume, pan, rate, delay}
+    ui.play('tick', {pitch: valor});      // p. ej. un slider cuyo tono sigue al valor
+    const h = ui.down('btn');  h.up();    // gate; ui.loop('loading') devuelve un manejador con .stop(fade)
+    ui.bind(boton, {hover:'hover', down:'btn', click:'click', up:'release'});
+    ui.attach(document);                  // atributos: <button data-snd-hover="hover" data-snd-click="click">
+    ui.volume(.6); ui.mute(); ui.stopAll();
+    ```
+    El audio se desbloquea solo en el primer toque o tecla. Con la carpeta de audios hay que servir la página por http (no desde `file://`); `DKUI.load({base:'ruta/'})` cambia dónde busca los .wav.
+  - **Tonalidad (♪):** marca con ♪ los cues que son una nota (un «ding», un acierto, un combo). Usan la **Escala** del proyecto (la de junto al piano roll; también se cambia en el cuadro Banco). Se tocan por grado: `ui.play('nota',{degree:3})` suena la tercera de la escala, `{degree:[1,3,5], spread:.06}` toca el acorde en abanico, `oct:1` sube una octava y `ui.transpose(2)` mueve todo el banco. La nota base del cue se toma de la primera nota que compusiste dentro de él (o se fija en «Nota base», en semitonos sobre la tónica). Si hay cues ♪ y el proyecto no tiene escala, se usa Mayor y el cuadro lo avisa al exportar.
+  - **Interfaz simulada:** «Probar en vivo» (y el `ejemplo.html` del .zip) arma una interfaz de mentira con botón, mantener presionado, interruptor, slider (el tono sigue al valor), campo de texto, pestañas, paneles, lista, avisos, cargando y un teclado por grados, usando los cues que existan. Sirve para sentir el banco como lo sentiría un usuario.
+  - **Temas:** el manifiesto ya guarda los cues dentro de un tema (`default`) y el runtime ya tiene `ui.theme()` / `ui.themes()`; el estudio todavía no crea más de un tema.
+
 - **Apariencia y rendimiento (⚙):** dos temas, **Cristal** (por defecto, con transparencias y desenfoque) y **Clásico**, con interruptores para el desenfoque, el fondo animado y las animaciones. Si el equipo va lento, el estudio lo avisa y propone apagarlos.
 
 - **Pantalla completa:** toca el logo «dk» de la cabecera. El fondo (aurora y partículas) se queda quieto cuando no hay actividad y despierta con un toque, una tecla o Play.

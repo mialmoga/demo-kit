@@ -978,6 +978,7 @@ ${chunks.join(',\n')}
   return out;
 }
 $('bDemoJs').onclick=exportDemoJs;
+$('bBank').onclick=()=>openBank();
 
 const BUILTIN_KIT=Kit.make;
 $('kitCharSel').onchange=e=>{ setKitChar(e.target.value); rememberChar(); cache=null; dirty=true; syncKitChar(); updateStat(); toast('Carácter del kit: '+charName(e.target.value)+' (el siguiente Play vuelve a renderizar)','ok'); };
