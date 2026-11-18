@@ -823,3 +823,18 @@ Demo Kit es de Brujo, hecho con la ayuda de varias IAs. **Ámbar** es Claude Son
 |---|---|
 | `project_examples/` (los ejemplos oficiales: demos convertidas a proyecto y rolas hechas en el estudio, como *Marea de ceniza*, *Sueños sin dientes* y *La rotita*) | Ámbar |
 | `projects/` (proyectos que no son oficiales o no son de Ámbar; sirve de carpeta de prueba para quien clone el repo): una pieza de Brujo y `Nexo_Latente.demokit.json` | Brujo y Éter |
+
+
+## Espacio 3D (audífonos)
+
+Efecto por pista (entre compresor y delay). Toma la pista en mono y coloca la fuente en un espacio 3D alrededor de una cabeza: diferencia de tiempo entre oídos, sombra de la cabeza, distancia, atrás/adelante y arriba/abajo. Funciona bien solo con audífonos.
+
+- Dos vistas (desde arriba y de lado): arrastra el centro de la órbita; el punto naranja es la fuente.
+- Movimiento: radio, giro en vueltas por compás (negativo = al revés, sincronizado al tempo), inclinación del plano, fase inicial. Radio 0 = fuente quieta; en el centro de la cabeza suena "dentro".
+- Presets: quieto, dentro de la cabeza, giros, de oreja a oreja, rodear una oreja.
+- Automatizable en carriles: `fx:sp.r/cx/cy/cz/rot/mix`.
+- Límites: modelo de cabeza genérico (no HRTF personal); adelante/atrás y elevación son señales más débiles; al sumar a mono se pierde el efecto.
+
+### Espacio 3D · repartir voces
+
+Con **Voces** mayor que 1, la pista se renderiza en varias voces y cada una gira en su propio lugar de la órbita (desfasada 360°/voces). **Reparto**: «por altura en cada acorde» (la nota más grave va a la voz 1, etc.) o «alternando nota a nota». **Separación** (también automatizable, carril «separación de voces»): 1 = repartidas parejo, 0 = todas juntas en el mismo punto; automatizarla de 1 a 0 hace que las notas de un acorde rueden hasta sincronizarse. Notas: cada voz usa su propia pasada del instrumento, así que con separación 0 suena equivalente pero no idéntico a una sola voz (el azar interno del instrumento difiere); la escucha previa de la pista usa una sola voz, el render completo sí reparte.

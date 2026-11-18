@@ -543,6 +543,38 @@ const FX_PRESETS={
   'Pegamento suave':{eq:null,comp:{thr:-14,ratio:2,atk:30,rel:200,knee:8,makeup:1.5,mix:1}},
   'Brillo':{eq:{low:0,mid:1.5,midF:5000,midQ:1,high:4},comp:null}};
 function updateGR(){ const e=$('compGR'), tr=P.tracks[sel]; if(!e||!tr) return; const c=stemCache.get(tr.id), on=compOn(fxOf(tr).comp); e.textContent=!on?'':(c&&c.gr!=null&&c.fxKey)?('Reducción máxima: '+fmtNum(+c.gr.toFixed(1))+' dB'):'Reducción máxima: se muestra tras renderizar'; }
+
+// ── Espacio 3D: vista desde arriba (x derecha, z adelante) y de lado (z adelante, y arriba); arrastra el centro de la órbita con el dedo o el ratón
+const SP_PRESETS={'Quieto al frente':{cx:0,cy:0,cz:2,r:0,rot:0,incl:0,paz:0,ph:0},'Dentro de la cabeza':{cx:0,cy:0,cz:0,r:0,rot:0,incl:0,paz:0,ph:0},
+  'Giro horizontal (1 vuelta por compás)':{cx:0,cy:0,cz:0,r:2.2,rot:1,incl:0,paz:0,ph:0},'Giro lento (1 vuelta cada 4 compases)':{cx:0,cy:0,cz:0,r:2.2,rot:.25,incl:0,paz:0,ph:0},'Giro rápido (4 vueltas por compás)':{cx:0,cy:0,cz:0,r:2.2,rot:4,incl:0,paz:0,ph:0},
+  'Giro al revés':{cx:0,cy:0,cz:0,r:2.2,rot:-1,incl:0,paz:0,ph:0},'De oreja a oreja, por arriba':{cx:0,cy:0,cz:0,r:2.2,rot:1,incl:90,paz:0,ph:90},'De frente a atrás, por arriba':{cx:0,cy:0,cz:0,r:2.2,rot:1,incl:90,paz:90,ph:0},
+  'Rodear la oreja derecha':{cx:1,cy:0,cz:0,r:1.7,rot:1.5,incl:90,paz:90,ph:0},'Rodear la oreja izquierda':{cx:-1,cy:0,cz:0,r:1.7,rot:-1.5,incl:90,paz:90,ph:0}};
+function spaceWidget(tr){
+  const W=210,H=150,SC=2,RG=6, sp=()=>fxOf(tr).sp, box=el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;margin:4px 0'});
+  const mk=t=>el('canvas',{width:W*SC,height:H*SC,title:t,style:'width:'+W+'px;height:'+H+'px;touch-action:none;border-radius:8px;background:rgba(128,128,160,.12);cursor:crosshair'});
+  const cT=mk('Vista desde arriba (arriba = adelante). Arrastra para mover el centro de la órbita.'), cS=mk('Vista de lado (derecha = adelante). Arrastra para mover el centro de la órbita.'); box.append(cT,cS);
+  const orb=(q,ph)=>{ const inc=q.incl*Math.PI/180, paz=q.paz*Math.PI/180, nx=Math.sin(inc)*Math.sin(paz), ny=Math.cos(inc), nz=Math.sin(inc)*Math.cos(paz);
+    let ux=-nz*nx, uy=-nz*ny, uz=1-nz*nz, ul=Math.hypot(ux,uy,uz); if(ul<1e-3){ ux=1-nx*nx; uy=-nx*ny; uz=-nx*nz; ul=Math.hypot(ux,uy,uz); } ux/=ul; uy/=ul; uz/=ul;
+    const vx=ny*uz-nz*uy, vy=nz*ux-nx*uz, vz=nx*uy-ny*ux, c=Math.cos(ph), sn=Math.sin(ph);
+    return [q.cx+q.r*(c*ux+sn*vx), q.cy+q.r*(c*uy+sn*vy), q.cz+q.r*(c*uz+sn*vz)]; };
+  function draw(){ const q=sp(), t=performance.now()/1000, bar=4*60/P.bpm, ph=q.ph*Math.PI/180+(q.rot?Math.PI*2*q.rot*(t/bar):0);
+    for(const [cv,view] of [[cT,'top'],[cS,'side']]){ const g=cv.getContext('2d'), w=cv.width, h=cv.height, u=w/(2*RG), col=getComputedStyle(cv).color||'#ccd';
+      const px=(a,b)=>[w/2+a*u, h/2-b*u*(w/h>1?1:1)]; g.clearRect(0,0,w,h); g.lineWidth=2; g.strokeStyle=col; g.fillStyle=col;
+      g.globalAlpha=.18; for(let r=2;r<=RG;r+=2){ g.beginPath(); g.arc(w/2,h/2,r*u,0,7); g.stroke(); } g.beginPath(); g.moveTo(0,h/2); g.lineTo(w,h/2); g.moveTo(w/2,0); g.lineTo(w/2,h); g.stroke();
+      g.globalAlpha=.9; g.beginPath(); g.arc(w/2,h/2,u,0,7); g.stroke();                                   // cabeza (radio 1)
+      if(view==='top'){ g.beginPath(); g.moveTo(w/2-.28*u,h/2-.97*u); g.lineTo(w/2,h/2-1.35*u); g.lineTo(w/2+.28*u,h/2-.97*u); g.stroke(); g.fillRect(w/2-1.12*u,h/2-.3*u,.14*u,.6*u); g.fillRect(w/2+.98*u,h/2-.3*u,.14*u,.6*u); }
+      else { g.beginPath(); g.moveTo(w/2+.97*u,h/2-.28*u); g.lineTo(w/2+1.35*u,h/2); g.lineTo(w/2+.97*u,h/2+.28*u); g.stroke(); g.fillRect(w/2-.1*u,h/2-.3*u,.2*u,.6*u); }
+      const proj=(x,y,z)=>view==='top'?[w/2+x*u,h/2-z*u]:[w/2+z*u,h/2-y*u];
+      if(q.r>0.01){ g.globalAlpha=.55; g.beginPath(); for(let k=0;k<=72;k++){ const o=orb(q,k/72*Math.PI*2), [a,b]=proj(...o); k?g.lineTo(a,b):g.moveTo(a,b); } g.stroke(); }
+      const [ca,cb]=proj(q.cx,q.cy,q.cz); g.globalAlpha=.9; g.beginPath(); g.moveTo(ca-7,cb); g.lineTo(ca+7,cb); g.moveTo(ca,cb-7); g.lineTo(ca,cb+7); g.stroke();   // centro (arrastrable)
+      const o=orb(q,ph), [sa,sb]=proj(...o); g.fillStyle='#ff9b3d'; g.globalAlpha=1; g.beginPath(); g.arc(sa,sb,6,0,7); g.fill(); g.fillStyle=col; g.globalAlpha=.7; g.font='20px system-ui'; g.fillText(view==='top'?'arriba = adelante':'→ adelante',10,24); } }
+  const drag=(cv,view)=>{ const set=e=>{ const r=cv.getBoundingClientRect(), a=clamp(((e.clientX-r.left)/r.width*2-1)*RG,-RG,RG), b=clamp((1-(e.clientY-r.top)/r.height*2)*RG,-RG,RG), rd=v=>Math.round(v*10)/10;
+      if(view==='top'){ setFx(tr,'sp','cx',rd(a)); setFx(tr,'sp','cz',rd(b)); } else { setFx(tr,'sp','cz',rd(a)); setFx(tr,'sp','cy',rd(b)); } draw(); };
+    let on=false; cv.addEventListener('pointerdown',e=>{ on=true; cv.setPointerCapture(e.pointerId); set(e); }); cv.addEventListener('pointermove',e=>{ if(on) set(e); });
+    cv.addEventListener('pointerup',()=>{ if(!on) return; on=false; renderInspector(); previewTrack(); }); };
+  drag(cT,'top'); drag(cS,'side');
+  const loop=()=>{ if(!cT.isConnected) return; if(sp().rot||(sp().on&&0)) draw(); requestAnimationFrame(loop); };
+  draw(); setTimeout(()=>requestAnimationFrame(loop),0); box.redraw=draw; return box; }
 function fxBlock(tr){
   const T=[['1/16',.25],['1/8',.5],['1/8 punteado',.75],['1/4',1],['1/4 punteado',1.5],['1/2',2]];
   const group=(g,title,...rows)=>el('div',{class:'fxg'},
@@ -552,12 +584,22 @@ function fxBlock(tr){
   const cur=fxOf(tr).delay.time, ts=el('select',{onchange:e=>{ setFx(tr,'delay','time',+e.target.value); previewTrack(); }},...T.map(([n,v])=>el('option',{value:v,text:n}))); ts.value=(T.find(x=>Math.abs(x[1]-cur)<1e-6)||T[2])[1];
   const fmtDb=v=>(v>0?'+':'')+fmtNum(v)+' dB', fmtHz=v=>v>=1000?fmtNum(+(v/1000).toFixed(2))+' kHz':Math.round(v)+' Hz', fmtMs=v=>fmtNum(v)+' ms';
   const ps=el('select',{onchange:e=>{ const p=FX_PRESETS[e.target.value]; if(!p) return; pushUndo(); tr.fx=tr.fx||{}; for(const g of ['eq','comp']){ if(p[g]) tr.fx[g]=Object.assign({},FX_DEF[g],p[g],{on:true}); else if(tr.fx[g]) tr.fx[g]=Object.assign({},tr.fx[g],{on:false}); } touch(); renderInspector(); previewTrack(); }},el('option',{value:'',text:'Elegir…'}),...Object.keys(FX_PRESETS).map(k=>el('option',{value:k,text:k})));
+  const spW=spaceWidget(tr), ss=(k,label,min,max,step,fmt)=>sliderRow(label,()=>fxOf(tr).sp[k],v=>{ setFx(tr,'sp',k,v); spW.redraw(); },min,max,step,FX_DEF.sp[k],fmt);
+  const spPre=el('select',{onchange:e=>{ const q=SP_PRESETS[e.target.value]; if(!q) return; pushUndo(); tr.fx=tr.fx||{}; tr.fx.sp=Object.assign({},FX_DEF.sp,tr.fx.sp,q,{on:true}); touch(); renderInspector(); previewTrack(); }},el('option',{value:'',text:'— elegir —'}),...Object.keys(SP_PRESETS).map(n=>el('option',{value:n,text:n})));
   const box=sec('Mezcla y efectos de la pista',
-    el('p',{class:'desc',text:'Se aplican al audio de esta pista ya renderizado (Potencia → EQ → compresor → delay → reverb): cambiarlos no vuelve a renderizar el instrumento. También salen en los stems.'}),
+    el('p',{class:'desc',text:'Se aplican al audio de esta pista ya renderizado (Potencia → EQ → compresor → espacio 3D → delay → reverb): cambiarlos no vuelve a renderizar el instrumento. También salen en los stems.'}),
     el('div',{class:'row'},el('label',{text:'Preajuste'}),ps),
     group('pw','Potencia',sl('pw','sub','Graves profundos (80 Hz)',0,9,.5,fmtDb),sl('pw','body','Cuerpo (300 Hz)',0,12,.5,fmtDb),sl('pw','drive','Saturación',0,1,.01),sl('pw','dark','Recorte de agudos',0,1,.01),sl('pw','glue','Compresión «pegamento»',0,1,.01)),
     group('eq','EQ',sl('eq','low','Graves (120 Hz)',-12,12,.5,fmtDb),sl('eq','mid','Medios',-12,12,.5,fmtDb),sl('eq','midF','Frec. medios',200,5000,10,fmtHz),sl('eq','midQ','Q de medios',.3,6,.05),sl('eq','high','Agudos (7 kHz)',-12,12,.5,fmtDb)),
     group('comp','Compresor',sl('comp','thr','Umbral',-48,0,.5,fmtDb),sl('comp','ratio','Razón',1,20,.1,v=>fmtNum(v)+':1'),sl('comp','atk','Ataque',.5,100,.5,fmtMs),sl('comp','rel','Liberación',10,800,5,fmtMs),sl('comp','knee','Codo',0,24,.5,fmtDb),sl('comp','makeup','Compensación',0,24,.5,fmtDb),sl('comp','mix','Mezcla (paralelo)',0,1,.01),el('div',{class:'hint',id:'compGR'})),
+    group('sp','Espacio 3D (audífonos)',el('p',{class:'desc',text:'Una fuente que se mueve alrededor de tu cabeza: solo funciona bien con audífonos. Toma la pista en mono y la coloca en el espacio. Arrastra el centro de la órbita en cualquiera de las dos vistas.'}),
+      el('div',{class:'row'},el('label',{text:'Movimiento'}),spPre),spW,
+      ss('cx','Izquierda ← → derecha',-6,6,.1,v=>fmtNum(v)+' r'),ss('cy','Abajo ↓ ↑ arriba',-6,6,.1,v=>fmtNum(v)+' r'),ss('cz','Atrás ← → adelante',-6,6,.1,v=>fmtNum(v)+' r'),
+      ss('r','Radio de la órbita',0,6,.1,v=>fmtNum(v)+' r'),ss('rot','Giro (vueltas por compás; − = al revés)',-8,8,.05,v=>fmtNum(v)),ss('ph','Fase inicial',0,360,1,v=>Math.round(v)+'°'),
+      ss('incl','Inclinación del plano (0 = horizontal, 90 = vertical)',0,90,1,v=>Math.round(v)+'°'),ss('paz','Hacia dónde se inclina (0 = frente–atrás, 90 = ladeado)',-180,180,1,v=>Math.round(v)+'°'),el('p',{class:'desc',text:'Repartir voces: cada nota de un acorde se separa y gira en su propio lugar de la órbita. «Separación» 1 = repartidas parejo, 0 = todas juntas en el mismo punto (automatiza el carril «separación de voces» para que se abran y se junten).'}),
+      ss('vox','Voces (1 = sin repartir)',1,8,1,v=>Math.round(v)+''),el('div',{class:'row'},el('label',{text:'Reparto'}),el('select',{onchange:e=>{ setFx(tr,'sp','vmode',+e.target.value); previewTrack(); }},el('option',{value:'0',text:'Por altura en cada acorde',selected:!fxOf(tr).sp.vmode}),el('option',{value:'1',text:'Alternando nota a nota',selected:fxOf(tr).sp.vmode===1}))),
+      ss('spread','Separación de las voces',0,1,.01),
+      ss('mix','Mezcla',0,1,.01)),
     group('delay','Delay',el('div',{class:'row'},el('label',{text:'Tiempo'}),ts),sl('delay','fb','Repeticiones',0,.92,.01),sl('delay','tone','Tono (Hz)',500,12000,50),sl('delay','mix','Mezcla',0,1,.01),
       el('label',{class:'chk',style:'margin:4px 0'},el('input',{type:'checkbox',checked:fxOf(tr).delay.pp,onchange:e=>{ setFx(tr,'delay','pp',e.target.checked); previewTrack(); }}),' ping-pong (rebota entre izquierda y derecha)')),
     group('reverb','Reverb',sl('reverb','size','Tamaño',0,1,.01),sl('reverb','damp','Amortiguación',0,1,.01),sl('reverb','mix','Mezcla',0,1,.01),sl('reverb','pre','Pre-delay (ms)',0,80,1)));
@@ -739,7 +781,7 @@ function drawAuto(ph){
     if(k.slice(0,2)==='p:'){ const LV=tr.alv===16?16:8, dd=paramDef(INSTRUMENTS[tr.inst],k.slice(2)); if(dd){ g.strokeStyle='#e8eaf0'; for(const n of tr.notes){ const x=KW+n.b*BW-sx; if(x<KW-6||x>W) continue; const y=autoY(k,stepVal(dd,autoValue(pts,n.b),LV),H); g.beginPath(); g.arc(x,y,3,0,7); g.stroke(); } } }
     if(autoDrag){ const p=autoDrag.p,x=KW+p.b*BW-sx,y=autoY(k,p.v,H); g.fillStyle='#e8eaf0'; g.font='11px system-ui'; g.fillText(autoFmt(k,p.v),Math.min(x+8,W-70),Math.max(12,y-8)); } }
   else { g.fillStyle='#6b7388'; g.font='12px system-ui'; g.fillText('Sin curva: el parámetro queda fijo. Haz clic para poner el primer punto.',KW+12,H/2); }
-  if(k.slice(0,3)==='fx:'&&tr&&!fxOf(tr)[FX_LANES[k].g].on){ g.fillStyle='#ffb86b'; g.font='11px system-ui'; g.textAlign='right'; g.fillText('«'+({eq:'EQ',comp:'Compresor',delay:'Delay',reverb:'Reverb'})[FX_LANES[k].g]+'» está apagado: enciéndelo en el panel de la pista para que la curva actúe',W-8,14); g.textAlign='left'; }
+  if(k.slice(0,3)==='fx:'&&tr&&!fxOf(tr)[FX_LANES[k].g].on){ g.fillStyle='#ffb86b'; g.font='11px system-ui'; g.textAlign='right'; g.fillText('«'+({eq:'EQ',comp:'Compresor',delay:'Delay',reverb:'Reverb',sp:'Espacio 3D'})[FX_LANES[k].g]+'» está apagado: enciéndelo en el panel de la pista para que la curva actúe',W-8,14); g.textAlign='left'; }
   g.restore();
   const cx=KW+cursorBeat*BW-sx; if(cx>=KW){ g.strokeStyle='#8fa8ff'; g.setLineDash([4,4]); g.beginPath(); g.moveTo(cx+.5,0); g.lineTo(cx+.5,H); g.stroke(); g.setLineDash([]); }
   if(ph!=null){ const x=KW+ph*BW-sx; if(x>=KW){ g.fillStyle='#ff7ab8'; g.fillRect(x-1,0,2,H); } }
