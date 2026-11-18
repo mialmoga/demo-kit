@@ -165,7 +165,7 @@ const cmpVer=(a,b)=>a[0]-b[0]||a[1]-b[1];
 const verStr=a=>a[0]+'.'+a[1];
 function codeVersion(code){ const m=/version\s*:\s*['"]([\d.]+)['"]/.exec(code||''); return parseVer(m&&m[1]); }   // leída del texto, sin ejecutar nada
 // Los plugins temporales (de un proyecto) viven solo mientras ese proyecto está abierto: no se guardan en el navegador y, si pisan a uno instalado, lo guardan en «shadow» para devolverlo.
-function persistPlugins(){ try{ if(typeof localStorage!=='undefined') localStorage.setItem('demokit-studio-plugins',JSON.stringify(USER_PLUGINS.map(u=>u.temp?u.shadow:u).filter(Boolean).map(u=>({id:u.id,name:u.name,code:u.code})))); }catch(e){} }
+function persistPlugins(){ if(typeof DK_NO_PERSIST!=='undefined') return; try{ if(typeof localStorage!=='undefined') localStorage.setItem('demokit-studio-plugins',JSON.stringify(USER_PLUGINS.map(u=>u.temp?u.shadow:u).filter(Boolean).map(u=>({id:u.id,name:u.name,code:u.code})))); }catch(e){} }
 function installPlugin(code,opts){
   const def=evalPlugin(code); registerInstrument(def,{user:true});
   const rec={id:def.id,name:def.name,code,version:verStr(parseVer(def.version))}; const i=USER_PLUGINS.findIndex(u=>u.id===def.id), prev=i>=0?USER_PLUGINS[i]:null;
@@ -219,12 +219,39 @@ function bankCues(P){ const mm=meter(P), tm=tmap(P), L=markPts(P).filter(m=>m.ba
 function cueProject(P,q,variant){
   const mm=meter(P), tm=tmap(P), solo=P.tracks.some(t=>t.solo), b0=q.b0, b1=q.b1, E=1e-9;
   const Q={name:(P.name||'banco')+'·'+q.c.id,bpm:Math.round(tm.bpmAt(b0)*1000)/1000||P.bpm,bars:Math.max(1,q.bar1-q.bar0),sig:mm.sigAtBar(q.bar0).slice(),seed:(((P.seed||KIT_SEED)+(variant|0)*7919)>>>0)||1,
-    sc:P.sc,master:P.master,clips:P.clips,key:P.key,tracks:[]};
+    sc:P.sc,master:P.master,clips:Object.assign({},P.clips),key:P.key,tracks:[]};
   for(const tr of P.tracks){ if(tr.mute||(solo&&!tr.solo)) continue; const notes=[]; for(const n of tr.notes) if(n.b>=b0-E&&n.b<b1-E) notes.push(Object.assign({},n,{b:n.b-b0})); if(!notes.length) continue;
     const t=Object.assign({},tr,{notes}); if(tr.auto){ const a={}; for(const k in tr.auto){ const pts=tr.auto[k].slice().sort((x,y)=>x.b-y.b), o=[]; let prev=null; for(const p of pts){ if(p.b<b0-E) prev=p; else if(p.b<b1+E) o.push({b:p.b-b0,v:p.v}); }
         if(prev&&(!o.length||o[0].b>E)) o.unshift({b:0,v:prev.v}); if(o.length) a[k]=o; } t.auto=a; }
     Q.tracks.push(t); }
   return Q; }
+
+// ── armado de un cue (lo usan el estudio y el banco «en vivo»: mismo código → mismo sonido)
+function foldLoop(L,R,n){ const N=L.length; if(N<=n) return [L,R]; const a=new Float32Array(n), b=new Float32Array(n); a.set(L.subarray(0,n)); b.set(R.subarray(0,n)); for(let i=n;i<N;i++){ const j=(i-n)%n; a[j]+=L[i]; b[j]+=R[i]; } return [a,b]; }
+function bankEdge(L,R,thr,last){ if(last){ for(let i=L.length-1;i>=0;i--) if(Math.abs(L[i])>thr||Math.abs(R[i])>thr) return i; return -1; } for(let i=0;i<L.length;i++) if(Math.abs(L[i])>thr||Math.abs(R[i])>thr) return i; return -1; }
+const bankFade=(x,i0,i1,up)=>{ const n=Math.max(1,i1-i0); for(let i=i0;i<i1&&i<x.length;i++){ const w=(i-i0)/n; x[i]*=up?w:1-w; } };
+// corta y prepara el audio crudo de un cue según su tipo; devuelve {L,R,h?} con h = largo del cuerpo (gate) en segundos
+function bankShape(q,L,R,sr){ const c=q.c; let a,b,h=0;
+  if(c.type==='loop'){ const n=Math.max(1,Math.round(q.sec*sr)); [a,b]=foldLoop(L,R,n); if(a.length<n){ const A=new Float32Array(n),B=new Float32Array(n); A.set(a); B.set(b); a=A; b=B; } return {L:a,R:b}; }
+  if(c.type==='gate'){ const xf=Math.round(.02*sr), r=Math.min(L.length-1,Math.round((c.rel>0?c.rel:q.sec)*sr)), s=Math.max(xf+1,Math.round(Math.max(c.att,.04)*sr)), end=bankEdge(L,R,3e-4,true);
+    const hn=Math.max(s+xf+2,r), tl=Math.min(L.length,Math.max(hn+1,end+Math.round(.002*sr)))-hn, A=Float32Array.from(L.subarray(0,hn+tl)), B=Float32Array.from(R.subarray(0,hn+tl));
+    if(hn-s>xf*2) for(let i=0;i<xf;i++){ const w=i/xf, co=Math.cos(w*Math.PI/2), si=Math.sin(w*Math.PI/2), j=hn-xf+i; A[j]=L[j]*co+L[s-xf+i]*si; B[j]=R[j]*co+R[s-xf+i]*si; }
+    bankFade(A,hn+tl-Math.round(.003*sr),hn+tl,false); bankFade(B,hn+tl-Math.round(.003*sr),hn+tl,false); return {L:A,R:B,h:hn/sr,a:s/sr}; }
+  const i0=Math.max(0,bankEdge(L,R,1e-3,false)-Math.round(.0005*sr)), i1=bankEdge(L,R,3e-4,true);
+  if(i1<0) return {L:new Float32Array(1),R:new Float32Array(1)};
+  a=Float32Array.from(L.subarray(i0,i1+Math.round(.004*sr))); b=Float32Array.from(R.subarray(i0,i1+Math.round(.004*sr)));
+  bankFade(a,0,Math.round(.0003*sr),true); bankFade(b,0,Math.round(.0003*sr),true); bankFade(a,a.length-Math.round(.003*sr),a.length,false); bankFade(b,b.length-Math.round(.003*sr),b.length,false); return {L:a,R:b}; }
+// renderiza un cue (una toma) a la frecuencia de salida; el proyecto principal conserva su caché de stems
+// render crudo de un cue ya extraído (Q = cueProject): estéreo a la frecuencia sr (si sr<44100 se renderiza a 44100 y se decima)
+async function cueRenderRaw(Q,tail,sr){ const t0=TAIL,s0=SR,o0=OSF,h0=HQ,RS=sr<44100?44100:sr; TAIL=tail; SR=RS; OSF=1; HQ=false;
+  try{ const o=await renderProject(Q,null); let L=o.L,R=o.R; if(RS!==sr){ L=await decimatePow2(L,sr,RS/sr); R=await decimatePow2(R,sr,RS/sr); } return {L,R}; }
+  finally{ TAIL=t0; SR=s0; OSF=o0; HQ=h0; } }
+// cue terminado: render → recorte / bucle / gate → ganancia (ya calculada en el estudio) → mono. cq={type,att,rel,tail}
+async function cueFinal(Q,cq,sec,sr,gdb,mono){ const raw=await cueRenderRaw(Q,cq.tail==null?(cq.type==='loop'?0:1.5):cq.tail,sr), sh=bankShape({c:cq,sec},raw.L,raw.R,sr);
+  const g=Math.pow(10,gdb/20); let L=new Float32Array(sh.L.length), R=new Float32Array(sh.R.length), pk=0; for(let i=0;i<L.length;i++){ L[i]=sh.L[i]*g; R[i]=sh.R[i]*g; const a=Math.abs(L[i]),b=Math.abs(R[i]); if(a>pk) pk=a; if(b>pk) pk=b; }
+  if(pk>.995){ const f=.995/pk; for(let i=0;i<L.length;i++){ L[i]*=f; R[i]*=f; } }
+  if(mono){ const m=new Float32Array(L.length); for(let i=0;i<m.length;i++) m[i]=(L[i]+R[i])/2; L=R=m; }
+  return {L,R,len:L.length,h:sh.h||0,a:sh.a||0}; }
 const SIGS=[[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[3,8],[5,8],[6,8],[7,8],[9,8],[12,8]];
 // ── progresión de acordes del proyecto: P.prog = {text}. Texto tipo «Am7 | Dm7 G7 | Cmaj7 %»; «|» separa compases, varios acordes en un compás lo reparten por igual,
 // «%» solo en un compás (o un compás vacío) repite el compás anterior; «%» o «.» junto a otros acordes sostienen el anterior. La progresión se repite si el proyecto es más largo.

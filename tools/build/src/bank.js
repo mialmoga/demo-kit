@@ -8,7 +8,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 // ───────────── 1) runtime (lo que corre en la interfaz / el juego) ─────────────
-function makeDKUI(M,EMBED,SRC){
+function makeDKUI(M,EMBED,SRC,ENG){
   const AC=typeof AudioContext!=='undefined'?AudioContext:(typeof webkitAudioContext!=='undefined'?webkitAudioContext:null);
   const R=()=>Math.random()*2-1, DKEV=['hover','leave','down','up','click','focus'];
   function load(opts){
@@ -19,9 +19,31 @@ function makeDKUI(M,EMBED,SRC){
       if(!out){ out=ctx.createGain(); out.gain.value=muted?0:vol; out.connect(O.destination||ctx.destination); } return ctx; };
     const unlock=()=>{ try{ const c=getCtx(); return c.state==='suspended'?c.resume():Promise.resolve(); }catch(e){ return Promise.resolve(); } };
     const dec=ab=>new Promise((res,rej)=>{ const p=getCtx().decodeAudioData(ab,res,rej); if(p&&p.catch) p.catch(rej); });
+    // ── modo en vivo: el motor (en un Worker) renderiza los cues en este dispositivo, por prioridad ──
+    let lw=null, lapi=null, lrid=0, lpend=new Map(), jobs=[], running=false, done=0, total=0, rerolls={}, liveErr=null;
+    const lcall=(msg)=>new Promise((res,rej)=>{ const id=++lrid; lpend.set(id,{res,rej}); lw.postMessage(Object.assign({rid:id},msg)); });
+    async function lstart(){
+      try{ if(typeof Worker==='undefined') throw new Error('sin Worker'); lw=new Worker(URL.createObjectURL(new Blob([ENG],{type:'text/javascript'})));
+        lw.onmessage=e=>{ const d=e.data, p=lpend.get(d.id); if(!p) return; lpend.delete(d.id); if(d.op==='e') p.rej(new Error(d.err)); else p.res(d.r||true); };
+        lw.onerror=e=>{ for(const p of lpend.values()) p.rej(new Error('Worker: '+(e&&e.message||'error'))); lpend.clear(); };
+        await Promise.race([lcall({op:'init',plugins:M.plugins||[],clips:M.clips||{}}),new Promise((_,rej)=>setTimeout(()=>rej(new Error('el Worker no respondió')),15000))]);
+      }catch(err){ try{ lw&&lw.terminate(); }catch(e){} lw=null; lapi=new Function(ENG+'\nreturn globalThis.__dkLive;')(); await lapi.init(M.plugins||[],M.clips||{}); } }
+    const lrender=(msg)=>lw?lcall(Object.assign({op:'render'},msg)):lapi.render(msg);
+    function lmk(c,r){ const x=getCtx(), ch=M.ch||2, b=x.createBuffer(ch,Math.max(1,r.len),M.sr); b.copyToChannel(r.L,0); if(ch>1) b.copyToChannel(r.R,1); return {b,s:0,l:r.len/M.sr,h:r.h||0}; }
+    async function lrun(){ const th=T(), order=(M.order||Object.keys(th.cues)).filter(n=>th.cues[n]); total=0; done=0;
+      jobs=[]; for(const n of order) jobs.push({n,v:0,first:true}); for(const n of order){ const k=th.cues[n].L.n; for(let v=1;v<k;v++) jobs.push({n,v}); } total=jobs.length;
+      await lstart(); ok=true; let firstLeft=order.length; const fin=new Promise(res=>{ if(!firstLeft) res(); lrun.fin=res; });
+      const step=async()=>{ if(running) return; running=true; try{ while(jobs.length){ const j=jobs.shift(), c=th.cues[j.n], sp=c.L;
+          try{ const r=await lrender({id:j.n,q:sp.q,cq:sp.cq,sec:sp.sec,gdb:sp.gdb,variant:j.v,sr:M.sr,mono:(M.ch||2)===1}); const v=lmk(c,r); if(r.a&&c.t==='gate') c.a=r.a;
+            if(j.rr){ if(c.v.length>=6) c.v.splice(1,1); c.v.push(v); } else c.v[j.v]=v; }catch(e){ liveErr=e; console.error('[DKUI] '+j.n,e); }
+          if(j.first){ firstLeft--; if(!firstLeft&&lrun.fin) lrun.fin(); } done++; await new Promise(r=>setTimeout(r,0)); } }finally{ running=false; } };
+      lrun.step=step; step(); await fin; }
+    const prio=n=>{ const i=jobs.findIndex(j=>j.n===n&&j.first); if(i>0){ const [j]=jobs.splice(i,1); jobs.unshift(j); } };
     const ready=(async()=>{
       getCtx();
-      if(EMBED){ const bin=atob(EMBED), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+      if(M.live){ await lrun(); }
+      else if(EMBED){
+ const bin=atob(EMBED), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
         const buf=await dec(u.buffer); for(const t in M.themes) for(const id in M.themes[t].cues) for(const v of M.themes[t].cues[id].v){ v.b=buf; v.s=v.o||0; } }
       else { const base=O.base!=null?O.base:((SRC||'').replace(/[^\/]*$/,'')+(M.dir||'audio')+'/'), seen={};
         const get=f=>seen[f]||(seen[f]=fetch(base+f).then(r=>{ if(!r.ok) throw new Error('No pude cargar '+base+f+' ('+r.status+')'); return r.arrayBuffer(); }).then(dec));
@@ -30,7 +52,7 @@ function makeDKUI(M,EMBED,SRC){
       ok=true; })();
     ready.catch(e=>{ error=e; console.error('[DKUI]',e); });
     if(O.autounlock&&typeof window!=='undefined'){ const f=()=>{ unlock(); for(const t of ['pointerdown','keydown','touchend']) window.removeEventListener(t,f,true); }; for(const t of ['pointerdown','keydown','touchend']) window.addEventListener(t,f,true); }
-    const cue=n=>{ const c=T().cues[n]; return ok&&c?c:null; };
+    const cue=n=>{ const c=T().cues[n]; if(!c) return null; if(M.live){ if(!c.v.length){ prio(n); return null; } return c; } return ok?c:null; };
     const NUL={stop(){},up(){},ended:Promise.resolve(),playing:false};
     const pick=c=>{ const n=c.v.length; if(n===1) return c.v[0]; let i; do{ i=(Math.random()*n)|0; }while(i===c._last); c._last=i; return c.v[i]; };
     let trs=0;
@@ -82,6 +104,7 @@ function makeDKUI(M,EMBED,SRC){
     const ui={name:M.name,ready,get error(){ return error; },get loaded(){ return ok; },get context(){ return ctx; },
       play,loop,down,bind,attach,unlock,has:n=>!!(T().cues[n]),
       cues:()=>Object.keys(T().cues).map(id=>({id,type:T().cues[id].t,variants:T().cues[id].v.length,pitched:!!T().cues[id].p})),
+      progress:()=>M.live&&total?done/total:1, reroll(n){ const c=T().cues[n]; if(!M.live||!c||!c.v.length) return; rerolls[n]=(rerolls[n]||0)+1; total++; jobs.push({n,v:c.L.n+rerolls[n],rr:1}); if(lrun.step) lrun.step(); },
       key:()=>M.key||null, transpose(n){ if(n!==undefined) trs=+n||0; return trs; },
       volume(v){ if(v===undefined) return vol; vol=Math.max(0,v); if(out&&!muted) out.gain.setTargetAtTime(vol,getCtx().currentTime,.01); return vol; },
       mute(b){ muted=b===undefined?!muted:!!b; if(out) out.gain.setTargetAtTime(muted?0:vol,getCtx().currentTime,.01); return muted; },
@@ -120,29 +143,15 @@ function wavPCM(chs,sr){ const n=chs[0].length, c=chs.length, buf=new ArrayBuffe
   ws(0,'RIFF'); v.setUint32(4,36+n*c*2,true); ws(8,'WAVE'); ws(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,c,true); v.setUint32(24,sr,true); v.setUint32(28,sr*c*2,true); v.setUint16(32,c*2,true); v.setUint16(34,16,true); ws(36,'data'); v.setUint32(40,n*c*2,true);
   let o=44; for(let i=0;i<n;i++) for(let k=0;k<c;k++){ const x=chs[k][i], s=x>1?1:x<-1?-1:x; v.setInt16(o,Math.round(s*32767),true); o+=2; } return buf; }
 function bankLoud(L,R,sr){ const a=kWeight(L,sr), b=kWeight(R,sr); let s=0; for(let i=0;i<a.length;i++) s+=a[i]*a[i]+b[i]*b[i]; s/=Math.max(1,a.length); return s>0?-.691+10*Math.log10(s):-Infinity; }
-function bankEdge(L,R,thr,last){ if(last){ for(let i=L.length-1;i>=0;i--) if(Math.abs(L[i])>thr||Math.abs(R[i])>thr) return i; return -1; } for(let i=0;i<L.length;i++) if(Math.abs(L[i])>thr||Math.abs(R[i])>thr) return i; return -1; }
-const bankFade=(x,i0,i1,up)=>{ const n=Math.max(1,i1-i0); for(let i=i0;i<i1&&i<x.length;i++){ const w=(i-i0)/n; x[i]*=up?w:1-w; } };
-// corta y prepara el audio crudo de un cue según su tipo; devuelve {L,R,h?} con h = largo del cuerpo (gate) en segundos
-function bankShape(q,L,R,sr){ const c=q.c; let a,b,h=0;
-  if(c.type==='loop'){ const n=Math.max(1,Math.round(q.sec*sr)); [a,b]=foldLoop(L,R,n); if(a.length<n){ const A=new Float32Array(n),B=new Float32Array(n); A.set(a); B.set(b); a=A; b=B; } return {L:a,R:b}; }
-  if(c.type==='gate'){ const xf=Math.round(.02*sr), r=Math.min(L.length-1,Math.round((c.rel>0?c.rel:q.sec)*sr)), s=Math.max(xf+1,Math.round(Math.max(c.att,.04)*sr)), end=bankEdge(L,R,3e-4,true);
-    const hn=Math.max(s+xf+2,r), tl=Math.min(L.length,Math.max(hn+1,end+Math.round(.002*sr)))-hn, A=Float32Array.from(L.subarray(0,hn+tl)), B=Float32Array.from(R.subarray(0,hn+tl));
-    if(hn-s>xf*2) for(let i=0;i<xf;i++){ const w=i/xf, co=Math.cos(w*Math.PI/2), si=Math.sin(w*Math.PI/2), j=hn-xf+i; A[j]=L[j]*co+L[s-xf+i]*si; B[j]=R[j]*co+R[s-xf+i]*si; }
-    bankFade(A,hn+tl-Math.round(.003*sr),hn+tl,false); bankFade(B,hn+tl-Math.round(.003*sr),hn+tl,false); return {L:A,R:B,h:hn/sr,a:s/sr}; }
-  const i0=Math.max(0,bankEdge(L,R,1e-3,false)-Math.round(.0005*sr)), i1=bankEdge(L,R,3e-4,true);
-  if(i1<0) return {L:new Float32Array(1),R:new Float32Array(1)};
-  a=Float32Array.from(L.subarray(i0,i1+Math.round(.004*sr))); b=Float32Array.from(R.subarray(i0,i1+Math.round(.004*sr)));
-  bankFade(a,0,Math.round(.0003*sr),true); bankFade(b,0,Math.round(.0003*sr),true); bankFade(a,a.length-Math.round(.003*sr),a.length,false); bankFade(b,b.length-Math.round(.003*sr),b.length,false); return {L:a,R:b}; }
 // renderiza un cue (una toma) a la frecuencia de salida; el proyecto principal conserva su caché de stems
 async function bankRenderCue(q,variant,sr){
   const Q=cueProject(P,q,variant); if(!Q.tracks.length) return null;
-  const saved=new Map(stemCache), t0=TAIL, s0=SR, o0=OSF, h0=HQ, RS=sr<44100?44100:sr, was=exportBusy;
-  stemCache.clear(); TAIL=q.c.tail==null?(q.c.type==='loop'?0:1.5):q.c.tail; SR=RS; OSF=1; HQ=false; exportBusy=true;
-  try{ const o=await renderProject(Q,null); let L=o.L, R=o.R; if(RS!==sr){ L=await decimatePow2(L,sr,RS/sr); R=await decimatePow2(R,sr,RS/sr); } return {L,R}; }
-  finally{ TAIL=t0; SR=s0; OSF=o0; HQ=h0; exportBusy=was; stemCache.clear(); for(const [k,v] of saved) stemCache.set(k,v); } }
+  const saved=new Map(stemCache), was=exportBusy; stemCache.clear(); exportBusy=true;
+  try{ return await cueRenderRaw(Q,q.c.tail==null?(q.c.type==='loop'?0:1.5):q.c.tail,sr); }
+  finally{ exportBusy=was; stemCache.clear(); for(const [k,v] of saved) stemCache.set(k,v); } }
 // opts: {sr, mono, level:true}. Devuelve {M (manifiesto), sprite (Float32 canales + offsets), clips:[{id,v,L,R,h}], report}
 async function bankBuild(opts,onProg){
-  const sr=opts.sr||48000, qs=bankCues(P), report=[], themeId=(P.bank&&P.bank.theme)||'default', cues={}, items=[];
+  const sr=opts.sr||48000, qs=bankCues(P), report=[], themeId=(P.bank&&P.bank.theme)||'default', cues={}, items=[]; const plugs={}, clipsU={}, liveInfo={};
   if(!qs.length) throw new Error('No hay secciones: crea marcas en la barra de secciones o usa una plantilla.');
   const dup=qs.find(q=>q.dup); if(dup) throw new Error('Hay dos cues con el mismo nombre «'+dup.c.id+'». Cada sección necesita un nombre distinto.');
   for(let k=0;k<qs.length;k++){ const q=qs[k], raws=[]; if(onProg) onProg(k/qs.length);
@@ -156,6 +165,7 @@ async function bankBuild(opts,onProg){
     if(opts.mono) for(const r of raws){ const m=new Float32Array(r.L.length); for(let i=0;i<m.length;i++) m[i]=(r.L[i]+r.R[i])/2; r.L=m; r.R=m; }
     let tn=0; if(q.c.pit){ if(q.c.tn!=null) tn=q.c.tn; else { const Q0=cueProject(P,q,0); let best=null; for(const tr of Q0.tracks){ const ins=INSTRUMENTS[tr.inst]; if(!ins||ins.kind==='perc') continue; for(const nt of tr.notes) if(!best||nt.b<best.b-1e-9||(Math.abs(nt.b-best.b)<1e-9&&nt.m<best.m)) best=nt; }
         if(best){ const r=KEY().root; tn=((best.m-r)%12+12)%12; if(tn>=6) tn-=12; } } }
+    if(opts.live){ const j=projectToJSON(cueProject(P,q,0),{compact:true}); for(const u of j.plugins||[]) plugs[u.id]=u.code; Object.assign(clipsU,j.clips||{}); delete j.clips; delete j.plugins; liveInfo[q.c.id]={q:JSON.stringify(j),cq:{type:q.c.type,att:q.c.att,rel:q.c.rel,tail:q.c.tail},sec:+q.sec.toFixed(6),gdb:+gdb.toFixed(4),n:raws.length}; }
     const tpAfter=dB(truePeakOf(raws[0].L,raws[0].R)), dur=raws[0].L.length/sr, a=raws[0].a||0;
     const warn=[]; if(q.c.type==='one'&&/^(hover|leave|focus)/.test(q.c.id)&&dur>.4) warn.push('dura '+Math.round(dur*1000)+' ms: un hover largo se siente pesado'); if(q.c.type==='one'&&dur>3) warn.push('dura '+dur.toFixed(1)+' s');
     if(lim) warn.push('el techo de pico impidió llegar a la sonoridad común (queda más bajo que los demás)');
@@ -165,6 +175,8 @@ async function bankBuild(opts,onProg){
   if(!items.length) throw new Error('Ningún cue tiene notas dentro de su sección.');
   let key; if(items.some(it=>cues[it.id].p)){ const k=KEY(), ivs=SCALES[k.scale]||SCALES['Mayor']; key={root:k.root,scale:SCALES[k.scale]?k.scale:'Mayor',ivs}; if(!SCALES[k.scale]) report.push({id:'(tonalidad)',type:'',warn:['el proyecto no tiene escala elegida: usé '+NOTE_NAMES[k.root]+' Mayor para los cues con ♪']}); }
   const ch=opts.mono?1:2, M={format:'demokit-bank',v:1,key,name:P.name||'banco',sr,ch,theme:themeId,themes:{[themeId]:{name:themeId==='default'?'Predeterminado':themeId,cues}},made:'Demo Kit'};
+  if(opts.live){ const rank=n=>{ const L=[...BANK_TEMPLATES.ui.cues,...BANK_TEMPLATES.game.cues].map(c=>cueSlug(c[0])), i=L.indexOf(n); return i<0?999:i; };
+    M.live=true; M.order=Object.keys(cues).sort((a,b)=>rank(a)-rank(b)); M.plugins=Object.values(plugs); M.clips=clipsU; for(const id in cues){ cues[id].L=liveInfo[id]; cues[id].v=[]; } }
   return {M,items,report,sr,ch}; }
 function bankPackSprite(B){ const gap=Math.round(B.sr*BANK_GAP); let n=0; for(const it of B.items) n+=it.L.length+gap;
   const chs=B.ch===1?[new Float32Array(n)]:[new Float32Array(n),new Float32Array(n)]; let o=0; const M=B.M, cues=M.themes[M.theme].cues;
@@ -173,6 +185,33 @@ function bankPackSprite(B){ const gap=Math.round(B.sr*BANK_GAP); let n=0; for(co
 function bankPackFiles(B,dir){ const M=B.M, cues=M.themes[M.theme].cues, files=[]; M.dir=dir;
   for(const it of B.items){ const f=it.id+'_'+(it.i+1)+'.wav', v={f,l:+(it.L.length/B.sr).toFixed(5)}; if(it.h) v.h=+it.h.toFixed(5); cues[it.id].v[it.i]=v; files.push({name:dir+'/'+f,blob:new Blob([wavPCM(B.ch===1?[it.L]:[it.L,it.R],B.sr)],{type:'audio/wav'})}); }
   return {M,files}; }
+// ── banco «en vivo»: lleva el motor + kit + plugins y renderiza los cues en el dispositivo (en un Worker). Este código se incrusta tal cual dentro del motor.
+function dkLiveGlue(){ const projs={}; let clips={};
+  const api={ async init(plugins,cl){ clips=cl||{}; for(const c of plugins||[]){ try{ installPlugin(c); }catch(e){ console.error('[DKUI] plugin',e); } } },
+    async render(m){ let Q=projs[m.id]; if(!Q){ const j=JSON.parse(m.q); j.clips=clips; Q=projs[m.id]=projectFromJSON(j); }
+      const QQ=Object.assign({},Q,{seed:((Q.seed+m.variant*7919)>>>0)||1}); return await cueFinal(QQ,m.cq,m.sec,m.sr,m.gdb,m.mono); } };
+  globalThis.__dkLive=api;
+  if(typeof importScripts==='function') self.onmessage=async e=>{ const d=e.data; try{ if(d.op==='init'){ await api.init(d.plugins,d.clips); self.postMessage({id:d.rid,op:'i'}); } else { const r=await api.render(d); const tr=[r.L.buffer]; if(r.R!==r.L) tr.push(r.R.buffer); self.postMessage({id:d.rid,op:'r',r},tr); } }catch(err){ self.postMessage({id:d.rid,op:'e',err:String(err&&err.message||err)}); } };
+}
+// código del kit de síntesis que está usando el estudio ahora (el incluido o el que cargaste)
+function bankKitSource(){ let src=null; try{ const o=JSON.parse(localStorage.getItem('demokit-kit')||'null'); if(o&&typeof o.src==='string'&&Kit.make!==BUILTIN_KIT) src=o.src; }catch(e){}
+  if(!src){ const MB='//#ENGINE'+'-BEGIN'; for(const sc of document.scripts){ const t=sc.textContent, b=t.indexOf(MB); if(b>0){ const a=t.indexOf('function demoKit('); if(a>=0&&a<b){ src=t.slice(a,b); break; } } } }
+  if(!src) return null; if(Kit.make&&Kit.make.character) src+='\ndemoKit.character='+JSON.stringify(Kit.make.character)+';'; return src; }
+const bankEngineSrc=()=>{ const kit=bankKitSource(), eng=engineSource(); if(!kit||!eng) return null; return 'var DK_NO_PERSIST=true;\n'+kit+'\n'+eng+'\n;('+dkLiveGlue.toString()+')();'; };
+const bankLiveJs=(M,eng)=>`// ── ${M.name} · banco de sonidos EN VIVO de Demo Kit ──
+// Lleva dentro el motor, el kit y los plugins del banco: renderiza los sonidos en el dispositivo (en un Worker), por prioridad, sin archivos de audio.
+// Uso:   const ui = DKUI.load();   ui.play('click');   ui.reroll('click');   // toma nueva en segundo plano   ·   ui.progress() = 0..1
+// Cues: ${M.order.join(', ')}
+(function(g){
+  const SRC=(typeof document!=='undefined'&&document.currentScript&&document.currentScript.src)||'';
+  const MANIFEST=${JSON.stringify(M)};
+  const ENGINE=${JSON.stringify(eng)};
+  ${makeDKUI.toString()}
+  const bank=makeDKUI(MANIFEST,null,SRC,ENGINE), D=g.DKUI=g.DKUI||{banks:{}}; D.banks[bank.name]=bank; if(!D.load) D.load=o=>bank.load(o);
+})(typeof globalThis!=='undefined'?globalThis:window);
+`;
+// los .js exportados salen en ASCII puro (\uXXXX): así funcionan aunque la página que los carga no declare UTF-8
+const bankAscii=t=>t.replace(/[^\x00-\x7f]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));
 const bankJs=(M,embed,tag)=>`// ── ${M.name} · banco de sonidos de Demo Kit (${tag}) ──
 // Uso:   const ui = DKUI.load();   ui.play('click');   ui.bind(boton,{hover:'hover',click:'click'});   ui.attach(document);   // data-snd-click="click"
 // Cues: ${Object.keys(M.themes[M.theme].cues).join(', ')}
@@ -235,7 +274,7 @@ function openBank(){
       el('button',{text:'＋ Plantilla de juego',onclick:()=>{ const n=bankTemplate('game'); toast(n?'Plantilla: '+n+' cues nuevos.':'Ya están todos los cues de la plantilla.','ok'); draw(); }}),
       el('button',{text:'🎮 Probar en vivo',class:'pri',title:'Construye el banco con el mismo runtime que se exporta y te deja tocarlo',onclick:()=>bankTry(live,info)})));
     const live=el('div',{style:'display:flex;flex-wrap:wrap;gap:6px;margin:6px 0'}), info=el('p',{class:'desc'}); body.append(live,info);
-    const o=pf, sm=sel([['embed','Un solo .js con los sonidos dentro'],['folder','Carpeta: .js + audios (.zip)']],o.mode,v=>{ o.mode=v; sv(); }), sr=sel([[48000,'48 kHz'],[44100,'44.1 kHz'],[22050,'22.05 kHz (más ligero)']],o.sr,v=>{ o.sr=+v; sv(); }), sc=sel([['mono','Mono (recomendado)'],['stereo','Estéreo']],o.ch,v=>{ o.ch=v; sv(); }),
+    const o=pf, sm=sel([['embed','Un solo .js con los sonidos dentro'],['folder','Carpeta: .js + audios (.zip)'],['live','En vivo: el .js lleva el motor y renderiza en el dispositivo (muy liviano)']],o.mode,v=>{ o.mode=v; sv(); }), sr=sel([[48000,'48 kHz'],[44100,'44.1 kHz'],[22050,'22.05 kHz (más ligero)']],o.sr,v=>{ o.sr=+v; sv(); }), sc=sel([['mono','Mono (recomendado)'],['stereo','Estéreo']],o.ch,v=>{ o.ch=v; sv(); }),
       lv=el('input',{type:'checkbox',checked:!!o.level,onchange:e=>{ o.level=e.target.checked; sv(); }}); const sv=()=>{ try{ localStorage.setItem(BANK_PREF,JSON.stringify(o)); }catch(e){} };
     const row=(l,x,h)=>el('div',{class:'row',title:h||'',style:'grid-template-columns:150px minmax(0,1fr)'},el('label',{text:l}),x);
     body.append(row('Formato',sm),row('Frecuencia',sr),row('Canales',sc),row('Nivelar sonoridad',el('label',{},lv,' que ningún cue suene más fuerte que otro (techo −1 dBTP)')));
@@ -243,14 +282,15 @@ function openBank(){
   }
   card.append(el('h3',{text:'🔊 Banco de sonidos'}),el('p',{class:'desc',text:'Cada sección del proyecto es un cue con nombre. Compón el sonido dentro de su sección (un compás = un cue en la plantilla; a 240 BPM dura 1 s). Se exporta como librería ui_dk.js lista para cargar en una interfaz o un juego.'}),body); m.append(card); document.body.append(m); draw(); }
 async function bankExport(o,info){ if(rendering||exportBusy) return; rendering=true; stop(); $('stat').textContent='Armando el banco…'; $('stat').className=''; info.textContent='Renderizando cues…'; const t0=performance.now();
-  try{ const B=await bankBuild({sr:o.sr,mono:o.ch==='mono',level:o.level},p=>{ prog(p); }), nm=slug(P.name||'banco').replace(/-/g,'_')+'_dk', rep=B.report;
+  try{ const B=await bankBuild({sr:o.sr,mono:o.ch==='mono',level:o.level,live:o.mode==='live'},p=>{ prog(p); }), nm=slug(P.name||'banco').replace(/-/g,'_')+'_dk', rep=B.report;
     let kb;
-    if(o.mode==='embed'){ const {M,wav}=bankPackSprite(B), js=bankJs(M,u8ToB64(new Uint8Array(wav)),'sonidos incluidos'); kb=js.length/1024; download(new Blob([js],{type:'text/javascript'}),nm+'.js'); }
-    else { const {M,files}=bankPackFiles(B,nm), js=bankJs(M,null,'audios en la carpeta '+nm+'/'); files.unshift({name:nm+'.js',blob:new Blob([js],{type:'text/javascript'})},{name:'ejemplo.html',blob:new Blob([bankExample(M,nm+'.js')],{type:'text/html'})},{name:nm+'.json',blob:new Blob([JSON.stringify(M,null,1)],{type:'application/json'})});
+    if(o.mode==='live'){ const eng=bankEngineSrc(); if(!eng) throw new Error('No pude leer el motor o el kit de esta página para incrustarlos'); const js=bankAscii(bankLiveJs(B.M,eng)); kb=js.length/1024; download(new Blob([js],{type:'text/javascript'}),nm+'_live.js'); }
+    else if(o.mode==='embed'){ const {M,wav}=bankPackSprite(B), js=bankAscii(bankJs(M,u8ToB64(new Uint8Array(wav)),'sonidos incluidos')); kb=js.length/1024; download(new Blob([js],{type:'text/javascript'}),nm+'.js'); }
+    else { const {M,files}=bankPackFiles(B,nm), js=bankAscii(bankJs(M,null,'audios en la carpeta '+nm+'/')); files.unshift({name:nm+'.js',blob:new Blob([js],{type:'text/javascript'})},{name:'ejemplo.html',blob:new Blob([bankExample(M,nm+'.js')],{type:'text/html'})},{name:nm+'.json',blob:new Blob([JSON.stringify(M,null,1)],{type:'application/json'})});
       const zip=await makeZip(files); kb=zip.size/1024; download(zip,nm+'.zip'); }
     const w=rep.filter(r=>r.warn&&r.warn.length||r.empty);
     info.textContent=rep.filter(r=>!r.empty).length+' cues · '+(kb>1024?(kb/1024).toFixed(1)+' MB':kb.toFixed(0)+' KB')+' · '+((performance.now()-t0)/1000).toFixed(1)+' s'+(w.length?' · ⚠ '+w.map(r=>r.id+': '+(r.empty?'sin notas en su sección':r.warn.join('; '))).join(' | '):'');
-    toast('Banco exportado: '+nm+(o.mode==='embed'?'.js':'.zip'),'ok');
+    toast('Banco exportado: '+nm+(o.mode==='live'?'_live.js':o.mode==='embed'?'.js':'.zip'),'ok');
   }catch(e){ console.error(e); info.textContent='Error: '+e.message; toast('Error al exportar el banco: '+e.message,'err'); }
   finally{ prog(0); rendering=false; updateStat(); } }
 // prueba en vivo: arma el banco (sonidos incluidos) y lo carga con el runtime exportable

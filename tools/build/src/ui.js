@@ -957,17 +957,20 @@ function exportDemoJs(){
   if(!P.tracks.some(t=>t.notes.length)){ toast('El proyecto está vacío','err'); return; }
   const words=slug(P.name||'cancion').split('-').filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(''), fn='render'+(/^[A-Za-z]/.test(words)?words:'P'+words);
   const b64=utf8b64(JSON.stringify(projectToJSON(P,{compact:true}))), chunks=[]; for(let i=0;i<b64.length;i+=110) chunks.push('    "'+b64.slice(i,i+110)+'"');
-  const body=eng.replace('const SR=44100,','let SR=44100,');
-  if(body===eng){ toast('No pude preparar el motor (SR)','err'); return; }
+  const kit=bankKitSource(); if(!kit){ toast('No pude leer el kit de síntesis de esta página para incrustarlo','err'); return; }
+  const body=eng;
   const out=`// ── ${P.name||'Canción'} · exportada de Demo Kit ──
 // BPM = ${P.bpm} | BARS = ${P.bars}${P.sig&&barBeats(P)!==4?' | SIG = '+P.sig[0]+'/'+P.sig[1]:''}
-// Demo autónoma: lleva dentro el proyecto editable (__DEMOKIT_PROJECT__) y el motor de Demo Kit,
-// así que suena igual que en el estudio y se puede volver a abrir con «Convertir en editable» sin pérdidas.
-// Solo necesita que la página aporte demoKit (demo_kit.js), como cualquier demo.
+// Demo autónoma: lleva dentro el proyecto editable (__DEMOKIT_PROJECT__), el kit de síntesis, el motor de Demo Kit
+// y los plugins que usa el proyecto: suena igual que en el estudio sin que la página aporte nada
+// y se puede volver a abrir con «Convertir en editable» sin pérdidas.
 async function ${fn}(sr, onProg) {
   const __DEMOKIT_PROJECT__ = [
 ${chunks.join(',\n')}
   ].join('');
+  var DK_NO_PERSIST = true;   // los plugins incrustados no se guardan en el almacenamiento de la página
+  // ═══ kit de síntesis (incrustado) ═══
+${kit}
   // ═══ motor de Demo Kit (incrustado) ═══${body}  // ═══ fin del motor ═══
   SR = sr || 44100;
   const P = projectFromJSON(JSON.parse(decodeURIComponent(escape(atob(__DEMOKIT_PROJECT__)))));
@@ -1497,7 +1500,7 @@ function truePeakOf(L,R){ const C=24,M=4,T=48, h=new Float64Array(T); for(let k=
       for(let p=1;p<M;p++){ let s=0; for(let d=-6;d<=5;d++){ const j=i-d; if(j>=0&&j<n) s+=h[M*d+p+C]*x[j]; } if(Math.abs(s)>pk) pk=Math.abs(s); } } }
   return pk; }
 const dB=v=>v>0?20*Math.log10(v):-Infinity;
-function foldLoop(L,R,n){ const N=L.length; if(N<=n) return [L,R]; const a=new Float32Array(n), b=new Float32Array(n); a.set(L.subarray(0,n)); b.set(R.subarray(0,n)); for(let i=n;i<N;i++){ const j=(i-n)%n; a[j]+=L[i]; b[j]+=R[i]; } return [a,b]; }
+// foldLoop vive ahora en engine.js (lo comparten el estudio y el banco en vivo)
 const gainArr=(x,g)=>{ const y=new Float32Array(x.length); for(let i=0;i<y.length;i++) y[i]=x[i]*g; return y; };
 // loop + volumen sobre un render ya hecho; no modifica L ni R (pueden ser de la caché). loopN = largo del loop en muestras (sin la cola)
 async function expoPost(L,R,o,loopN,stems){ const info={};
