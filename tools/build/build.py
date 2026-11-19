@@ -15,7 +15,7 @@ repo = pathlib.Path(os.environ['DK_REPO']) if os.environ.get('DK_REPO') else her
 repo.mkdir(parents=True, exist_ok=True)
 
 online = ''.join([(d/'head.html').read_text(encoding='utf-8'), (d/'demo_kit.js').read_text(encoding='utf-8'), '\n',
-                  (d/'engine.js').read_text(encoding='utf-8'), '\n', (d/'genres.js').read_text(encoding='utf-8'), '\n', (d/'bank.js').read_text(encoding='utf-8'), '\n',
+                  (d/'engine.js').read_text(encoding='utf-8'), '\n', (d/'genres.js').read_text(encoding='utf-8'), '\n', (d/'bank.js').read_text(encoding='utf-8'), '\n', (d/'gamepad.js').read_text(encoding='utf-8'), '\n',
                   (d/'ui.js').read_text(encoding='utf-8'), (d/'tail.html').read_text(encoding='utf-8')])
 D64 = 'data:image/png;base64,' + (d/'icon64.txt').read_text().strip(); D180 = 'data:image/png;base64,' + (d/'icon180.txt').read_text().strip()
 offline = []; hit = 0

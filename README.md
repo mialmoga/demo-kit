@@ -838,3 +838,13 @@ Efecto por pista (entre compresor y delay). Toma la pista en mono y coloca la fu
 ### Espacio 3D · repartir voces
 
 Con **Voces** mayor que 1, la pista se renderiza en varias voces y cada una gira en su propio lugar de la órbita (desfasada 360°/voces). **Reparto**: «por altura en cada acorde» (la nota más grave va a la voz 1, etc.) o «alternando nota a nota». **Separación** (también automatizable, carril «separación de voces»): 1 = repartidas parejo, 0 = todas juntas en el mismo punto; automatizarla de 1 a 0 hace que las notas de un acorde rueden hasta sincronizarse. Notas: cada voz usa su propia pasada del instrumento, así que con separación 0 suena equivalente pero no idéntico a una sola voz (el azar interno del instrumento difiere); la escucha previa de la pista usa una sola voz, el render completo sí reparte.
+
+## 🎮 Control (palancas y gatillos)
+
+Botón **🎮 Control** (barra superior): panel flotante para asignar entradas de un control de Xbox (Gamepad API de Chrome; PC y teléfono) a los sliders visibles del panel de la pista seleccionada, instrumento o efectos (por ejemplo el Espacio 3D).
+
+- Cada asignación: botón modificador (X, Y, A, B, LB, RB o ninguno) + entrada (palanca izq./der. en ↔ o ↕, gatillos) → slider. Con modificador solo actúa mientras lo mantienes; las asignaciones «sin botón» actúan cuando no mantienes ninguno de los botones usados.
+- Modo **empuja** (la palanca mueve el valor y lo deja donde lo sueltes; velocidad ajustable) o **es el valor** (la palanca fija el valor mientras está fuera del centro). Casilla ⇅ invierte.
+- Los sliders se identifican por «grupo|etiqueta», así que una asignación sirve con cualquier instrumento que tenga ese slider. Mapeos guardables con nombre (navegador) y ejemplo del Espacio 3D.
+- La escucha previa suena al soltar (unos 0.35 s después del último movimiento). No graba movimientos todavía.
+- Si el control no aparece: presiona cualquier botón (Chrome no lo expone hasta que se toca). Probado con control simulado; la sensación real la afina quien lo usa.
