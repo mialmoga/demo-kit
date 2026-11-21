@@ -10,7 +10,7 @@ python3 tools/build/build_lib.py    # lib/demokit.js y lib/demokit.min.js (neces
 Funcionan desde cualquier carpeta. Con `DK_REPO=/otra/ruta` escriben ahí en vez de la raíz del repo. Solo hace falta Python 3 (y Node para la librería).
 
 ## sw.js: la versión ya no se sube a mano
-`build.py` reescribe únicamente la línea `const VERSION = '…'` de `sw.js` con `dk-` + un hash de `index.html` y de los archivos que el propio `sw.js` lista en `SHELL` (favicon, manifest, iconos). Si cambia el HTML o un icono, la versión cambia sola y la app instalada se actualiza. Si nada cambió, no toca el archivo. Si `sw.js` no tiene esa línea, la build se detiene con un error.
+`build.py` reescribe únicamente la línea `const VERSION = '…'` de `sw.js` con `dk-` + un hash de `index.html`, de los archivos que el propio `sw.js` lista en `SHELL` y de `plugins/**/*.js` (así un cambio solo en un plugin también sube la versión; desde el 21 nov). Si `sw.js` trae marcas de conflicto de git, el build se detiene sin tocar nada (favicon, manifest, iconos). Si cambia el HTML o un icono, la versión cambia sola y la app instalada se actualiza. Si nada cambió, no toca el archivo. Si `sw.js` no tiene esa línea, la build se detiene con un error.
 Ojo: si corres la build fuera del repo (sin los iconos al lado), avisa qué archivos del `SHELL` no encontró y la versión sale distinta de la que saldría en el repo. Es inofensivo (la app se actualiza una vez de más), pero conviene correrla en el repo.
 
 ## Qué hay aquí

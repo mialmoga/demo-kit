@@ -5,8 +5,9 @@ Uso (desde cualquier carpeta):   python3 tools/build/build.py
   Escribe en la raíz del repo (dos carpetas arriba de este archivo). Con DK_REPO=/otra/ruta escribe ahí.
    index.html            → en línea (iconos por archivo, manifest y service worker)
    demo_kit_studio.html  → sin conexión (iconos incrustados en base64, sin manifest ni SW)
-   sw.js                 → solo cambia la línea `const VERSION = '…'`: 'dk-' + hash de index.html y de los
-                           archivos que el propio sw.js precachea (SHELL). Así la app instalada se actualiza sola.
+   sw.js                 → solo cambia la línea `const VERSION = '…'`: 'dk-' + hash de index.html, de los
+                           archivos que el propio sw.js precachea (SHELL) y de plugins/**/*.js. Así la app
+                           instalada se actualiza sola (también cuando solo cambió un plugin).
 """
 import pathlib, os, re, hashlib
 
@@ -39,6 +40,7 @@ if not sw.exists():
     print('AVISO: no hay sw.js en', repo, '→ no se actualizó la versión del service worker')
 else:
     txt = sw.read_bytes().decode('utf-8')          # bytes: se conservan los saltos de línea del archivo
+    if re.search(r'^(<<<<<<<|=======|>>>>>>>)', txt, re.M): raise SystemExit("ERROR: sw.js tiene marcas de conflicto de git (<<<<<<< / ======= / >>>>>>>): resuélvelo y vuelve a correr — no se tocó nada")
     m = re.search(r"const VERSION = '([^']*)';", txt)
     if not m: raise SystemExit("ERROR: sw.js no tiene la línea  const VERSION = '…';  — no se tocó nada")
     shell = re.search(r"const SHELL = \[(.*?)\];", txt, re.S)
@@ -50,6 +52,10 @@ else:
         f = repo/n[2:]
         if f.is_file(): h.update(n.encode()+b'\0'); h.update(f.read_bytes())
         else: missing.append(n)
+    pl = repo/'plugins'                                    # los plugins no se precachean (se refrescan en segundo plano), pero un cambio en ellos también sube la versión
+    if pl.is_dir():
+        for f in sorted(pl.rglob('*.js')):
+            h.update(b'plugins/'+f.relative_to(pl).as_posix().encode()+b'\0'); h.update(f.read_bytes())
     ver = 'dk-' + h.hexdigest()[:8]
     if missing: print('AVISO: estos archivos del SHELL no están en', repo, '(no entran al hash):', ', '.join(missing))
     if m.group(1) != ver:

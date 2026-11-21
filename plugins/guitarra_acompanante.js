@@ -75,6 +75,24 @@ registerInstrument((() => {
     }
     return ev.length ? { per: Math.max(.25, pos), ev } : null;
   };
+  // revisa el texto del patrón y dice qué se ignora (lo usa el estudio bajo el campo, vía `check`); no cambia el sonido
+  const TOK = /^(@[a-z0-9_]+|B5|BS|[DUCSMXB]|[1-6]{1,6}|\.)([-+]*)([>~]?)$/i;
+  const checkPat = (p) => {
+    const txt = String((p && p.patronTxt) || ''); if (!txt.trim()) return null;
+    if (p.patron !== 'custom') return 'Este texto no se usa: elige «Personalizado (texto de abajo)» en el patrón.';
+    const bad = [], unk = []; let n = 0, far = false;
+    for (const part of txt.split(';')) for (const raw of part.split(/[\s|]+/)) {
+      if (!raw) continue; const m = TOK.exec(raw);
+      if (!m) { bad.push(raw); continue; }
+      if (m[1][0] === '@' && !PAT[m[1].slice(1).toLowerCase()]) unk.push(m[1]); n++;
+    }
+    const out = [];
+    if (bad.length) out.push('Se ignoran: ' + [...new Set(bad)].slice(0, 6).join('  ') + (bad.length > 6 ? ' …' : '') + '  (no son cuerdas 1–6, D U C S B B5 Bs M X, . ni @nombre).');
+    if (unk.length) out.push('No existe el patrón: ' + [...new Set(unk)].slice(0, 4).join('  ') + '.');
+    if (!n && !bad.length) out.push('El texto no tiene ningún elemento: se usa el patrón «Balada».');
+    else if (!n) out.push('Nada válido: se usa el patrón «Balada».');
+    return out.length ? out.join(' ') : null;
+  };
   Object.assign(PAT, {
     arpasc:   parsePat('6- 3- 2- 1- 2- 3- 2- 3-'),
     travis:   parsePat('6- 3- 4- 2- 5- 3- 4- 2-'),
@@ -151,7 +169,7 @@ registerInstrument((() => {
 
   const choice = (k, label, opts, vals, def) => ({ k, label, type: 'choice', opts, vals, def });
   return {
-    id: 'guitarra_acomp', name: 'Guitarra acompañante', version: '1.4', usesProg: true, kind: 'melodic', cat: 'acomp',
+    id: 'guitarra_acomp', name: 'Guitarra acompañante', version: '1.5', usesProg: true, kind: 'melodic', cat: 'acomp',
     desc: 'Una nota larga = un pasaje: la guitarra acompaña ese tiempo con un círculo de acordes y un patrón de rasgueo, tocado por un intérprete (Pedro Infante, Flamenco, Bossa, Ranchera, Lo-fi). La altura de la nota elige la tónica; el largo, cuánto acompaña. Con «Personalizado» escribes tu propio patrón: cuerdas 1–6 (6 = grave; «321» juntas), D U C S B B5 Bs M X, . silencio, - mitad, + doble, @nombre y «;» para uno distinto por acorde.',
     params: [
       { k: 'gain', label: 'Ganancia', min: 0, max: 1.5, step: .01, def: .5 },
@@ -159,7 +177,7 @@ registerInstrument((() => {
       choice('circulo', 'Círculo de acordes', ['Lo-fi romántico (I–vi–ii–V)', 'Jazz 2-5-1', 'Bossa (I–#i°–ii–V)', 'Andaluza (i–VII–VI–V)', 'Menor (i–VI–III–VII)', 'Pop (I–V–vi–IV)', 'Ranchera (I–IV–V–I)', 'Círculo de quintas', 'Del proyecto (la progresión de la pestaña Acordes)'], ['lofi', 'jazz', 'bossa', 'andaluza', 'menor', 'pop', 'ranchera', 'quintas', 'proyecto'], 'lofi'),
       choice('ext', 'Acordes', ['Tríadas', 'Séptimas', 'Novenas'], [0, 1, 2], 1),
       choice('patron', 'Patrón de la mano derecha', ['Abajo (negras)', 'Balada', 'Ida y vuelta', 'Arpegio', 'Bossa', 'Ranchera', 'Vals (3 pulsos)', 'Flamenco', 'Bossa (clave de 2 compases)', 'Ranchera (chuntata, con muteo)', 'Balada (con golpe en la tapa)', 'Arpegio ascendente', 'Travis (pulgar alternado)', 'Arpegio de vals (3 pulsos)', 'Balada pop arpegiada', 'Clásico (p-i-m-a)', 'Personalizado (texto de abajo)'], ['abajo', 'balada', 'idavuelta', 'arpegio', 'bossa', 'ranchera', 'vals', 'flamenco', 'bossaclave', 'ranchachk', 'baladaperc', 'arpasc', 'travis', 'arpvals', 'arppop', 'arpclas', 'custom'], 'balada'),
-      { k: 'patronTxt', label: 'Patrón escrito (varios con «;», uno por acorde)', type: 'text', def: '' },
+      { k: 'patronTxt', label: 'Patrón escrito (varios con «;», uno por acorde)', type: 'text', def: '', check: checkPat },
       { k: 'retardo', label: 'Retardo del cambio de acorde (pulsos; − anticipa)', min: -1, max: 1, step: .05, def: 0 },
       { k: 'muteo', label: 'Muteo y golpes (cuánto pesan)', min: 0, max: 1.5, step: .05, def: 1 },
       { k: 'pulsos', label: 'Pulsos por acorde', min: 1, max: 16, step: 1, def: 4 },

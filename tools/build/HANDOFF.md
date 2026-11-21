@@ -1,3 +1,30 @@
+# Actualización 2026-11-19 (léela primero)
+Esta sección va por delante de las anteriores (siguen abajo y son válidas en lo demás). La lista de trabajo es `PENDIENTES.md` (también en el Project de Claude).
+
+## Estado de los archivos
+- **`tools/build/src/` y el repo son pares exactos**: con estas fuentes, `build.py` reproduce `index.html` byte a byte (verificado el 19 nov antes de tocar nada). Los archivos del zip llevan la fecha en que se empaquetó, pero son los actuales.
+- **El README ya no lo edita Brujo a mano**: lo mantiene Ámbar (al día hasta el 18 nov). Aun así, parte de la última versión que él adjunte. Siguen siendo suyos `ejemplo/libreria.html`, su piel de cristal y los iconos.
+- `test_evol.js` vive en `tools/build/tests/` (ya no hay copias en `bootleg/` ni `experiments/`).
+- Brujo suele pasar al hilo nuevo: `PENDIENTES.md`, `tools_build.zip` y el `README.md`; y los archivos del repo que vayas a tocar (`index.html`, el plugin…).
+
+## Hecho el 19 nov
+- **REFERENCIA.md**: §10 «Plugins: campos y ganchos» (`cat:'acomp'`, `version`, `sec`, `on`, `lane`, `check`, `presetReset`, `laneNames`, `midiLane`, `midiNote`, `mono`/`monoWhen`, `usesProg`, `n.link`, `n.chords`) y §11 «Cómo pedirle a tu IA un plugin o un kit» (dos prompts de ejemplo). El antiguo §10 pasó a §12. Ruta de la prueba: `node tools/build/tests/test_evol.js tu_kit.js demo_kit.js`. (REFERENCIA.md vive en `kits/` del repo.)
+- **Gancho nuevo `check(params)` en parámetros de texto** (`ui.js` + CSS `.pwarn` en `head.html`): devuelve un aviso o `null`; se muestra en rojo bajo el campo, mientras se escribe. Solo avisa.
+- **Guitarra v1.5** (`plugins/guitarra_acompanante.js`): usa `check` para decir qué elementos del patrón escrito se ignoran, qué `@nombre` no existe, o que el texto no se usa si el patrón no es «Personalizado». No toca `play()`: el sonido es idéntico a v1.4.
+- **Voicing por vuelta** (`progToNotes` en `engine.js`): opción `cycle` (por defecto `false` = igual que antes). Con ella, cada vuelta de la progresión parte de `center`, así las vueltas suenan igual en vez de derivar. En la interfaz: casilla «reiniciar cada vuelta» (`#cCyc`, activada por defecto, se recuerda en `localStorage['dk_voicing_cyc']`).
+- Prueba: `tests/t_aviso_voicing.py <carpeta con index.html> <plugin>`.
+
+## 21 nov
+- **`lib/` regenerada** (`build_lib.py`, v1.5.0 sin cambio de versión: `cycle` viene apagado por defecto; se comprobó que `demokit.js` y `.min.js` cargan y exponen `DemoKit` 1.5.0).
+- **`build.py` y `sw.js`**: la versión ahora también hashea `plugins/**/*.js`; y se detiene con un error claro si `sw.js` tiene marcas de conflicto de git (a Brujo le quedó así tras un `git stash pop`: los dos lados solo diferían en `VERSION`; se entrega un `sw.js` limpio y `build.py` lo recalcula).
+
+## Pendiente de esta entrega (lo hace Brujo o el siguiente hilo)
+- Correr `python3 tools/build/build.py` **dentro del repo** (así sube solo el `VERSION` de `sw.js`) y `python3 tools/build/build_lib.py`: `progToNotes` también está en `lib/` (el cambio solo añade una opción) y la lib no se regeneró (necesita `npx terser`).
+- Sin oír: guitarra v1.5 (el sonido no cambió por construcción). Sin probar en teléfono: la casilla y el aviso.
+- Siguiente acordado: #27 prueba de humo de un solo comando.
+
+---
+
 # Actualización 2026-11-07 (tarde) · nueva ubicación de la build
 Las fuentes y los scripts viven ahora en el repo: **`tools/build/`** (ver `LEEME.md` ahí). Uso: `python3 tools/build/build.py` y `python3 tools/build/build_lib.py`; escriben en la raíz del repo (o en `$DK_REPO`). `build.py` también reescribe `const VERSION` de `sw.js` con un hash (ya no se sube a mano). Donde este documento diga `python3 build.py` o `out/`, léase esto. **Kit `ultimate` 1.0.0** (`kits/bootleg/demo-kit-ultimate.js`) = Evol + extras opcionales + presets `pro`/`ultra` (caracteres); sustituye a Pro, Ultra, Fidelity y Ultimate v1–v3.1 (ver `PENDIENTES.md`, punto 3). El panel «En el repositorio» ya no mira `proyectos/` (solo `projects/` y `project_examples/`). La librería se reconstruyó como v1.5.0 (el `lib/` del repo estaba atrasado; ver `PENDIENTES.md`, punto 25).
 

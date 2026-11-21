@@ -673,7 +673,9 @@ function renderInspector(){
   for(const d of inst.params){
     if(d.type==='choice'){ const vals=d.vals||d.opts.map((_,i)=>i); const s=el('select',{onchange:e=>{ tr.params[d.k]=vals[+e.target.value]; if(d.lane!=null) pvLane=d.lane; touch(); upd(); if(inst.laneNames){ draw(); buildOsk(); } previewTrack(); }},...d.opts.map((o,i)=>el('option',{value:i,text:o}))); s.value=Math.max(0,vals.indexOf(tr.params[d.k]));
       put(d,el('div',{class:'row'},el('label',{text:d.label,title:d.label}),s)); }
-    else if(d.type==='text'){ put(d,el('div',{class:'row'},el('label',{text:d.label}),el('input',{type:'text',value:tr.params[d.k]==null?'':tr.params[d.k],onchange:e=>{ tr.params[d.k]=e.target.value; touch(); previewTrack(); }}))); }
+    else if(d.type==='text'){ const warn=el('div',{class:'pwarn'});   // d.check(params) → texto de aviso o null: se muestra bajo el campo (sin bloquear nada)
+      const chk=v=>{ let w=null; if(typeof d.check==='function'){ try{ w=d.check(v==null?tr.params:Object.assign({},tr.params,{[d.k]:v})); }catch(e){} } warn.textContent=w||''; }; chk();
+      put(d,el('div',{class:'row'},el('label',{text:d.label}),el('input',{type:'text',value:tr.params[d.k]==null?'':tr.params[d.k],oninput:e=>{ chk(e.target.value); },onchange:e=>{ tr.params[d.k]=e.target.value; chk(); touch(); previewTrack(); }}),warn)); }
     else put(d,sliderRow(d.label,()=>tr.params[d.k],v=>{ tr.params[d.k]=v; if(d.lane!=null) pvLane=d.lane; touch(); upd(); },d.min,d.max,d.step,d.def));
   }
   if(useSec) groups.forEach((g,gi)=>{ const key=inst.id+'|'+g.name, det=el('details',{class:'psec'},el('summary',{},g.name,g.cnt),...g.rows); det.open=key in openMap?openMap[key]:gi===0; det.addEventListener('toggle',()=>{ openMap[key]=det.open; }); pk.push(det); });
@@ -875,9 +877,10 @@ function refreshChordInfo(){
   const t=(P.prog&&P.prog.text)||''; if(document.activeElement!==$('cText')) $('cText').value=t;
   const r=progChords(P); let msg; if(!t.trim()) msg='escribe una progresión para verla aquí'; else if(r.errors.length) msg='⚠ '+r.errors.slice(0,3).map(e=>e.msg).join(' · ')+(r.errors.length>3?' · …':''); else msg=r.cycleBars+(r.cycleBars>1?' compases':' compás')+(r.cycleBars<P.bars?' · se repite cada '+r.cycleBars+' hasta el compás '+P.bars:'')+(r.cycleBars>P.bars?' · el proyecto solo tiene '+P.bars+' compases: se corta':'');
   $('cInfo').textContent=msg; $('cGen').disabled=!r.chords.some(c=>c.ok); $('cInfo').style.color=r.errors.length?'#ff9aa6':''; }
-{ const sv=$('cVoic'); for(const [v,n] of VOICINGS) sv.append(el('option',{value:v,text:n})); try{ const s=localStorage.getItem('dk_voicing'); if(s&&VOICINGS.some(x=>x[0]===s)) sv.value=s; }catch(e){} sv.onchange=()=>{ try{ localStorage.setItem('dk_voicing',sv.value); }catch(e){} }; }
+{ const sv=$('cVoic'); for(const [v,n] of VOICINGS) sv.append(el('option',{value:v,text:n})); try{ const s=localStorage.getItem('dk_voicing'); if(s&&VOICINGS.some(x=>x[0]===s)) sv.value=s; }catch(e){} sv.onchange=()=>{ try{ localStorage.setItem('dk_voicing',sv.value); }catch(e){} };
+  const cc=$('cCyc'); try{ if(localStorage.getItem('dk_voicing_cyc')==='0') cc.checked=false; }catch(e){} cc.onchange=()=>{ try{ localStorage.setItem('dk_voicing_cyc',cc.checked?'1':'0'); }catch(e){} }; }
 $('cGen').onclick=()=>{
-  const r=progToNotes(P,{voicing:$('cVoic').value,noRoot:$('cBass').checked&&$('cVoic').value==='amplio'}); if(!r.chords.length){ toast('Escribe primero una progresión con acordes válidos','err'); return; }
+  const r=progToNotes(P,{voicing:$('cVoic').value,cycle:$('cCyc').checked,noRoot:$('cBass').checked&&$('cVoic').value==='amplio'}); if(!r.chords.length){ toast('Escribe primero una progresión con acordes válidos','err'); return; }
   pushUndo(); const mk=(inst,name,notes)=>{ const t=newTrack(inst,name); const base=t.name; let k=1; while(P.tracks.some(x=>x.name===t.name)) t.name=base+' '+(++k); t.notes=notes; P.tracks.push(t); return t; };
   const tc=mk('pad','Acordes (progresión)',r.chords.flatMap(c=>c.ms.map(m=>({b:c.b,l:c.l,m,v:.8})))); let nb=0;
   if($('cBass').checked){ mk('subfall','Bajo (progresión)',r.bass.map(x=>({b:x.b,l:x.l,m:x.m,v:.9}))); nb=r.bass.length; }

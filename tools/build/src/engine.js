@@ -327,8 +327,9 @@ function voiceChord(c,prev,mode,noRoot){
   return {ms,mean:mc};
 }
 function progToNotes(P,opts){
-  const L=progChords(P).chords.filter(c=>c.ok), o=Object.assign({center:62,gap:.02,voicing:'suave',noRoot:false},opts||{}), out={chords:[],bass:[]}; let prev=o.center;
+  const L=progChords(P).chords.filter(c=>c.ok), o=Object.assign({center:62,gap:.02,voicing:'suave',noRoot:false},opts||{}), out={chords:[],bass:[]}; let prev=o.center, lastCyc=null;   // o.cycle: al empezar cada vuelta de la progresión la conducción de voces vuelve a partir de `center` (así todas las vueltas suenan igual)
   for(const c of L){
+    if(o.cycle&&c.cyc!==lastCyc){ if(lastCyc!==null) prev=o.center; lastCyc=c.cyc; }
     const v=voiceChord(c,o.voicing==='fijo'?o.center:prev,o.voicing,o.noRoot); prev=v.mean; const len=Math.max(.05,c.b1-c.b0-o.gap);
     out.chords.push({b:r6(c.b0),l:r6(len),ms:v.ms});
     const bp=c.bass!=null?c.bass:c.root; out.bass.push({b:r6(c.b0),l:r6(len),m:36+(((bp-36)%12)+12)%12}); }
